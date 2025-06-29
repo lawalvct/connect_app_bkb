@@ -1,0 +1,164 @@
+# Laravel specific
+/node_modules
+/public/hot
+/public/storage
+/storage/*.key
+/vendor
+.env
+.env.backup
+.env.production
+.phpunit.result.cache
+Homestead.json
+Homestead.yaml
+auth.json
+npm-debug.log
+yarn-error.log
+/.fleet
+/.idea
+/.vscode
+
+# Laravel Mix
+/public/css
+/public/js
+/public/mix-manifest.json
+
+# PHPUnit
+.phpunit.result.cache
+
+# Composer
+composer.phar
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Application specific
+/public/uploads
+/public/images
+/public/files
+
+# Log files
+*.log
+/storage/logs/*
+!/storage/logs/.gitkeep
+
+# Cache files
+.phpstorm.meta.php
+_ide_helper.php
+_ide_helper_models.php
+.phpstorm.meta.php
+
+# Credentials and secrets
+*.pem
+*.key
+*.crt
+*.cert
+*.p12
+*.pfx
+*.csr
+*.der
+*.keystore
+*.jks
+*.p7b
+*.p7c
+*.p7s
+*.spc
+*.stl
+*.pkcs12
+*.pkcs7
+*.pkcs8
+*.pkcs10
+*.pem
+*.key
+*.crt
+*.cert
+*.p12
+*.pfx
+*.csr
+*.der
+*.keystore
+*.jks
+*.p7b
+*.p7c
+*.p7s
+*.spc
+*.stl
+*.pkcs12
+*.pkcs7
+*.pkcs8
+*.pkcs10
+
+# AWS specific
+.aws/
+aws.json
+aws-config.json
+aws-credentials.json
+aws.yml
+aws-config.yml
+aws-credentials.yml
+
+# Stripe specific
+stripe.json
+stripe-config.json
+stripe-credentials.json
+stripe.yml
+stripe-config.yml
+stripe-credentials.yml
+
+# Database dumps
+*.sql
+*.sqlite
+*.sqlite3
+*.db
+
+# Backup files
+*.bak
+*.backup
+*.old
+*.orig
+*.swp
+*.swo
+
+# Build files
+/build
+/dist
+/public/build
+
+# Dependency directories
+/bower_components
+
+# Temporary files
+/tmp
+/temp
+
+# Coverage reports
+/coverage
+
+# Compiled files
+*.com
+*.class
+*.dll
+*.exe
+*.o
+*.so
+
+# Compressed files
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# Logs and databases
+*.log
+*.sqlite
+
+# Local configuration files
+config.local.php
+database.local.php
+mail.local.php
+
+
