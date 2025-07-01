@@ -16,6 +16,8 @@ use App\Http\Controllers\API\V1\SubscriptionController;
 use App\Http\Controllers\API\V1\MessageController;
 use App\Http\Controllers\API\V1\ConversationController;
 use App\Http\Controllers\API\V1\ProfileController;
+use App\Http\Controllers\API\V1\AdController;
+use App\Http\Controllers\API\V1\AdminAdController;
 
 Route::middleware('auth:api')->get('/user', function (Request $request) {
     return $request->user();
@@ -231,6 +233,54 @@ Route::prefix('discover')->group(function () {
         Route::get('{call}/participants', [CallController::class, 'getCallParticipants']);
         Route::post('{call}/participants/{user}/kick', [CallController::class, 'kickParticipant']);
     });
+
+
+
+
+    // User Advertising Routes
+    Route::prefix('ads')->group(function () {
+        // Dashboard and listing
+        Route::get('/dashboard', [AdController::class, 'dashboard']);
+        Route::get('/', [AdController::class, 'index']);
+        Route::get('/export', [AdController::class, 'export']);
+
+        // CRUD operations
+        Route::post('/', [AdController::class, 'store']);
+        Route::get('/{id}', [AdController::class, 'show']);
+        Route::put('/{id}', [AdController::class, 'update']);
+        Route::delete('/{id}', [AdController::class, 'destroy']);
+
+        // Ad management actions
+        Route::post('/{id}/pause', [AdController::class, 'pause']);
+        Route::post('/{id}/resume', [AdController::class, 'resume']);
+        Route::post('/{id}/stop', [AdController::class, 'stop']);
+
+        // Analytics and preview
+        Route::get('/{id}/preview', [AdController::class, 'preview']);
+        Route::get('/{id}/analytics', [AdController::class, 'analytics']);
+    });
+
+    // Admin Advertising Routes (Add role-based middleware as needed)
+    Route::prefix('admin/ads')->group(function () {
+        Route::get('/', [AdminAdController::class, 'index']);
+        Route::get('/dashboard', [AdminAdController::class, 'dashboard']);
+        Route::post('/{id}/approve', [AdminAdController::class, 'approve']);
+        Route::post('/{id}/reject', [AdminAdController::class, 'reject']);
+    });
+
+       // uncomment later for admin role base
+    //    Route::prefix('admin/ads')->middleware(['role:admin'])->group(function () {
+    //     Route::get('/', [AdminAdController::class, 'index']);
+    //     Route::get('/dashboard', [AdminAdController::class, 'dashboard']);
+    //     Route::post('/{id}/approve', [AdminAdController::class, 'approve']);
+    //     Route::post('/{id}/reject', [AdminAdController::class, 'reject']);
+    // });
+
+});
+
+
+
+
 
     // Test service - Remove this in production
     Route::get('test-agora', function () {
