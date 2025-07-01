@@ -20,6 +20,8 @@ class CreateAdRequest extends FormRequest
             'media_files.*' => 'nullable|file|mimes:jpg,jpeg,png,gif,mp4,mov,avi|max:50000',
             'call_to_action' => 'nullable|string|max:100',
             'destination_url' => 'nullable|url',
+            'ad_placement' => 'required|array|min:1', // At least one social circle required
+            'ad_placement.*' => 'integer|exists:social_circles,id', // Each must be valid social circle ID
             'start_date' => 'required|date|after_or_equal:today',
             'end_date' => 'required|date|after:start_date',
             'budget' => 'required|numeric|min:10|max:100000',
@@ -45,6 +47,11 @@ class CreateAdRequest extends FormRequest
             'media_files.*.file' => 'Each media file must be a valid file.',
             'media_files.*.mimes' => 'Media files must be of type: jpg, jpeg, png, gif, mp4, mov, avi.',
             'media_files.*.max' => 'Each media file must not exceed 50MB.',
+            'ad_placement.required' => 'Please select at least one social circle for ad placement.',
+            'ad_placement.array' => 'Ad placement must be an array of social circle IDs.',
+            'ad_placement.min' => 'Please select at least one social circle for ad placement.',
+            'ad_placement.*.integer' => 'Each ad placement must be a valid social circle ID.',
+            'ad_placement.*.exists' => 'Selected social circle does not exist.',
             'start_date.required' => 'Start date is required.',
             'start_date.after_or_equal' => 'Start date must be today or later.',
             'end_date.required' => 'End date is required.',

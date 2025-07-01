@@ -30,6 +30,7 @@ class AdController extends BaseController
      *     summary="Get advertising dashboard data",
      *     tags={"Advertising"},
      *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="period", in="query", @OA\Schema(type="string", enum={"today", "week", "month", "all"})),
      *     @OA\Response(response=200, description="Dashboard data retrieved successfully")
      * )
      */
@@ -37,52 +38,78 @@ class AdController extends BaseController
     {
         try {
             $user = $request->user();
+            $period = $request->input('period', 'month');
 
-            // Get user's ads statistics
-            $totalAds = Ad::byUser($user->id)->notDeleted()->count();
-            $activeAds = Ad::byUser($user->id)->where('status', 'active')->count();
-            $pausedAds = Ad::byUser($user->id)->where('status', 'paused')->count();
-            $pendingAds = Ad::byUser($user->id)->where('admin_status', 'pending')->count();
+            // Define date range based on period
+            $dateFrom = match($period) {
+                'today' => now()->startOfDay(),
+                'week' => now()->startOfWeek(),
+                'month' => now()->startOfMonth(),
+                default => null
+            };
 
-            // Get performance metrics
-            $totalImpressions = Ad::byUser($user->id)->sum('current_impressions');
-            $totalClicks = Ad::byUser($user->id)->sum('clicks');
-            $totalSpent = Ad::byUser($user->id)->sum('total_spent');
-            $totalBudget = Ad::byUser($user->id)->sum('budget');
+            $query = Ad::where('user_id', $user->id)->where('deleted_flag', 'N');
 
-            // Calculate CTR
-            $overallCtr = $totalImpressions > 0 ? round(($totalClicks / $totalImpressions) * 100, 2) : 0;
+            if ($dateFrom) {
+                $query->where('created_at', '>=', $dateFrom);
+            }
+
+            // Get summary statistics
+            $stats = $query->selectRaw('
+                COUNT(*) as total_ads,
+                COUNT(CASE WHEN status = "active" THEN 1 END) as active_ads,
+                COUNT(CASE WHEN status = "pending_review" THEN 1 END) as pending_ads,
+                COUNT(CASE WHEN admin_status = "rejected" THEN 1 END) as rejected_ads,
+                SUM(current_impressions) as total_impressions,
+                SUM(clicks) as total_clicks,
+                SUM(conversions) as total_conversions,
+                SUM(total_spent) as total_spent,
+                SUM(budget) as total_budget,
+                AVG(CASE WHEN current_impressions > 0 THEN (clicks / current_impressions) * 100 ELSE 0 END) as avg_ctr
+            ')->first();
 
             // Get recent ads
-            $recentAds = Ad::byUser($user->id)
-                ->notDeleted()
-                ->with(['user'])
-                ->latest()
+            $recentAds = $query->with(['placementSocialCircles'])
+                ->orderBy('created_at', 'desc')
                 ->limit(5)
                 ->get();
 
-            // Get ads by status for chart
-            $adsByStatus = Ad::byUser($user->id)
-                ->notDeleted()
-                ->selectRaw('status, count(*) as count')
-                ->groupBy('status')
-                ->pluck('count', 'status');
+            // Get performance by social circle
+            $socialCirclePerformance = [];
+            $userSocialCircles = $user->socialCircles;
+
+            foreach ($userSocialCircles as $circle) {
+                $circleStats = AdHelper::getAdPerformanceBySocialCircle($circle->id, $dateFrom);
+                if ($circleStats->total_ads > 0) {
+                    $socialCirclePerformance[] = [
+                        'social_circle' => [
+                            'id' => $circle->id,
+                            'name' => $circle->name,
+                            'color' => $circle->color
+                        ],
+                        'stats' => $circleStats
+                    ];
+                }
+            }
 
             return $this->sendResponse('Dashboard data retrieved successfully', [
                 'summary' => [
-                    'total_ads' => $totalAds,
-                    'active_ads' => $activeAds,
-                    'paused_ads' => $pausedAds,
-                    'pending_ads' => $pendingAds,
-                    'total_impressions' => $totalImpressions,
-                    'total_clicks' => $totalClicks,
-                    'total_spent' => $totalSpent,
-                    'total_budget' => $totalBudget,
-                    'overall_ctr' => $overallCtr,
-                    'budget_utilization' => $totalBudget > 0 ? round(($totalSpent / $totalBudget) * 100, 2) : 0
+                    'total_ads' => (int) $stats->total_ads,
+                    'active_ads' => (int) $stats->active_ads,
+                    'pending_ads' => (int) $stats->pending_ads,
+                    'rejected_ads' => (int) $stats->rejected_ads,
+                    'total_impressions' => (int) $stats->total_impressions,
+                    'total_clicks' => (int) $stats->total_clicks,
+                    'total_conversions' => (int) $stats->total_conversions,
+                    'total_spent' => (float) $stats->total_spent,
+                    'total_budget' => (float) $stats->total_budget,
+                    'avg_ctr' => round((float) $stats->avg_ctr, 2),
+                    'budget_utilization' => $stats->total_budget > 0 ?
+                        round((($stats->total_spent / $stats->total_budget) * 100), 2) : 0
                 ],
-                'recent_ads' => $recentAds,
-                'ads_by_status' => $adsByStatus
+                'recent_ads' => AdResource::collection($recentAds),
+                'social_circle_performance' => $socialCirclePerformance,
+                'period' => $period
             ]);
 
         } catch (\Exception $e) {
@@ -217,6 +244,12 @@ class AdController extends BaseController
                 }
             }
 
+            // Validate selected social circles exist and user has access to them
+            $selectedSocialCircles = SocialCircle::whereIn('id', $data['ad_placement'])->pluck('id')->toArray();
+            if (count($selectedSocialCircles) !== count($data['ad_placement'])) {
+                return $this->sendError('One or more selected social circles are invalid', null, 400);
+            }
+
             $adData = [
                 'user_id' => $user->id,
                 'ad_name' => $data['ad_name'],
@@ -225,6 +258,7 @@ class AdController extends BaseController
                 'media_files' => !empty($mediaFiles) ? $mediaFiles : null,
                 'call_to_action' => $data['call_to_action'] ?? null,
                 'destination_url' => $data['destination_url'] ?? null,
+                'ad_placement' => $data['ad_placement'], // Store social circle IDs
                 'start_date' => $data['start_date'],
                 'end_date' => $data['end_date'],
                 'budget' => $data['budget'],
@@ -242,10 +276,13 @@ class AdController extends BaseController
 
             $ad = Ad::create($adData);
 
+            // Load the ad with social circles for response
+            $ad->load(['user', 'placementSocialCircles']);
+
             // Send notification to admins for review
             // event(new AdCreatedEvent($ad));
 
-            return $this->sendResponse('Advertisement created successfully and sent for review', new AdResource($ad->load('user')), 201);
+            return $this->sendResponse('Advertisement created successfully and sent for review', new AdResource($ad), 201);
 
         } catch (\Exception $e) {
             return $this->sendError('Failed to create advertisement: ' . $e->getMessage(), null, 500);
@@ -851,5 +888,131 @@ class AdController extends BaseController
                    ];
                }
            }, $filename);
+       }
+
+       /**
+        * @OA\Post(
+        *     path="/api/v1/ads/tracking/{id}/impression",
+        *     summary="Record ad impression",
+        *     tags={"Advertising"},
+        *     security={{"bearerAuth":{}}},
+        *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
+        *     @OA\Response(response=200, description="Impression recorded successfully")
+        * )
+        */
+       public function recordImpression(Request $request, $id)
+       {
+           try {
+               $user = $request->user();
+               $success = AdHelper::recordImpression($id, $user->id);
+
+               if (!$success) {
+                   return $this->sendError('Failed to record impression', null, 404);
+               }
+
+               return $this->sendResponse('Impression recorded successfully');
+
+           } catch (\Exception $e) {
+               return $this->sendError('Failed to record impression: ' . $e->getMessage(), null, 500);
+           }
+       }
+
+       /**
+        * @OA\Post(
+        *     path="/api/v1/ads/tracking/{id}/click",
+        *     summary="Record ad click",
+        *     tags={"Advertising"},
+        *     security={{"bearerAuth":{}}},
+        *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
+        *     @OA\Response(response=200, description="Click recorded successfully")
+        * )
+        */
+       public function recordClick(Request $request, $id)
+       {
+           try {
+               $user = $request->user();
+               $success = AdHelper::recordClick($id, $user->id);
+
+               if (!$success) {
+                   return $this->sendError('Failed to record click', null, 404);
+               }
+
+               return $this->sendResponse('Click recorded successfully');
+
+           } catch (\Exception $e) {
+               return $this->sendError('Failed to record click: ' . $e->getMessage(), null, 500);
+           }
+       }
+
+       /**
+        * @OA\Get(
+        *     path="/api/v1/social-circles/{id}/ads",
+        *     summary="Get ads for specific social circle",
+        *     tags={"Advertising"},
+        *     security={{"bearerAuth":{}}},
+        *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
+        *     @OA\Parameter(name="limit", in="query", @OA\Schema(type="integer", default=3)),
+        *     @OA\Response(response=200, description="Ads retrieved successfully")
+        * )
+        */
+       public function getAdsForSocialCircle(Request $request, $socialCircleId)
+       {
+           try {
+               $limit = $request->query('limit', 3);
+               $ads = AdHelper::getAdsForSocialCircle($socialCircleId, $limit);
+
+               return $this->sendResponse('Ads retrieved successfully', [
+                   'ads' => AdResource::collection($ads),
+                   'total' => $ads->count()
+               ]);
+
+           } catch (\Exception $e) {
+               return $this->sendError('Failed to retrieve ads: ' . $e->getMessage(), null, 500);
+           }
+       }
+
+       /**
+        * @OA\Post(
+        *     path="/api/v1/ads/for-circles",
+        *     summary="Get ads for multiple social circles",
+        *     tags={"Advertising"},
+        *     security={{"bearerAuth":{}}},
+        *     @OA\RequestBody(
+        *         required=true,
+        *         @OA\JsonContent(
+        *             @OA\Property(property="social_circle_ids", type="array", @OA\Items(type="integer")),
+        *             @OA\Property(property="limit", type="integer", default=5)
+        *         )
+        *     ),
+        *     @OA\Response(response=200, description="Ads retrieved successfully")
+        * )
+        */
+       public function getAdsForSocialCircles(Request $request)
+       {
+           try {
+               $validator = Validator::make($request->all(), [
+                   'social_circle_ids' => 'required|array',
+                   'social_circle_ids.*' => 'integer|exists:social_circles,id',
+                   'limit' => 'nullable|integer|min:1|max:20'
+               ]);
+
+               if ($validator->fails()) {
+                   return $this->sendError('Validation Error', $validator->errors(), 422);
+               }
+
+               $socialCircleIds = $request->input('social_circle_ids');
+               $limit = $request->input('limit', 5);
+
+               $ads = AdHelper::getAdsForSocialCircles($socialCircleIds, $limit);
+
+               return $this->sendResponse('Ads retrieved successfully', [
+                   'ads' => AdResource::collection($ads),
+                   'total' => $ads->count(),
+                   'social_circles' => $socialCircleIds
+               ]);
+
+           } catch (\Exception $e) {
+               return $this->sendError('Failed to retrieve ads: ' . $e->getMessage(), null, 500);
+           }
        }
    }

@@ -17,6 +17,7 @@ return new class extends Migration
             $table->json('media_files')->nullable(); // Store multiple images/videos
             $table->string('call_to_action')->nullable();
             $table->string('destination_url')->nullable();
+            $table->json('ad_placement')->nullable(); // Social circles where ad should appear
             $table->date('start_date');
             $table->date('end_date');
             $table->json('target_audience')->nullable(); // Age, gender, location, interests
@@ -49,6 +50,7 @@ return new class extends Migration
             $table->index(['user_id', 'status']);
             $table->index(['start_date', 'end_date']);
             $table->index('admin_status');
+            $table->index('ad_placement'); // Index for JSON column
         });
     }
 

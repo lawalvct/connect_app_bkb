@@ -16,6 +16,22 @@ class AdResource extends JsonResource
             'media_files' => $this->media_files,
             'call_to_action' => $this->call_to_action,
             'destination_url' => $this->destination_url,
+            'ad_placement' => $this->ad_placement, // Social circle IDs
+            'placement_social_circles' => $this->when(
+                $this->relationLoaded('placementSocialCircles') || !empty($this->ad_placement),
+                function () {
+                    // Get social circles by IDs if not loaded as relationship
+                    $socialCircles = $this->placement_social_circles ?? collect();
+                    return $socialCircles->map(function ($circle) {
+                        return [
+                            'id' => $circle->id,
+                            'name' => $circle->name,
+                            'color' => $circle->color,
+                            'icon' => $circle->icon,
+                        ];
+                    });
+                }
+            ),
             'start_date' => $this->start_date->format('Y-m-d'),
             'end_date' => $this->end_date->format('Y-m-d'),
             'target_audience' => $this->target_audience,

@@ -128,4 +128,148 @@ class AdHelper
                      return $ad->ctr < $ctrThreshold;
                  });
     }
+
+    /**
+     * Get active ads for specific social circles
+     */
+    public static function getAdsForSocialCircles($socialCircleIds, $limit = 5)
+    {
+        if (empty($socialCircleIds)) {
+            return collect();
+        }
+
+        return Ad::where('status', 'active')
+            ->where('admin_status', 'approved')
+            ->where('start_date', '<=', now())
+            ->where('end_date', '>=', now())
+            ->where('deleted_flag', 'N')
+            ->where(function ($query) use ($socialCircleIds) {
+                foreach ($socialCircleIds as $socialCircleId) {
+                    $query->orWhereJsonContains('ad_placement', $socialCircleId);
+                }
+            })
+            ->with(['user', 'placementSocialCircles'])
+            ->inRandomOrder() // Randomize ad display
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
+     * Get ads for a single social circle
+     */
+    public static function getAdsForSocialCircle($socialCircleId, $limit = 3)
+    {
+        return self::getAdsForSocialCircles([$socialCircleId], $limit);
+    }
+
+    /**
+     * Record ad impression
+     */
+    public static function recordImpression($adId, $userId = null)
+    {
+        try {
+            $ad = Ad::find($adId);
+            if (!$ad) {
+                return false;
+            }
+
+            // Increment impression count
+            $ad->increment('current_impressions');
+
+            // You can also log detailed impression data in a separate table
+            // AdImpression::create([
+            //     'ad_id' => $adId,
+            //     'user_id' => $userId,
+            //     'ip_address' => request()->ip(),
+            //     'user_agent' => request()->header('User-Agent'),
+            //     'created_at' => now()
+            // ]);
+
+            return true;
+        } catch (\Exception $e) {
+            \Log::error('Failed to record ad impression: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Record ad click
+     */
+    public static function recordClick($adId, $userId = null)
+    {
+        try {
+            $ad = Ad::find($adId);
+            if (!$ad) {
+                return false;
+            }
+
+            // Increment click count
+            $ad->increment('clicks');
+
+            // Update cost per click and total spent (simplified calculation)
+            if ($ad->clicks > 0 && $ad->current_impressions > 0) {
+                $ctr = ($ad->clicks / $ad->current_impressions) * 100;
+                $estimatedCostPerClick = ($ad->budget / $ad->target_impressions) * ($ctr / 100);
+                $totalSpent = $ad->clicks * $estimatedCostPerClick;
+
+                $ad->update([
+                    'cost_per_click' => $estimatedCostPerClick,
+                    'total_spent' => min($totalSpent, $ad->budget) // Don't exceed budget
+                ]);
+            }
+
+            // You can also log detailed click data
+            // AdClick::create([
+            //     'ad_id' => $adId,
+            //     'user_id' => $userId,
+            //     'ip_address' => request()->ip(),
+            //     'user_agent' => request()->header('User-Agent'),
+            //     'created_at' => now()
+            // ]);
+
+            return true;
+        } catch (\Exception $e) {
+            \Log::error('Failed to record ad click: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Check if user can see ads from specific social circles
+     */
+    public static function getUserVisibleAds($userId, $socialCircleIds, $limit = 5)
+    {
+        // Get user's social circles if not provided
+        if (empty($socialCircleIds)) {
+            $user = \App\Models\User::with('socialCircles')->find($userId);
+            $socialCircleIds = $user ? $user->socialCircles->pluck('id')->toArray() : [];
+        }
+
+        return self::getAdsForSocialCircles($socialCircleIds, $limit);
+    }
+
+    /**
+     * Get ad performance summary for social circles
+     */
+    public static function getAdPerformanceBySocialCircle($socialCircleId, $dateFrom = null, $dateTo = null)
+    {
+        $query = Ad::forSocialCircle($socialCircleId);
+
+        if ($dateFrom) {
+            $query->where('created_at', '>=', $dateFrom);
+        }
+
+        if ($dateTo) {
+            $query->where('created_at', '<=', $dateTo);
+        }
+
+        return $query->selectRaw('
+            COUNT(*) as total_ads,
+            SUM(current_impressions) as total_impressions,
+            SUM(clicks) as total_clicks,
+            SUM(conversions) as total_conversions,
+            SUM(total_spent) as total_spent,
+            AVG(CASE WHEN current_impressions > 0 THEN (clicks / current_impressions) * 100 ELSE 0 END) as avg_ctr
+        ')->first();
+    }
 }

@@ -2,13 +2,17 @@
 
 namespace App\Console;
 
-use App\Console\Commands\ProcessAdMetrics;
-use App\Console\Commands\SendAdReminders;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 
 class Kernel extends ConsoleKernel
 {
+    protected $commands = [
+      //  ProcessAdMetrics::class,
+       // SendAdReminders::class,
+        \App\Console\Commands\TestAdSystem::class, // Add this line
+    ];
+
     /**
      * Define the application's command schedule.
      */
@@ -30,14 +34,4 @@ class Kernel extends ConsoleKernel
 
         require base_path('routes/console.php');
     }
-
-    /**
-     * The Artisan commands provided by your application.
-     *
-     * @var array
-     */
-    protected $commands = [
-        ProcessAdMetrics::class,
-        SendAdReminders::class,
-    ];
 }

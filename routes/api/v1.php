@@ -260,6 +260,19 @@ Route::prefix('discover')->group(function () {
         Route::get('/{id}/analytics', [AdController::class, 'analytics']);
     });
 
+     // Ad Tracking Routes (for recording impressions and clicks)
+     Route::prefix('ads/tracking')->group(function () {
+        Route::post('/{id}/impression', [AdController::class, 'recordImpression']);
+        Route::post('/{id}/click', [AdController::class, 'recordClick']);
+    });
+
+      // Get ads for social circle feeds
+      Route::get('social-circles/{id}/ads', [AdController::class, 'getAdsForSocialCircle']);
+      Route::post('ads/for-circles', [AdController::class, 'getAdsForSocialCircles']);
+
+      Route::get('posts/feed-with-ads', [PostController::class, 'getFeedWithAds']);
+
+      
     // Admin Advertising Routes (Add role-based middleware as needed)
     Route::prefix('admin/ads')->group(function () {
         Route::get('/', [AdminAdController::class, 'index']);

@@ -18,6 +18,7 @@ class Ad extends Model
         'media_files',
         'call_to_action',
         'destination_url',
+        'ad_placement',
         'start_date',
         'end_date',
         'target_audience',
@@ -45,6 +46,7 @@ class Ad extends Model
     protected $casts = [
         'media_files' => 'array',
         'target_audience' => 'array',
+        'ad_placement' => 'array',
         'budget' => 'decimal:2',
         'daily_budget' => 'decimal:2',
         'cost_per_click' => 'decimal:4',
@@ -86,6 +88,27 @@ class Ad extends Model
         return $this->belongsTo(User::class, 'updated_by');
     }
 
+    // New relationship for ad placements (social circles)
+    public function socialCircles()
+    {
+        return $this->belongsToMany(
+            SocialCircle::class,
+            'ad_social_circles', // We'll create this pivot table if needed
+            'ad_id',
+            'social_circle_id'
+        );
+    }
+
+    // Alternative: Get social circles by IDs stored in ad_placement JSON
+    public function getPlacementSocialCirclesAttribute()
+    {
+        if (empty($this->ad_placement)) {
+            return collect();
+        }
+
+        return SocialCircle::whereIn('id', $this->ad_placement)->get();
+    }
+
     // Scopes
     public function scopeActive($query)
     {
@@ -110,6 +133,21 @@ class Ad extends Model
     public function scopeNotDeleted($query)
     {
         return $query->where('deleted_flag', 'N');
+    }
+
+    // Scope for ads that should appear in specific social circles
+    public function scopeForSocialCircle($query, $socialCircleId)
+    {
+        return $query->whereJsonContains('ad_placement', $socialCircleId);
+    }
+
+    public function scopeForSocialCircles($query, $socialCircleIds)
+    {
+        return $query->where(function ($q) use ($socialCircleIds) {
+            foreach ($socialCircleIds as $socialCircleId) {
+                $q->orWhereJsonContains('ad_placement', $socialCircleId);
+            }
+        });
     }
 
     // Accessors
@@ -220,5 +258,15 @@ class Ad extends Model
             'reviewed_by' => $adminId,
             'reviewed_at' => now()
         ]);
+    }
+
+    // Check if ad should be displayed in a specific social circle
+    public function shouldDisplayInSocialCircle($socialCircleId)
+    {
+        return $this->status === 'active'
+            && $this->admin_status === 'approved'
+            && in_array($socialCircleId, $this->ad_placement ?? [])
+            && $this->start_date <= now()
+            && $this->end_date >= now();
     }
 }

@@ -81,6 +81,72 @@ class PostController extends BaseController
     }
 
     /**
+     * Get feed with ads integrated
+     */
+    public function getFeedWithAds(Request $request)
+    {
+        try {
+            $user = $request->user();
+            $page = $request->input('page', 1);
+            $limit = $request->input('limit', 10);
+
+            // Get user's social circles
+            $userSocialCircles = $user->socialCircles->pluck('id')->toArray();
+
+            // Get posts for the feed (your existing logic)
+            $posts = Post::whereIn('social_circle_id', $userSocialCircles)
+                ->with(['user', 'socialCircle', 'media'])
+                ->latest()
+                ->paginate($limit);
+
+            // Get ads for user's social circles
+            $ads = AdHelper::getUserVisibleAds($user->id, $userSocialCircles, 3);
+
+            // Convert posts to array and inject ads
+            $feedItems = [];
+            $postArray = $posts->items();
+            $adIndex = 0;
+
+            foreach ($postArray as $index => $post) {
+                // Add post
+                $feedItems[] = [
+                    'type' => 'post',
+                    'data' => new PostResource($post)
+                ];
+
+                // Insert ad every 3 posts
+                if (($index + 1) % 3 === 0 && $adIndex < count($ads)) {
+                    $feedItems[] = [
+                        'type' => 'ad',
+                        'data' => new AdResource($ads[$adIndex])
+                    ];
+                    $adIndex++;
+                }
+            }
+
+            return response()->json([
+                'status' => 1,
+                'message' => 'Feed retrieved successfully',
+                'data' => [
+                    'feed_items' => $feedItems,
+                    'pagination' => [
+                        'current_page' => $posts->currentPage(),
+                        'total_pages' => $posts->lastPage(),
+                        'per_page' => $posts->perPage(),
+                        'total' => $posts->total(),
+                    ]
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to retrieve feed: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Create a new post
      */
     public function store(StorePostRequest $request): JsonResponse
