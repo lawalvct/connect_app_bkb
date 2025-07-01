@@ -99,7 +99,7 @@ class Ad extends Model
         );
     }
 
-    // Alternative: Get social circles by IDs stored in ad_placement JSON
+    // Get social circles by IDs stored in ad_placement JSON
     public function getPlacementSocialCirclesAttribute()
     {
         if (empty($this->ad_placement)) {

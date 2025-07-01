@@ -131,26 +131,30 @@ class SocialCircle extends Model
         return $this->hasMany(Post::class, 'social_id');
     }
 
+    // Relationship for ads
+    public function ads()
+    {
+        return $this->belongsToMany(Ad::class, 'ad_social_circles', 'social_circle_id', 'ad_id');
+    }
 
-      // New relationship for ads
-      public function ads()
-      {
-          return $this->whereJsonContains('ads.ad_placement', $this->id);
-      }
+    // Get ads that target this social circle via JSON field
+    public function getTargetingAdsAttribute()
+    {
+        return Ad::whereJsonContains('ad_placement', $this->id)->get();
+    }
 
-      // Get active ads for this social circle
-      public function getActiveAdsAttribute()
-      {
-          return Ad::forSocialCircle($this->id)
-              ->where('status', 'active')
-              ->where('admin_status', 'approved')
-              ->where('start_date', '<=', now())
-              ->where('end_date', '>=', now())
-              ->get();
-      }
+    // Get active ads for this social circle
+    public function getActiveAdsAttribute()
+    {
+        return Ad::forSocialCircle($this->id)
+            ->where('status', 'active')
+            ->where('admin_status', 'approved')
+            ->where('start_date', '<=', now())
+            ->where('end_date', '>=', now())
+            ->get();
+    }
 
-
-         // Get ads count for this social circle
+    // Get ads count for this social circle
     public function getAdsCountAttribute()
     {
         return Ad::forSocialCircle($this->id)->count();
@@ -165,5 +169,3 @@ class SocialCircle extends Model
             ->count();
     }
 }
-
-

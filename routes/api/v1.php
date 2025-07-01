@@ -272,7 +272,7 @@ Route::prefix('discover')->group(function () {
 
       Route::get('posts/feed-with-ads', [PostController::class, 'getFeedWithAds']);
 
-      
+
     // Admin Advertising Routes (Add role-based middleware as needed)
     Route::prefix('admin/ads')->group(function () {
         Route::get('/', [AdminAdController::class, 'index']);
@@ -318,7 +318,7 @@ Route::prefix('discover')->group(function () {
             return response()->json(['error' => $e->getMessage()]);
         }
     });
-});
+
 
 
   // Webhook routes (no auth needed)
