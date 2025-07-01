@@ -33,7 +33,13 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->api(prepend: [
             \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
         ]);
+          // Disable CSRF for API routes
+          $middleware->validateCsrfTokens(except: [
+            'api/*',
+        ]);
+        $middleware->append(\App\Http\Middleware\HandleCors::class);
     })
+
     ->withCommands([
         \App\Console\Commands\ResetDailySwipes::class,
     ])
@@ -42,6 +48,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('swipes:reset-daily')
                  ->dailyAt('00:01')
                  ->timezone('UTC');
+
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //
