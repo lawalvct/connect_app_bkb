@@ -68,6 +68,7 @@ class User extends Authenticatable implements MustVerifyEmail
          'email_otp_expires_at',
          'deleted_at',
         'deleted_flag',
+        'registration_step'
     ];
 
     /**
@@ -155,7 +156,7 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
-     * Get the social circles that the user belongs to.
+     * Get the social circles that belong to the user.
      */
     public function socialCircles()
     {
@@ -163,7 +164,8 @@ class User extends Authenticatable implements MustVerifyEmail
             ->withTimestamps()
             ->withPivot(['deleted_at', 'deleted_flag'])
             ->wherePivot('deleted_flag', 'N')
-            ->withoutGlobalScopes(); // This removes the global scope that's causing the ambiguity
+            ->where('social_circles.deleted_flag', 'N')
+            ->where('social_circles.is_active', true);
     }
 
     /**

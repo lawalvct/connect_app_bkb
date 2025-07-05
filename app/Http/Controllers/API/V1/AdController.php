@@ -1324,4 +1324,270 @@ class AdController extends BaseController
             ], 500);
         }
     }
+
+    /**
+ * @OA\Get(
+ *     path="/api/v1/ads/export",
+ *     summary="Export ads data",
+ *     tags={"Advertising"},
+ *     security={{"bearerAuth":{}}},
+ *     @OA\Parameter(name="format", in="query", @OA\Schema(type="string", enum={"excel", "pdf"})),
+ *     @OA\Parameter(name="status", in="query", @OA\Schema(type="string", enum={"active", "paused", "completed", "all"})),
+ *     @OA\Response(response=200, description="Data exported successfully")
+ * )
+ */
+public function export(Request $request)
+{
+    try {
+        $user = $request->user();
+        $format = $request->input('format', 'excel');
+        $status = $request->input('status', 'all');
+
+        // Build query
+        $query = Ad::where('user_id', $user->id)
+            ->where('deleted_flag', 'N');
+
+        // Filter by status if provided
+        if ($status !== 'all') {
+            $query->where('status', $status);
+        }
+
+        $ads = $query->get();
+
+        // Export date for the report
+        $export_date = now()->format('Y-m-d H:i:s');
+
+        if ($format === 'pdf') {
+            // Generate PDF using the ads-pdf.blade.php view
+            $pdf = Pdf::loadView('exports.ads-pdf', [
+                'ads' => $ads,
+                'user' => $user,
+                'export_date' => $export_date,
+                'status' => $status
+            ]);
+
+            return $pdf->download('ads-report-' . date('Y-m-d') . '.pdf');
+        } else {
+            // For Excel export
+            return Excel::download(
+                new \App\Exports\AdsExport($ads, $user),
+                'ads-report-' . date('Y-m-d') . '.xlsx'
+            );
+        }
+    } catch (\Exception $e) {
+        return $this->sendError('Failed to export data', $e->getMessage(), 500);
+    }
+}
+
+/**
+ * @OA\Post(
+ *     path="/api/v1/ads/preview",
+ *     summary="Preview an advertisement before creating",
+ *     tags={"Advertising"},
+ *     security={{"bearerAuth":{}}},
+ *     @OA\RequestBody(
+ *         required=true,
+ *         @OA\JsonContent(
+ *             @OA\Property(property="ad_name", type="string"),
+ *             @OA\Property(property="type", type="string"),
+ *             @OA\Property(property="description", type="string"),
+ *             @OA\Property(property="call_to_action", type="string"),
+ *             @OA\Property(property="destination_url", type="string"),
+ *             @OA\Property(property="ad_placement", type="array", @OA\Items(type="integer")),
+ *             @OA\Property(property="media_files", type="array", @OA\Items(type="string")),
+ *             @OA\Property(property="target_audience", type="object")
+ *         )
+ *     ),
+ *     @OA\Response(response=200, description="Advertisement preview generated successfully")
+ * )
+ */
+public function preview(Request $request)
+{
+    try {
+        $user = $request->user();
+
+        // Validate the request data
+        $validator = Validator::make($request->all(), [
+            'ad_name' => 'required|string|max:255',
+            'type' => 'required|string|in:banner,video,text,carousel',
+            'description' => 'required|string',
+            'call_to_action' => 'required|string|max:50',
+            'destination_url' => 'required|url',
+            'ad_placement' => 'required|array|min:1',
+            'ad_placement.*' => 'integer|exists:social_circles,id',
+            'media_files' => 'nullable|array',
+            'target_audience' => 'required|array',
+        ]);
+
+        if ($validator->fails()) {
+            return $this->sendError('Validation Error', $validator->errors(), 422);
+        }
+
+        // Get social circles for preview
+        $socialCircles = [];
+        if (!empty($request->ad_placement)) {
+            $socialCircles = SocialCircle::whereIn('id', $request->ad_placement)->get();
+        }
+
+        // Create a temporary ad object for preview
+        $previewAd = new Ad([
+            'ad_name' => $request->ad_name,
+            'type' => $request->type,
+            'description' => $request->description,
+            'call_to_action' => $request->call_to_action,
+            'destination_url' => $request->destination_url,
+            'ad_placement' => $request->ad_placement,
+            'media_files' => $request->media_files,
+            'target_audience' => $request->target_audience,
+        ]);
+
+        // Generate preview data
+        $previewData = [
+            'ad' => [
+                'ad_name' => $previewAd->ad_name,
+                'type' => $previewAd->type,
+                'description' => $previewAd->description,
+                'call_to_action' => $previewAd->call_to_action,
+                'destination_url' => $previewAd->destination_url,
+                'media_files' => $previewAd->media_files,
+                'target_audience' => $previewAd->target_audience,
+            ],
+            'social_circles' => $socialCircles->map(function ($circle) {
+                return [
+                    'id' => $circle->id,
+                    'name' => $circle->name,
+                    'color' => $circle->color ?? '#3498db',
+                    'icon' => $circle->icon ?? null
+                ];
+            }),
+            'preview_timestamp' => now()->toISOString(),
+            'estimated_reach' => AdHelper::estimateAdReach($request->ad_placement, $request->target_audience),
+        ];
+
+        return $this->sendResponse('Advertisement preview generated successfully', $previewData);
+    } catch (\Exception $e) {
+        return $this->sendError('Failed to generate advertisement preview', $e->getMessage(), 500);
+    }
+}
+
+
+
+/**
+ * @OA\Get(
+ *     path="/api/v1/ads/social-circle/{id}",
+ *     summary="Get ads for a specific social circle",
+ *     tags={"Advertising"},
+ *     security={{"bearerAuth":{}}},
+ *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="integer")),
+ *     @OA\Parameter(name="limit", in="query", @OA\Schema(type="integer", default=3)),
+ *     @OA\Response(response=200, description="Ads retrieved successfully")
+ * )
+ */
+public function getAdsForSocialCircle(Request $request, $socialCircleId)
+{
+    try {
+        $limit = $request->input('limit', 3);
+
+        // Get ads for the specified social circle using AdHelper
+        $ads = AdHelper::getAdsForSocialCircle($socialCircleId, $limit);
+
+        // Load social circles for each ad
+        foreach ($ads as $ad) {
+            $ad->social_circles = SocialCircle::whereIn('id', $ad->ad_placement ?? [])->get();
+        }
+
+        return $this->sendResponse('Ads retrieved successfully', [
+            'ads' => $ads->map(function ($ad) {
+                return [
+                    'id' => $ad->id,
+                    'ad_name' => $ad->ad_name,
+                    'type' => $ad->type,
+                    'description' => $ad->description,
+                    'media_files' => $ad->media_files,
+                    'call_to_action' => $ad->call_to_action,
+                    'destination_url' => $ad->destination_url,
+                    'social_circles' => $ad->social_circles->map(function ($circle) {
+                        return [
+                            'id' => $circle->id,
+                            'name' => $circle->name,
+                            'color' => $circle->color ?? '#3498db'
+                        ];
+                    })
+                ];
+            })
+        ]);
+    } catch (\Exception $e) {
+        return $this->sendError('Failed to retrieve ads', $e->getMessage(), 500);
+    }
+}
+
+/**
+ * @OA\Post(
+ *     path="/api/v1/ads/social-circles",
+ *     summary="Get ads for multiple social circles",
+ *     tags={"Advertising"},
+ *     security={{"bearerAuth":{}}},
+ *     @OA\RequestBody(
+ *         required=true,
+ *         @OA\JsonContent(
+ *             @OA\Property(property="social_circle_ids", type="array", @OA\Items(type="integer")),
+ *             @OA\Property(property="limit", type="integer", default=5)
+ *         )
+ *     ),
+ *     @OA\Response(response=200, description="Ads retrieved successfully")
+ * )
+ */
+public function getAdsForSocialCircles(Request $request)
+{
+    try {
+        $validator = Validator::make($request->all(), [
+            'social_circle_ids' => 'required|array',
+            'social_circle_ids.*' => 'integer|exists:social_circles,id',
+            'limit' => 'nullable|integer|min:1|max:10'
+        ]);
+
+        if ($validator->fails()) {
+            return $this->sendError('Validation Error', $validator->errors(), 422);
+        }
+
+        $socialCircleIds = $request->input('social_circle_ids', []);
+        $limit = $request->input('limit', 5);
+
+        // Get ads for the specified social circles using AdHelper
+        $ads = AdHelper::getAdsForSocialCircles($socialCircleIds, $limit);
+
+        // Load social circles for each ad
+        foreach ($ads as $ad) {
+            $ad->social_circles = SocialCircle::whereIn('id', $ad->ad_placement ?? [])->get();
+        }
+
+        return $this->sendResponse('Ads retrieved successfully', [
+            'ads' => $ads->map(function ($ad) {
+                return [
+                    'id' => $ad->id,
+                    'ad_name' => $ad->ad_name,
+                    'type' => $ad->type,
+                    'description' => $ad->description,
+                    'media_files' => $ad->media_files,
+                    'call_to_action' => $ad->call_to_action,
+                    'destination_url' => $ad->destination_url,
+                    'social_circles' => $ad->social_circles->map(function ($circle) {
+                        return [
+                            'id' => $circle->id,
+                            'name' => $circle->name,
+                            'color' => $circle->color ?? '#3498db'
+                        ];
+                    })
+                ];
+            })
+        ]);
+    } catch (\Exception $e) {
+        return $this->sendError('Failed to retrieve ads', $e->getMessage(), 500);
+    }
+}
+
+
+
+
+
 }

@@ -272,4 +272,77 @@ class AdHelper
             AVG(CASE WHEN current_impressions > 0 THEN (clicks / current_impressions) * 100 ELSE 0 END) as avg_ctr
         ')->first();
     }
+
+
+    /**
+ * Estimate the reach of an ad based on placement and target audience
+ *
+ * @param array $adPlacement
+ * @param array $targetAudience
+ * @return array
+ */
+public static function estimateAdReach($adPlacement, $targetAudience)
+{
+    // This is a placeholder implementation
+    // In a real application, you would calculate this based on actual user data
+
+    $totalUsers = 0;
+    $matchingUsers = 0;
+
+    // Get total users in the selected social circles
+    if (!empty($adPlacement)) {
+        foreach ($adPlacement as $circleId) {
+            // Get count of users in this social circle
+            $circleUsers = \DB::table('user_social_circle')
+                ->where('social_id', $circleId)
+                ->count();
+
+            $totalUsers += $circleUsers;
+        }
+    }
+
+    // Calculate matching users based on target audience criteria
+    if (!empty($targetAudience)) {
+        $query = \DB::table('users')
+            ->join('user_social_circle', 'users.id', '=', 'user_social_circle.user_id')
+            ->whereIn('user_social_circle.social_id', $adPlacement)
+            ->where('users.deleted_flag', 'N');
+
+        // Apply age filter if provided
+        if (isset($targetAudience['age_min']) && isset($targetAudience['age_max'])) {
+            $query->whereRaw('TIMESTAMPDIFF(YEAR, users.date_of_birth, CURDATE()) >= ?', [$targetAudience['age_min']])
+                  ->whereRaw('TIMESTAMPDIFF(YEAR, users.date_of_birth, CURDATE()) <= ?', [$targetAudience['age_max']]);
+        }
+
+        // Apply gender filter if provided
+        if (isset($targetAudience['gender']) && $targetAudience['gender'] !== 'all') {
+            $query->where('users.gender', $targetAudience['gender']);
+        }
+
+        // Apply location filter if provided
+        if (isset($targetAudience['locations']) && !empty($targetAudience['locations'])) {
+            $query->whereIn('users.country_id', $targetAudience['locations']);
+        }
+
+        $matchingUsers = $query->distinct('users.id')->count('users.id');
+    }
+
+    // Calculate estimated metrics
+    $estimatedImpressions = $matchingUsers * 5; // Assume each user sees the ad 5 times
+    $estimatedClicks = round($estimatedImpressions * 0.02); // Assume 2% CTR
+    $estimatedConversions = round($estimatedClicks * 0.1); // Assume 10% conversion rate
+
+    return [
+        'total_users' => $totalUsers,
+        'matching_users' => $matchingUsers,
+        'estimated_impressions' => $estimatedImpressions,
+        'estimated_clicks' => $estimatedClicks,
+        'estimated_conversions' => $estimatedConversions,
+        'estimated_ctr' => $estimatedImpressions > 0 ? round(($estimatedClicks / $estimatedImpressions) * 100, 2) : 0,
+    ];
+}
+
+
+
+
 }

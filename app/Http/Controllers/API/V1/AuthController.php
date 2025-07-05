@@ -23,6 +23,14 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use illuminate\Support\Str;
 
+
+use App\Http\Requests\V1\RegisterStep1Request;
+use App\Http\Requests\V1\RegisterStep2Request;
+use App\Http\Requests\V1\RegisterStep3Request;
+use App\Http\Requests\V1\RegisterStep4Request;
+use App\Http\Requests\V1\RegisterStep5Request;
+use App\Http\Requests\V1\RegisterStep6Request;
+
 class AuthController extends BaseController
 {
     protected $authService;
@@ -730,4 +738,432 @@ public function resendVerificationEmail(Request $request)
             ], 500);
         }
     }
+
+
+
+    /**
+     * Step 1: Register with username, email, password
+     */
+    public function registerStep1(RegisterStep1Request $request)
+    {
+        try {
+            $data = $request->validated();
+
+            // Create user with basic info
+            $user = User::create([
+                'username' => $data['username'],
+                'email' => $data['email'],
+                'password' => Hash::make($data['password']),
+                'device_token' => $data['device_token'] ?? null,
+                'registration_step' => 1, // Track current step
+            ]);
+
+            // Generate OTP for email verification
+            $otp = str_pad(random_int(0, 9999), 4, '0', STR_PAD_LEFT);
+            $user->email_otp = $otp;
+            $user->email_otp_expires_at = now()->addHours(1);
+            $user->save();
+
+            // Send verification email
+            try {
+                Mail::to($user->email)->queue(new VerificationEmail($user, $otp));
+            } catch (\Exception $mailException) {
+                \Log::error('Failed to queue verification email: ' . $mailException->getMessage());
+            }
+
+            return $this->sendResponse('Step 1 completed. Please check your email for verification code.', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'next_step' => 2
+            ], 201);
+
+        } catch (\Exception $e) {
+            return $this->sendError('Step 1 failed: ' . $e->getMessage(), null, 500);
+        }
+    }
+
+    /**
+     * Step 2: Verify OTP
+     */
+    public function registerStep2(RegisterStep2Request $request)
+    {
+        try {
+            $data = $request->validated();
+
+            $user = User::where('email', $data['email'])->first();
+
+            if (!$user) {
+                return $this->sendError('User not found', null, 404);
+            }
+
+            if ($user->email_otp != $data['otp']) {
+                return $this->sendError('Invalid OTP', null, 400);
+            }
+
+            if ($user->email_otp_expires_at < now()) {
+                return $this->sendError('OTP has expired', null, 400);
+            }
+
+            // Mark email as verified and update step
+            $user->email_verified_at = now();
+            $user->email_otp = null;
+            $user->email_otp_expires_at = null;
+            $user->registration_step = 2;
+            $user->save();
+
+            return $this->sendResponse('Email verified successfully', [
+                'user_id' => $user->id,
+                'next_step' => 3
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->sendError('Step 2 failed: ' . $e->getMessage(), null, 500);
+        }
+    }
+
+    /**
+     * Step 3: Add birth date and phone
+     */
+    public function registerStep3(RegisterStep3Request $request)
+    {
+        try {
+            $data = $request->validated();
+
+            $user = User::where('email', $data['email'])->first();
+
+            if (!$user || $user->registration_step < 2) {
+                return $this->sendError('Please complete previous steps first', null, 400);
+            }
+
+            $user->update([
+                'birth_date' => $data['birth_date'],
+                'phone' => $data['phone'],
+                'registration_step' => 3
+            ]);
+
+            return $this->sendResponse('Step 3 completed successfully', [
+                'user_id' => $user->id,
+                'next_step' => 4
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->sendError('Step 3 failed: ' . $e->getMessage(), null, 500);
+        }
+    }
+
+    /**
+     * Step 4: Select gender
+     */
+    public function registerStep4(RegisterStep4Request $request)
+    {
+        try {
+            $data = $request->validated();
+
+            $user = User::where('email', $data['email'])->first();
+
+            if (!$user || $user->registration_step < 3) {
+                return $this->sendError('Please complete previous steps first', null, 400);
+            }
+
+            $user->update([
+                'gender' => $data['gender'],
+                'registration_step' => 4
+            ]);
+
+            return $this->sendResponse('Step 4 completed successfully', [
+                'user_id' => $user->id,
+                'next_step' => 5
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->sendError('Step 4 failed: ' . $e->getMessage(), null, 500);
+        }
+    }
+
+    /**
+     * Step 5: Upload profile picture and bio
+     */
+    public function registerStep5(RegisterStep5Request $request)
+    {
+        try {
+            $data = $request->validated();
+
+            $user = User::where('email', $data['email'])->first();
+
+            if (!$user || $user->registration_step < 4) {
+                return $this->sendError('Please complete previous steps first', null, 400);
+            }
+
+            $updateData = [
+                'bio' => $data['bio'] ?? null,
+                'registration_step' => 5
+            ];
+
+            // Handle profile image upload
+            if ($request->hasFile('profile_image') && $request->file('profile_image')->isValid()) {
+                $fileData = S3UploadHelper::uploadFile(
+                    $request->file('profile_image'),
+                    'profiles'
+                );
+
+                $updateData['profile'] = $fileData['filename'];
+                $updateData['profile_url'] = $fileData['url'];
+            }
+
+            $user->update($updateData);
+
+            return $this->sendResponse('Step 5 completed successfully', [
+                'user_id' => $user->id,
+                'profile_url' => $user->profile_url,
+                'filename' => $user->profile,
+
+                'next_step' => 6
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->sendError('Step 5 failed: ' . $e->getMessage(), null, 500);
+        }
+    }
+
+
+    /**
+ * Step 6: Select social circles (Final step)
+ */
+public function registerStep6(RegisterStep6Request $request)
+{
+    try {
+        $data = $request->validated();
+
+        $user = User::where('email', $data['email'])->first();
+
+        if (!$user) {
+            return $this->sendError('User not found with this email address', null, 404);
+        }
+
+        if ($user->registration_step < 5) {
+            return $this->sendError('Please complete previous steps first. Current step: ' . $user->registration_step, null, 400);
+        }
+
+        // Validate social circles exist
+        $validSocialCircles = \App\Models\SocialCircle::whereIn('id', $data['social_circles'])
+            ->where('is_active', true)
+            ->where('deleted_flag', 'N')
+            ->pluck('id')
+            ->toArray();
+
+        if (count($validSocialCircles) !== count($data['social_circles'])) {
+            return $this->sendError('Some social circles are invalid or inactive', null, 400);
+        }
+
+        // Attach social circles to user
+        $user->socialCircles()->sync($data['social_circles']);
+
+        // Mark registration as complete
+        $user->update([
+            'registration_step' => 6,
+            'registration_completed_at' => now()
+        ]);
+
+        // Add default profile uploads
+        $this->addDefaultProfileUploads($user);
+
+        // Load relationships properly with error handling
+        try {
+            $user->load(['country', 'profileUploads', 'socialCircles']);
+        } catch (\Exception $loadException) {
+            \Log::error('Failed to load user relationships: ' . $loadException->getMessage());
+            // Continue without relationships if loading fails
+        }
+
+        // Create token
+        $token = $this->authService->createToken($user);
+
+        // Send welcome email
+        try {
+            Mail::to($user->email)->queue(new WelcomeEmail($user));
+        } catch (\Exception $mailException) {
+            \Log::error('Failed to queue welcome email: ' . $mailException->getMessage());
+        }
+
+        return $this->sendResponse('Registration completed successfully!', [
+            'user' => new UserResource($user),
+            'token' => $token,
+        ], 201);
+
+    } catch (\Exception $e) {
+        \Log::error('Step 6 registration failed', [
+            'email' => $request->input('email'),
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+
+        return $this->sendError('Step 6 failed: ' . $e->getMessage(), null, 500);
+    }
 }
+
+
+/**
+ * Debug: Check user registration status
+ */
+public function debugUserStatus(Request $request)
+{
+    $email = $request->input('email');
+
+    if (!$email) {
+        return response()->json(['error' => 'Email required']);
+    }
+
+    $user = User::where('email', $email)->first();
+
+    if (!$user) {
+        return response()->json(['error' => 'User not found']);
+    }
+
+    return response()->json([
+        'user_id' => $user->id,
+        'email' => $user->email,
+        'registration_step' => $user->registration_step,
+        'email_verified_at' => $user->email_verified_at,
+        'created_at' => $user->created_at
+    ]);
+}
+
+/**
+ * TEMPORARY: Delete user by email (FOR DEVELOPMENT ONLY)
+ * Remove this endpoint in production
+ */
+public function tempDeleteUserByEmail(Request $request)
+{
+    // Add environment check for safety
+    if (app()->environment('production')) {
+        return $this->sendError('This endpoint is not available in production', null, 403);
+    }
+
+    $validator = Validator::make($request->all(), [
+        'email' => 'required|email|exists:users,email'
+    ]);
+
+    if ($validator->fails()) {
+        return $this->sendError('Validation Error', $validator->errors(), 422);
+    }
+
+    try {
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user) {
+            return $this->sendError('User not found', null, 404);
+        }
+
+        // Store user info before deletion
+        $userInfo = [
+            'id' => $user->id,
+            'email' => $user->email,
+            'username' => $user->username,
+            'registration_step' => $user->registration_step
+        ];
+
+        // Delete related data first
+        $user->socialCircles()->detach(); // Remove social circle relationships
+        $user->profileUploads()->delete(); // Delete profile uploads
+
+        // Force delete the user (permanent deletion)
+        $user->forceDelete();
+
+        return $this->sendResponse('User deleted successfully', [
+            'deleted_user' => $userInfo
+        ]);
+
+    } catch (\Exception $e) {
+        return $this->sendError('Failed to delete user: ' . $e->getMessage(), null, 500);
+    }
+}
+
+/**
+ * TEMPORARY: Get user's current OTP codes (FOR DEVELOPMENT ONLY)
+ * Remove this endpoint in production
+ */
+public function tempGetUserOTP(Request $request)
+{
+    // Add environment check for safety
+    if (app()->environment('production')) {
+        return $this->sendError('This endpoint is not available in production', null, 403);
+    }
+
+    $validator = Validator::make($request->all(), [
+        'email' => 'required|email|exists:users,email'
+    ]);
+
+    if ($validator->fails()) {
+        return $this->sendError('Validation Error', $validator->errors(), 422);
+    }
+
+    try {
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user) {
+            return $this->sendError('User not found', null, 404);
+        }
+
+        return $this->sendResponse('User OTP retrieved successfully', [
+            'user_id' => $user->id,
+            'email' => $user->email,
+            'email_otp' => $user->email_otp,
+            'email_otp_expires_at' => $user->email_otp_expires_at,
+            'reset_otp' => $user->reset_otp,
+            'registration_step' => $user->registration_step,
+            'email_verified_at' => $user->email_verified_at,
+            'is_otp_expired' => $user->email_otp_expires_at ? $user->email_otp_expires_at < now() : null
+        ]);
+
+    } catch (\Exception $e) {
+        return $this->sendError('Failed to get user OTP: ' . $e->getMessage(), null, 500);
+    }
+}
+
+/**
+ * TEMPORARY: Get user's reset password OTP (FOR DEVELOPMENT ONLY)
+ * Remove this endpoint in production
+ */
+public function tempGetResetOTP(Request $request)
+{
+    // Add environment check for safety
+    if (app()->environment('production')) {
+        return $this->sendError('This endpoint is not available in production', null, 403);
+    }
+
+    $validator = Validator::make($request->all(), [
+        'email' => 'required|email|exists:users,email'
+    ]);
+
+    if ($validator->fails()) {
+        return $this->sendError('Validation Error', $validator->errors(), 422);
+    }
+
+    try {
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user) {
+            return $this->sendError('User not found', null, 404);
+        }
+
+        return $this->sendResponse('User reset OTP retrieved successfully', [
+            'user_id' => $user->id,
+            'email' => $user->email,
+            'reset_otp' => $user->reset_otp,
+            'email_otp' => $user->email_otp,
+            'email_otp_expires_at' => $user->email_otp_expires_at,
+            'registration_step' => $user->registration_step,
+            'email_verified_at' => $user->email_verified_at
+        ]);
+
+    } catch (\Exception $e) {
+        return $this->sendError('Failed to get reset OTP: ' . $e->getMessage(), null, 500);
+    }
+}
+  }
+
+
+
+
+
+

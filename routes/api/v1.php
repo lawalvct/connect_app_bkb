@@ -38,6 +38,28 @@ Route::post('resend-verification-otp', [AuthController::class, 'resendVerificati
 Route::post('verify-email-otp', [AuthController::class, 'verifyEmailOTP'])
     ->middleware(['throttle:5,1']);
 
+
+    // Multi-step registration routes
+Route::prefix('register')->group(function () {
+    Route::post('step-1', [AuthController::class, 'registerStep1']); // Username, email, password
+    Route::post('step-2', [AuthController::class, 'registerStep2']); // OTP verification
+    Route::post('step-3', [AuthController::class, 'registerStep3']); // Date of birth, phone
+    Route::post('step-4', [AuthController::class, 'registerStep4']); // Gender
+    Route::post('step-5', [AuthController::class, 'registerStep5']); // Profile picture, bio
+    Route::post('step-6', [AuthController::class, 'registerStep6']); // Social circles (final)
+});
+
+
+
+// Temporary endpoints for frontend development (Remove in production)
+Route::prefix('temp')->group(function () {
+    Route::delete('user/delete-by-email', [AuthController::class, 'tempDeleteUserByEmail']);
+    Route::post('user/get-otp', [AuthController::class, 'tempGetUserOTP']);
+    Route::post('user/get-reset-otp', [AuthController::class, 'tempGetResetOTP']);
+    Route::post('user/user-status', [AuthController::class, 'debugUserStatus']);
+});
+
+
 // Social login routes
 Route::get('auth/{provider}', [AuthController::class, 'redirectToProvider']);
 Route::get('auth/{provider}/callback', [AuthController::class, 'handleProviderCallback']);
@@ -262,8 +284,8 @@ Route::prefix('discover')->group(function () {
 
      // Ad Tracking Routes (for recording impressions and clicks)
      Route::prefix('ads/tracking')->group(function () {
-        Route::post('/{id}/impression', [AdController::class, 'recordImpression']);
-        Route::post('/{id}/click', [AdController::class, 'recordClick']);
+        Route::post('/{id}/impression', [AdController::class, 'trackImpression']);
+        Route::post('/{id}/click', [AdController::class, 'trackClick']);
     });
 
       // Get ads for social circle feeds
