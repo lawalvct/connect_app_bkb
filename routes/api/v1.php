@@ -82,6 +82,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('account', [ProfileController::class, 'deleteAccount']);
     Route::post('user/timezone', [UserController::class, 'updateTimezone']);
 
+        // Profile Images Management
+        Route::get('profile/images', [ProfileController::class, 'getProfileImages']);
+        Route::get('profile/images/{imageId}', [ProfileController::class, 'getProfileImageById']);
+        Route::post('profile/images/set-main', [ProfileController::class, 'setMainProfileImage']);
+        Route::delete('profile/images', [ProfileController::class, 'deleteProfileImage']);
+
+        Route::post('profile/images/upload', [ProfileController::class, 'uploadSingleProfileImage']);
+        Route::post('profile/images/upload-multiple', [ProfileController::class, 'uploadNewProfileImages']);
+        Route::post('profile/images/bulk-upload', [ProfileController::class, 'bulkUploadProfileImages']);
+        Route::put('profile/images/replace', [ProfileController::class, 'replaceProfileImage']);
+        Route::patch('profile/images/metadata', [ProfileController::class, 'updateProfileImageMetadata']);
+
     // Social Links
     Route::get('social-links', [ProfileController::class, 'getSocialLinks']);
     Route::post('social-links', [ProfileController::class, 'update']);
