@@ -42,7 +42,7 @@ return [
             'synchronous' => null,
         ],
 
-    'mysql' => [
+  'mysql' => [
     'driver' => 'mysql',
     'host' => env('DB_HOST', '127.0.0.1'),
     'port' => env('DB_PORT', '3306'),
@@ -58,26 +58,16 @@ return [
     'engine' => null,
     'options' => extension_loaded('pdo_mysql') ? array_filter([
         PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
-        PDO::MYSQL_ATTR_INIT_COMMAND => 'SET sql_mode="STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION"',
-        // Add these options to handle prepared statement issues
+        // Simplified SQL mode - compatible with all MySQL versions
+        PDO::MYSQL_ATTR_INIT_COMMAND => 'SET sql_mode="STRICT_TRANS_TABLES"',
         PDO::ATTR_EMULATE_PREPARES => false,
         PDO::ATTR_PERSISTENT => false,
         PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true,
         PDO::ATTR_TIMEOUT => 30,
     ]) : [],
-    // Add these Laravel-specific configurations
     'sticky' => true,
-    'read' => [
-        'host' => [
-            env('DB_READ_HOST', env('DB_HOST', '127.0.0.1')),
-        ]
-    ],
-    'write' => [
-        'host' => [
-            env('DB_WRITE_HOST', env('DB_HOST', '127.0.0.1')),
-        ]
-    ],
 ],
+
 
         'mariadb' => [
             'driver' => 'mariadb',
