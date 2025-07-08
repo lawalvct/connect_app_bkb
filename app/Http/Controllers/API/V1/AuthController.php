@@ -1044,29 +1044,25 @@ public function tempDeleteUserByEmail(Request $request)
     }
 
     try {
-        // Refresh database connection to avoid prepared statement issues
-        DB::purge('mysql');
-        DB::reconnect('mysql');
-
-        DB::beginTransaction();
-
-        // Find user
+        // Find the user first
         $user = User::where('email', $request->email)->first();
 
         if (!$user) {
-            DB::rollBack();
             return $this->sendError('User not found', null, 404);
         }
 
         $userId = $user->id;
-        $userEmail = $user->email;
 
-        // Delete related records first to avoid foreign key constraints
-        $user->tokens()->delete();
-        $user->profileUploads()->update(['deleted_flag' => 'Y']);
+        // Begin transaction
+        DB::beginTransaction();
 
-        // Use raw query to avoid prepared statement caching issues
-        $deleted = DB::statement('DELETE FROM users WHERE id = ?', [$userId]);
+        // Delete tokens first
+        DB::statement("DELETE FROM personal_access_tokens WHERE tokenable_id = ? AND tokenable_type = ?", [
+            $userId, User::class
+        ]);
+
+        // Delete user with direct SQL (avoids prepared statement issues)
+        $deleted = DB::statement("DELETE FROM users WHERE id = ?", [$userId]);
 
         if (!$deleted) {
             DB::rollBack();
@@ -1077,16 +1073,16 @@ public function tempDeleteUserByEmail(Request $request)
 
         return $this->sendResponse('User deleted successfully', [
             'user_id' => $userId,
-            'email' => $userEmail,
+            'email' => $request->email,
         ]);
 
     } catch (\Exception $e) {
         DB::rollBack();
 
+        // Log the error for debugging
         \Log::error('User deletion failed', [
             'email' => $request->email,
             'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString(),
         ]);
 
         return $this->sendError('Failed to delete user: ' . $e->getMessage(), null, 500);
