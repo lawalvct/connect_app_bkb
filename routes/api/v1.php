@@ -91,7 +91,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('profile/images/upload', [ProfileController::class, 'uploadSingleProfileImage']);
         Route::post('profile/images/upload-multiple', [ProfileController::class, 'uploadNewProfileImages']);
         Route::post('profile/images/bulk-upload', [ProfileController::class, 'bulkUploadProfileImages']);
-        Route::put('profile/images/replace', [ProfileController::class, 'replaceProfileImage']);
+        Route::post('profile/images/replace', [ProfileController::class, 'replaceProfileImage']);
         Route::patch('profile/images/metadata', [ProfileController::class, 'updateProfileImageMetadata']);
 
     // Social Links

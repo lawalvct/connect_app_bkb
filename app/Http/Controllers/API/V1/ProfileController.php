@@ -57,7 +57,7 @@ class ProfileController extends BaseController
         // Handle profile pictures
         if ($request->has('profile') && is_array($request->profile) && count($request->profile) > 0) {
             // Soft delete existing profile pictures
-            ProfileMultiUpload::where('user_id', $user->id)->update(['deleted_flag' => 'Y']);
+            UserProfileUpload::where('user_id', $user->id)->update(['deleted_flag' => 'Y']);
 
             // Add new profile pictures
             foreach ($request->profile as $file) {
@@ -67,7 +67,7 @@ class ProfileController extends BaseController
                     'user_id' => $user->id,
                 ];
 
-                ProfileMultiUpload::create($profileData);
+                UserProfileUpload::create($profileData);
             }
 
             // Update the user's main profile picture with the first one
@@ -174,7 +174,7 @@ class ProfileController extends BaseController
             $uploadedFiles = [];
 
             // Soft delete existing profile pictures
-            ProfileMultiUpload::where('user_id', $user->id)->update(['deleted_flag' => 'Y']);
+            UserProfileUpload::where('user_id', $user->id)->update(['deleted_flag' => 'Y']);
 
             foreach ($files as $index => $file) {
                 $path = 'uploads/profile/';
@@ -191,7 +191,7 @@ class ProfileController extends BaseController
                     'type' => 'image',
                 ];
 
-                ProfileMultiUpload::create($profileData);
+                UserProfileUpload::create($profileData);
 
                 $uploadedFiles[] = $filename;
 
@@ -642,12 +642,14 @@ class ProfileController extends BaseController
      */
     public function uploadNewProfileImages(Request $request)
     {
+
         $validator = Validator::make($request->all(), [
             'images' => 'required|array|min:1|max:10',
             'images.*' => 'required|file|image|mimes:jpeg,png,jpg,gif,webp|max:10240', // 10MB max
             'set_as_main' => 'nullable|boolean',
             'upload_type' => 'nullable|string|in:s3,local', // Allow choosing upload type
         ]);
+
 
         if ($validator->fails()) {
             return $this->sendError('Validation error', $validator->errors(), 422);
@@ -659,9 +661,19 @@ class ProfileController extends BaseController
             $uploadType = $request->get('upload_type', 's3'); // Default to S3
             $setAsMain = $request->get('set_as_main', false);
 
+            // Debug: Check how many files are received
+            $files = $request->file('images');
+            if (!$files || !is_array($files)) {
+                return $this->sendError('No images received or invalid format', null, 422);
+            }
+
             DB::beginTransaction();
 
-            foreach ($request->file('images') as $index => $file) {
+            foreach ($files as $index => $file) {
+                if (!$file || !$file->isValid()) {
+                    continue; // Skip invalid files
+                }
+
                 if ($uploadType === 's3') {
                     // Upload to S3
                     $uploadResult = S3UploadHelper::uploadFile($file, 'profiles');
@@ -707,10 +719,19 @@ class ProfileController extends BaseController
 
                 // Set first image as main if requested
                 if ($setAsMain && $index === 0) {
-                    $user->update([
-                        'profile' => $profileUpload->file_name,
-                        'profile_url' => $uploadType === 's3' ? '' : 'uploads/profile/',
-                    ]);
+                    if ($uploadType === 's3') {
+                        // For S3, store the full URL in profile field
+                        $user->update([
+                            'profile' => $profileUpload->file_url, // Store full S3 URL
+                            'profile_url' => '', // Keep empty for S3
+                        ]);
+                    } else {
+                        // For local, store filename and path separately
+                        $user->update([
+                            'profile' => $profileUpload->file_name,
+                            'profile_url' => 'uploads/profile/',
+                        ]);
+                    }
                     $uploadedImages[0]['is_main'] = true;
                 }
             }
@@ -720,6 +741,7 @@ class ProfileController extends BaseController
             return $this->sendResponse('Profile images uploaded successfully', [
                 'uploaded_images' => $uploadedImages,
                 'total_uploaded' => count($uploadedImages),
+                'files_received' => count($files), // Debug info
                 'user' => new UserResource($user->fresh()),
             ], 201);
 
@@ -728,7 +750,6 @@ class ProfileController extends BaseController
             return $this->sendError('Failed to upload profile images', $e->getMessage(), 500);
         }
     }
-
     /**
      * Replace an existing profile image.
      *
@@ -737,6 +758,7 @@ class ProfileController extends BaseController
      */
     public function replaceProfileImage(Request $request)
     {
+    
         $validator = Validator::make($request->all(), [
             'image_id' => 'required|integer',
             'image_type' => 'required|string|in:profile_multi,user_profile',
@@ -762,7 +784,7 @@ class ProfileController extends BaseController
 
             // Find existing image
             if ($imageType === 'profile_multi') {
-                $existingImage = ProfileMultiUpload::where('id', $imageId)
+                $existingImage = UserProfileUpload::where('id', $imageId)
                     ->where('user_id', $user->id)
                     ->where('deleted_flag', 'N')
                     ->first();
@@ -920,10 +942,20 @@ class ProfileController extends BaseController
 
             // Set as main if requested
             if ($setAsMain) {
-                $user->update([
-                    'profile' => $profileUpload->file_name,
-                    'profile_url' => $uploadType === 's3' ? '' : 'uploads/profile/',
-                ]);
+                if ($uploadType === 's3') {
+                    // Get the S3 base URL (everything before the filename)
+                    $s3BaseUrl = substr($profileUpload->file_url, 0, strrpos($profileUpload->file_url, '/') + 1);
+
+                    $user->update([
+                        'profile' => $profileUpload->file_name,
+                        'profile_url' => $s3BaseUrl,
+                    ]);
+                } else {
+                    $user->update([
+                        'profile' => $profileUpload->file_name,
+                        'profile_url' => 'uploads/profile/',
+                    ]);
+                }
             }
 
             DB::commit();
@@ -1078,7 +1110,7 @@ class ProfileController extends BaseController
             $image = null;
 
             if ($imageType === 'profile_multi') {
-                $image = ProfileMultiUpload::where('id', $imageId)
+                $image = UserProfileUpload::where('id', $imageId)
                     ->where('user_id', $user->id)
                     ->where('deleted_flag', 'N')
                     ->first();
