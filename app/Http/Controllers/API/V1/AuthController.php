@@ -30,6 +30,7 @@ use App\Http\Requests\V1\RegisterStep3Request;
 use App\Http\Requests\V1\RegisterStep4Request;
 use App\Http\Requests\V1\RegisterStep5Request;
 use App\Http\Requests\V1\RegisterStep6Request;
+use Illuminate\Support\Facades\DB;
 
 class AuthController extends BaseController
 {
@@ -1034,46 +1035,60 @@ public function debugUserStatus(Request $request)
  */
 public function tempDeleteUserByEmail(Request $request)
 {
-    // Add environment check for safety
-    if (app()->environment('production')) {
-        return $this->sendError('This endpoint is not available in production', null, 403);
-    }
-
     $validator = Validator::make($request->all(), [
-        'email' => 'required|email|exists:users,email'
+        'email' => 'required|email',
     ]);
 
     if ($validator->fails()) {
-        return $this->sendError('Validation Error', $validator->errors(), 422);
+        return $this->sendError('Validation error', $validator->errors(), 422);
     }
 
     try {
+        // Refresh database connection to avoid prepared statement issues
+        DB::purge('mysql');
+        DB::reconnect('mysql');
+
+        DB::beginTransaction();
+
+        // Find user
         $user = User::where('email', $request->email)->first();
 
         if (!$user) {
+            DB::rollBack();
             return $this->sendError('User not found', null, 404);
         }
 
-        // Store user info before deletion
-        $userInfo = [
-            'id' => $user->id,
-            'email' => $user->email,
-            'username' => $user->username,
-            'registration_step' => $user->registration_step
-        ];
+        $userId = $user->id;
+        $userEmail = $user->email;
 
-        // Delete related data first
-        $user->socialCircles()->detach(); // Remove social circle relationships
-        $user->profileUploads()->delete(); // Delete profile uploads
+        // Delete related records first to avoid foreign key constraints
+        $user->tokens()->delete();
+        $user->profileUploads()->update(['deleted_flag' => 'Y']);
 
-        // Force delete the user (permanent deletion)
-        $user->forceDelete();
+        // Use raw query to avoid prepared statement caching issues
+        $deleted = DB::statement('DELETE FROM users WHERE id = ?', [$userId]);
+
+        if (!$deleted) {
+            DB::rollBack();
+            return $this->sendError('Failed to delete user', null, 500);
+        }
+
+        DB::commit();
 
         return $this->sendResponse('User deleted successfully', [
-            'deleted_user' => $userInfo
+            'user_id' => $userId,
+            'email' => $userEmail,
         ]);
 
     } catch (\Exception $e) {
+        DB::rollBack();
+
+        \Log::error('User deletion failed', [
+            'email' => $request->email,
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+        ]);
+
         return $this->sendError('Failed to delete user: ' . $e->getMessage(), null, 500);
     }
 }
