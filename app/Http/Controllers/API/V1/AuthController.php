@@ -1029,6 +1029,8 @@ public function debugUserStatus(Request $request)
     ]);
 }
 
+
+
 /**
  * TEMPORARY: Delete user by email (FOR DEVELOPMENT ONLY)
  * Remove this endpoint in production
@@ -1052,28 +1054,38 @@ public function tempDeleteUserByEmail(Request $request)
         }
 
         $userId = $user->id;
+        $originalEmail = $user->email;
 
         // Begin transaction
         DB::beginTransaction();
 
-        // Delete tokens first
-        DB::statement("DELETE FROM personal_access_tokens WHERE tokenable_id = ? AND tokenable_type = ?", [
-            $userId, User::class
+        // Instead of deleting, mark as deleted and randomize email
+        // This avoids the prepared statement issue completely
+        $randomSuffix = '_deleted_' . time() . '_' . substr(md5(rand()), 0, 8);
+
+        $updated = $user->update([
+            'deleted_flag' => 'Y',
+            'deleted_at' => now(),
+            'email' => $originalEmail . $randomSuffix,
+            'is_active' => false
         ]);
 
-        // Delete user with direct SQL (avoids prepared statement issues)
-        $deleted = DB::statement("DELETE FROM users WHERE id = ?", [$userId]);
-
-        if (!$deleted) {
+        if (!$updated) {
             DB::rollBack();
             return $this->sendError('Failed to delete user', null, 500);
         }
+
+        // Revoke all tokens
+        $user->tokens()->delete();
 
         DB::commit();
 
         return $this->sendResponse('User deleted successfully', [
             'user_id' => $userId,
-            'email' => $request->email,
+            'email' => $originalEmail,
+            'new_email' => $user->email,
+            'deleted_flag' => $user->deleted_flag,
+            'deleted_at' => $user->deleted_at,
         ]);
 
     } catch (\Exception $e) {
@@ -1083,54 +1095,12 @@ public function tempDeleteUserByEmail(Request $request)
         \Log::error('User deletion failed', [
             'email' => $request->email,
             'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
         ]);
 
         return $this->sendError('Failed to delete user: ' . $e->getMessage(), null, 500);
     }
 }
-
-/**
- * TEMPORARY: Get user's current OTP codes (FOR DEVELOPMENT ONLY)
- * Remove this endpoint in production
- */
-public function tempGetUserOTP(Request $request)
-{
-    // Add environment check for safety
-    if (app()->environment('production')) {
-        return $this->sendError('This endpoint is not available in production', null, 403);
-    }
-
-    $validator = Validator::make($request->all(), [
-        'email' => 'required|email|exists:users,email'
-    ]);
-
-    if ($validator->fails()) {
-        return $this->sendError('Validation Error', $validator->errors(), 422);
-    }
-
-    try {
-        $user = User::where('email', $request->email)->first();
-
-        if (!$user) {
-            return $this->sendError('User not found', null, 404);
-        }
-
-        return $this->sendResponse('User OTP retrieved successfully', [
-            'user_id' => $user->id,
-            'email' => $user->email,
-            'email_otp' => $user->email_otp,
-            'email_otp_expires_at' => $user->email_otp_expires_at,
-            'reset_otp' => $user->reset_otp,
-            'registration_step' => $user->registration_step,
-            'email_verified_at' => $user->email_verified_at,
-            'is_otp_expired' => $user->email_otp_expires_at ? $user->email_otp_expires_at < now() : null
-        ]);
-
-    } catch (\Exception $e) {
-        return $this->sendError('Failed to get user OTP: ' . $e->getMessage(), null, 500);
-    }
-}
-
 /**
  * TEMPORARY: Get user's reset password OTP (FOR DEVELOPMENT ONLY)
  * Remove this endpoint in production
