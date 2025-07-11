@@ -18,7 +18,7 @@ class SocialCircleResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'description' => $this->description,
-            'icon' => $this->icon,
+          'icon' => config('app.url') . '/' . $this->logo_url . $this->logo,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];
