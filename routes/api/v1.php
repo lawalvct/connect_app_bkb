@@ -16,6 +16,8 @@ use App\Http\Controllers\API\V1\SubscriptionController;
 use App\Http\Controllers\API\V1\MessageController;
 use App\Http\Controllers\API\V1\ConversationController;
 use App\Http\Controllers\API\V1\ProfileController;
+use App\Http\Controllers\API\V1\AdController;
+use App\Http\Controllers\API\V1\AdminAdController;
 
 Route::middleware('auth:api')->get('/user', function (Request $request) {
     return $request->user();
@@ -35,6 +37,28 @@ Route::post('resend-verification-otp', [AuthController::class, 'resendVerificati
     ->middleware(['throttle:5,1']);
 Route::post('verify-email-otp', [AuthController::class, 'verifyEmailOTP'])
     ->middleware(['throttle:5,1']);
+
+
+    // Multi-step registration routes
+Route::prefix('register')->group(function () {
+    Route::post('step-1', [AuthController::class, 'registerStep1']); // Username, email, password
+    Route::post('step-2', [AuthController::class, 'registerStep2']); // OTP verification
+    Route::post('step-3', [AuthController::class, 'registerStep3']); // Date of birth, phone
+    Route::post('step-4', [AuthController::class, 'registerStep4']); // Gender
+    Route::post('step-5', [AuthController::class, 'registerStep5']); // Profile picture, bio
+    Route::post('step-6', [AuthController::class, 'registerStep6']); // Social circles (final)
+});
+
+
+
+// Temporary endpoints for frontend development (Remove in production)
+Route::prefix('temp')->group(function () {
+    Route::delete('user/delete-by-email', [AuthController::class, 'tempDeleteUserByEmail']);
+    Route::post('user/get-otp', [AuthController::class, 'tempGetUserOTP']);
+    Route::post('user/get-reset-otp', [AuthController::class, 'tempGetResetOTP']);
+    Route::post('user/user-status', [AuthController::class, 'debugUserStatus']);
+});
+
 
 // Social login routes
 Route::get('auth/{provider}', [AuthController::class, 'redirectToProvider']);
@@ -57,6 +81,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('profile/upload-multiple', [ProfileController::class, 'uploadMultipleProfilePictures']);
     Route::delete('account', [ProfileController::class, 'deleteAccount']);
     Route::post('user/timezone', [UserController::class, 'updateTimezone']);
+
+        // Profile Images Management
+        Route::get('profile/images', [ProfileController::class, 'getProfileImages']);
+        Route::get('profile/images/{imageId}', [ProfileController::class, 'getProfileImageById']);
+        Route::post('profile/images/set-main', [ProfileController::class, 'setMainProfileImage']);
+        Route::delete('profile/images', [ProfileController::class, 'deleteProfileImage']);
+
+        Route::post('profile/images/upload', [ProfileController::class, 'uploadSingleProfileImage']);
+        Route::post('profile/images/upload-multiple', [ProfileController::class, 'uploadNewProfileImages']);
+        Route::post('profile/images/bulk-upload', [ProfileController::class, 'bulkUploadProfileImages']);
+        Route::post('profile/images/replace', [ProfileController::class, 'replaceProfileImage']);
+        Route::patch('profile/images/metadata', [ProfileController::class, 'updateProfileImageMetadata']);
 
     // Social Links
     Route::get('social-links', [ProfileController::class, 'getSocialLinks']);
@@ -232,6 +268,67 @@ Route::prefix('discover')->group(function () {
         Route::post('{call}/participants/{user}/kick', [CallController::class, 'kickParticipant']);
     });
 
+
+
+
+    // User Advertising Routes
+    Route::prefix('ads')->group(function () {
+        // Dashboard and listing
+        Route::get('/dashboard', [AdController::class, 'dashboard']);
+        Route::get('/', [AdController::class, 'index']);
+        Route::get('/export', [AdController::class, 'export']);
+
+        // CRUD operations
+        Route::post('/', [AdController::class, 'store']);
+        Route::get('/{id}', [AdController::class, 'show']);
+        Route::put('/{id}', [AdController::class, 'update']);
+        Route::delete('/{id}', [AdController::class, 'destroy']);
+
+        // Ad management actions
+        Route::post('/{id}/pause', [AdController::class, 'pause']);
+        Route::post('/{id}/resume', [AdController::class, 'resume']);
+        Route::post('/{id}/stop', [AdController::class, 'stop']);
+
+        // Analytics and preview
+        Route::get('/{id}/preview', [AdController::class, 'preview']);
+        Route::get('/{id}/analytics', [AdController::class, 'analytics']);
+    });
+
+     // Ad Tracking Routes (for recording impressions and clicks)
+     Route::prefix('ads/tracking')->group(function () {
+        Route::post('/{id}/impression', [AdController::class, 'trackImpression']);
+        Route::post('/{id}/click', [AdController::class, 'trackClick']);
+    });
+
+      // Get ads for social circle feeds
+      Route::get('social-circles/{id}/ads', [AdController::class, 'getAdsForSocialCircle']);
+      Route::post('ads/for-circles', [AdController::class, 'getAdsForSocialCircles']);
+
+      Route::get('posts/feed-with-ads', [PostController::class, 'getFeedWithAds']);
+
+
+    // Admin Advertising Routes (Add role-based middleware as needed)
+    Route::prefix('admin/ads')->group(function () {
+        Route::get('/', [AdminAdController::class, 'index']);
+        Route::get('/dashboard', [AdminAdController::class, 'dashboard']);
+        Route::post('/{id}/approve', [AdminAdController::class, 'approve']);
+        Route::post('/{id}/reject', [AdminAdController::class, 'reject']);
+    });
+
+       // uncomment later for admin role base
+    //    Route::prefix('admin/ads')->middleware(['role:admin'])->group(function () {
+    //     Route::get('/', [AdminAdController::class, 'index']);
+    //     Route::get('/dashboard', [AdminAdController::class, 'dashboard']);
+    //     Route::post('/{id}/approve', [AdminAdController::class, 'approve']);
+    //     Route::post('/{id}/reject', [AdminAdController::class, 'reject']);
+    // });
+
+});
+
+
+
+
+
     // Test service - Remove this in production
     Route::get('test-agora', function () {
         return \App\Helpers\AgoraHelper::testTokenGeneration();
@@ -255,7 +352,7 @@ Route::prefix('discover')->group(function () {
             return response()->json(['error' => $e->getMessage()]);
         }
     });
-});
+
 
 
   // Webhook routes (no auth needed)

@@ -22,22 +22,6 @@ class S3UploadHelper
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
         try {
             // Generate a unique filename
             $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();

@@ -68,6 +68,7 @@ class User extends Authenticatable implements MustVerifyEmail
          'email_otp_expires_at',
          'deleted_at',
         'deleted_flag',
+        'registration_step'
     ];
 
     /**
@@ -155,7 +156,7 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
-     * Get the social circles that the user belongs to.
+     * Get the social circles that belong to the user.
      */
     public function socialCircles()
     {
@@ -163,7 +164,8 @@ class User extends Authenticatable implements MustVerifyEmail
             ->withTimestamps()
             ->withPivot(['deleted_at', 'deleted_flag'])
             ->wherePivot('deleted_flag', 'N')
-            ->withoutGlobalScopes(); // This removes the global scope that's causing the ambiguity
+            ->where('social_circles.deleted_flag', 'N')
+            ->where('social_circles.is_active', true);
     }
 
     /**
@@ -910,4 +912,55 @@ public function profileUploads()
 
         return 'none';
     }
+
+     /**
+     * Get all profile images for the user (from both tables)
+     */
+    public function getAllProfileImages()
+    {
+        $profileMultiUploads = $this->hasMany(UserProfileUpload::class)
+            ->where('deleted_flag', 'N')
+            ->get()
+            ->map(function ($upload) {
+                return [
+                    'id' => $upload->id,
+                    'type' => 'profile_multi',
+                    'filename' => $upload->profile,
+                    'url' => $upload->profile_url . $upload->profile,
+                    'full_url' => url($upload->profile_url . $upload->profile),
+                    'is_main' => $this->profile === $upload->profile,
+                    'created_at' => $upload->created_at,
+                    'updated_at' => $upload->updated_at,
+                ];
+            });
+
+        $userProfileUploads = $this->profileUploads
+            ->map(function ($upload) {
+                return [
+                    'id' => $upload->id,
+                    'type' => 'user_profile',
+                    'filename' => $upload->file_name,
+                    'url' => $upload->file_url,
+                    'full_url' => url($upload->file_url),
+                    'file_type' => $upload->file_type,
+                    'is_main' => $this->profile === $upload->file_name,
+                    'created_at' => $upload->created_at,
+                    'updated_at' => $upload->updated_at,
+                ];
+            });
+
+        return $profileMultiUploads->concat($userProfileUploads)
+            ->sortByDesc('created_at')
+            ->values();
+    }
+
+    /**
+     * Get profile multi uploads relationship
+     */
+    public function profileMultiUploads()
+    {
+        return $this->hasMany(UserProfileUpload::class)
+                    ->where('deleted_flag', 'N');
+    }
+
 }

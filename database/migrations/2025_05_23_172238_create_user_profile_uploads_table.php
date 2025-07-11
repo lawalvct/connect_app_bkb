@@ -19,6 +19,10 @@ class CreateUserProfileUploadsTable extends Migration
             $table->string('file_name');
             $table->string('file_url');
             $table->string('file_type')->default('image'); // 'image' or 'video'
+            $table->string('caption')->nullable(); // Image caption
+            $table->string('alt_text')->nullable(); // Alt text for accessibility
+            $table->json('tags')->nullable(); // Tags for the image
+            $table->json('metadata')->nullable(); // Additional metadata (dimensions, etc.)
             $table->enum('deleted_flag', ['Y', 'N'])->default('N');
             $table->timestamps();
             $table->timestamp('deleted_at')->nullable();
@@ -27,6 +31,8 @@ class CreateUserProfileUploadsTable extends Migration
                   ->references('id')
                   ->on('users')
                   ->onDelete('cascade');
+
+            $table->index(['user_id', 'deleted_flag']);
         });
     }
 
