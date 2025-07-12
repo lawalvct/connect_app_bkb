@@ -31,6 +31,7 @@ Route::post('forgot-password', [AuthController::class, 'forgotPassword']);
 Route::post('verify-reset-otp', [AuthController::class, 'verifyResetOTP']);
 Route::post('reset-password', [AuthController::class, 'resetPassword']);
 Route::get('countries', [UserController::class, 'getCountries']);
+Route::get('states/{country}', [UserController::class, 'getStatesByCountry']);
 Route::get('social-circles', [SocialCircleController::class, 'index']);
 Route::post('verify-email', [AuthController::class, 'verifyEmail']);
 Route::post('resend-verification-otp', [AuthController::class, 'resendVerificationOTP'])

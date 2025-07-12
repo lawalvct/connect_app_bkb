@@ -20,7 +20,7 @@ class CountryResource extends JsonResource
             'code' => $this->code,
             'phone_code' => $this->phone_code,
             'timezone' => $this->timezone,
-            'flag' => $this->flag,
+            'flag' =>'https://flagcdn.com/w80/'.strtolower($this->code).'.png',
             'emoji' => $this->emoji,
             'currency' => $this->currency,
             'currency_code' => $this->currency_code,

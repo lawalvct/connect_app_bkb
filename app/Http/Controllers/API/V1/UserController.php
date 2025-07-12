@@ -14,6 +14,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Validator;
+use App\Http\Resources\V1\StateResource;
+use App\Models\State as CountState;
+
 
 class UserController extends BaseController
 {
@@ -174,4 +177,28 @@ public function getCountries()
             return $this->sendError('Failed to update timezone', $e->getMessage(), 500);
         }
     }
+
+public function getStatesByCountry($country)
+{
+    try {
+        $states = Cache::remember("states.{$country}", 60*24, function () use ($country) {
+            return CountState::where('country_id', $country)
+                ->orWhere('country_code', strtoupper($country))
+                ->orderBy('name', 'asc')
+                ->get();
+        });
+
+        if ($states->isEmpty()) {
+            return $this->sendError('No states found for this country', [], 404);
+        }
+
+        return $this->sendResponse('States retrieved successfully', [
+            'states' => StateResource::collection($states)
+        ]);
+    } catch (\Exception $e) {
+        return $this->sendError('Failed to retrieve states', $e->getMessage(), 500);
+    }
+}
+
+
 }
