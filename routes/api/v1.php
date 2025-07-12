@@ -78,6 +78,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('user', [UserController::class, 'show']);
     Route::get('user/{id}', [UserController::class, 'getUserById']);
     Route::post('profile', [ProfileController::class, 'update']);
+    Route::post('profile/social-links', [ProfileController::class, 'updateSocialLinks']);
     Route::post('profile/upload', [ProfileController::class, 'uploadProfilePicture']);
     Route::post('profile/upload-multiple', [ProfileController::class, 'uploadMultipleProfilePictures']);
     Route::delete('account', [ProfileController::class, 'deleteAccount']);

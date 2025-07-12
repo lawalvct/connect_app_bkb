@@ -758,7 +758,7 @@ class ProfileController extends BaseController
      */
     public function replaceProfileImage(Request $request)
     {
-    
+
         $validator = Validator::make($request->all(), [
             'image_id' => 'required|integer',
             'image_type' => 'required|string|in:profile_multi,user_profile',
@@ -1160,5 +1160,35 @@ class ProfileController extends BaseController
             return $this->sendError('Failed to update image metadata', $e->getMessage(), 500);
         }
     }
+
+
+    public function updateSocialLinks(Request $request)
+{
+    $validator = Validator::make($request->all(), [
+        'social_links' => 'required|array',
+        'social_links.*.platform' => 'required|string',
+        'social_links.*.url' => 'required|url'
+    ]);
+
+    if ($validator->fails()) {
+        return $this->sendError('Validation error', $validator->errors(), 422);
+    }
+
+    try {
+        $user = $request->user();
+
+        // Update social links
+        $user->update([
+            'social_links' => json_encode($request->social_links)
+        ]);
+
+        return $this->sendResponse('Social links updated successfully', [
+            'user' => new UserResource($user->fresh()),
+            'social_links' => json_decode($user->social_links, true)
+        ]);
+    } catch (\Exception $e) {
+        return $this->sendError('Failed to update social links', $e->getMessage(), 500);
+    }
+}
 
 }
