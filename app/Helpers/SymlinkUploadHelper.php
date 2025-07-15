@@ -69,16 +69,16 @@ class SymlinkUploadHelper
             if ($isProduction) {
                 // For production server
                 // Ensure the uploads directory exists in public
-                if (!file_exists('/var/www/wwwroot/connectapp.myschoolep.com/public/uploads')) {
+                if (!file_exists('/www/wwwroot/connectapp.myschoolep.com/public/uploads')) {
                     // Create the directory first
-                    mkdir('/var/www/wwwroot/connectapp.myschoolep.com/public/uploads', 0755, true);
+                    mkdir('/www/wwwroot/connectapp.myschoolep.com/public/uploads', 0755, true);
 
                     // Create symlink for the entire uploads directory
-                    symlink('/var/www/wwwroot/uploads', '/www/wwwroot/connectapp.myschoolep.com/public/uploads');
+                    symlink('/www/wwwroot/uploads', '/www/wwwroot/connectapp.myschoolep.com/public/uploads');
                 }
 
                 // Ensure the specific folder exists
-                $publicFolderPath = '/var/www/wwwroot/connectapp.myschoolep.com/public/uploads/' . $folder;
+                $publicFolderPath = '/www/wwwroot/connectapp.myschoolep.com/public/uploads/' . $folder;
                 if (!file_exists($publicFolderPath)) {
                     mkdir($publicFolderPath, 0755, true);
                 }

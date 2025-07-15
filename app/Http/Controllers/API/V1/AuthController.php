@@ -25,6 +25,7 @@ use Illuminate\Support\Facades\Mail;
 use illuminate\Support\Str;
 
 
+
 use App\Http\Requests\V1\RegisterStep1Request;
 use App\Http\Requests\V1\RegisterStep2Request;
 use App\Http\Requests\V1\RegisterStep3Request;
@@ -32,6 +33,8 @@ use App\Http\Requests\V1\RegisterStep4Request;
 use App\Http\Requests\V1\RegisterStep5Request;
 use App\Http\Requests\V1\RegisterStep6Request;
 use Illuminate\Support\Facades\DB;
+use App\Helpers\StorageUploadHelper;
+use Illuminate\Support\Facades\Log;
 
 class AuthController extends BaseController
 {
@@ -72,9 +75,7 @@ public function register(RegisterRequest $request)
         // Prepare registration data
         $registrationData = $request->validated();
 
-        // Handle profile image upload if provided - this will be the primary image in users table
-       // Replace lines 75-79 with:
-if ($request->hasFile('profile_image')) {
+        if ($request->hasFile('profile_image')) {
     try {
         $profileImage = $request->file('profile_image');
 
@@ -83,14 +84,22 @@ if ($request->hasFile('profile_image')) {
             return $this->sendError('Invalid profile image: ' . $profileImage->getErrorMessage(), null, 400);
         }
 
-        $fileData = SymlinkUploadHelper::uploadFile(
+        // Log file details for debugging
+        Log::info('Processing profile image upload', [
+            'original_name' => $profileImage->getClientOriginalName(),
+            'size' => $profileImage->getSize(),
+            'mime_type' => $profileImage->getMimeType()
+        ]);
+
+        // Upload file using our helper
+        $fileData = StorageUploadHelper::uploadFile(
             $profileImage,
             'profiles'
         );
 
         // Update the user data with the file information
         $registrationData['profile'] = $fileData['filename'];
-        $registrationData['profile_url'] = 'uploads/profiles/';
+        $registrationData['profile_url'] = $fileData['url'];
 
     } catch (\Exception $e) {
         Log::error('Profile image upload failed during registration', [
@@ -102,6 +111,7 @@ if ($request->hasFile('profile_image')) {
         Log::info('Continuing registration without profile image');
     }
 }
+
 
         // Process social circles if provided
         if ($request->has('social_circles')) {
@@ -923,13 +933,25 @@ public function resendVerificationEmail(Request $request)
 
             // Handle profile image upload
             if ($request->hasFile('profile_image') && $request->file('profile_image')->isValid()) {
-                $fileData = S3UploadHelper::uploadFile(
-                    $request->file('profile_image'),
-                    'profiles'
-                );
+               try {
+        $fileData = StorageUploadHelper::uploadFile(
+            $request->file('profile_image'),
+            'profiles'
+        );
 
-                $updateData['profile'] = $fileData['filename'];
-                $updateData['profile_url'] = $fileData['url'];
+        $updateData['profile'] = $fileData['filename'];
+        $updateData['profile_url'] = $fileData['url'];
+
+        Log::info('Profile image uploaded in step 5', [
+            'filename' => $fileData['filename'],
+            'url' => $fileData['url']
+        ]);
+    } catch (\Exception $e) {
+        Log::error('Profile image upload failed in step 5', [
+            'error' => $e->getMessage()
+        ]);
+        // Continue without profile image
+    }
             }
 
             $user->update($updateData);
