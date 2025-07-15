@@ -17,14 +17,15 @@ use Illuminate\Support\Facades\Log;
 
 class MediaProcessingService
 {
-    protected $s3Disk;
+    protected $localDisk;
     protected $imageManager;
     protected $allowedImageTypes = ['jpeg', 'jpg', 'png', 'gif', 'webp'];
     protected $allowedVideoTypes = ['mp4', 'mov', 'avi', 'wmv', 'flv', 'webm'];
+    protected $baseUploadPath = 'uploads/post';
 
     public function __construct()
     {
-        $this->s3Disk = Storage::disk('s3');
+        $this->localDisk = Storage::disk('public');
         $this->imageManager = new ImageManager(new GdDriver());
     }
 
@@ -39,7 +40,7 @@ class MediaProcessingService
 
         // Generate unique filename
         $filename = $this->generateFilename($fileExtension);
-        $basePath = "posts/{$postId}";
+        $basePath = "{$this->baseUploadPath}/{$postId}";
 
         // Determine file type
         $type = $this->determineFileType($fileExtension, $mimeType);
@@ -83,6 +84,9 @@ class MediaProcessingService
         $originalWidth = $image->width();
         $originalHeight = $image->height();
 
+        // Create directory if it doesn't exist
+        $this->ensureDirectoryExists("{$basePath}/original");
+
         // Upload original (compressed)
         $originalPath = "{$basePath}/original/{$filename}";
 
@@ -94,7 +98,7 @@ class MediaProcessingService
             'jpg', 'jpeg' => $image->encode(new JpegEncoder(quality: 85)),
             default => $image->encode(new JpegEncoder(quality: 85)) // Fallback
         };
-        $this->s3Disk->put($originalPath, $encodedOriginal->toString());
+        $this->localDisk->put($originalPath, $encodedOriginal->toString());
 
         // Create different sizes
         $compressedVersions = [];
@@ -110,6 +114,9 @@ class MediaProcessingService
         $resizedFilenameBase = pathinfo($filename, PATHINFO_FILENAME);
 
         foreach ($sizes as $sizeName => $dimensions) {
+            // Create directory if it doesn't exist
+            $this->ensureDirectoryExists("{$basePath}/{$sizeName}");
+
             // Clone the image object to avoid modifying the original in loop
             $resizedImage = clone $image;
             $resizedImage->cover($dimensions['width'], $dimensions['height']); // Use cover or fit
@@ -119,13 +126,13 @@ class MediaProcessingService
 
             $resizedCompressed = $resizedImage->encode(new JpegEncoder(quality: 80));
 
-            $this->s3Disk->put($resizedPath, $resizedCompressed->toString());
-            $compressedVersions[$sizeName] = $this->s3Disk->url($resizedPath);
+            $this->localDisk->put($resizedPath, $resizedCompressed->toString());
+            $compressedVersions[$sizeName] = asset("storage/{$resizedPath}");
         }
 
         return [
             'file_path' => $originalPath,
-            'file_url' => $this->s3Disk->url($originalPath),
+            'file_url' => asset("storage/{$originalPath}"),
             'width' => $originalWidth,
             'height' => $originalHeight,
             'compressed_versions' => $compressedVersions,
@@ -137,9 +144,12 @@ class MediaProcessingService
      */
     protected function processVideo(UploadedFile $file, string $basePath, string $filename): array
     {
+        // Create directory if it doesn't exist
+        $this->ensureDirectoryExists("{$basePath}/videos");
+
         // Upload original video
         $originalPath = "{$basePath}/videos/{$filename}";
-        $this->s3Disk->putFileAs($basePath . '/videos', $file, $filename);
+        $this->localDisk->putFileAs($basePath . '/videos', $file, $filename);
 
         // Get video info (you might need ffprobe for this)
         $videoInfo = $this->getVideoInfo($file);
@@ -149,12 +159,12 @@ class MediaProcessingService
 
         return [
             'file_path' => $originalPath,
-            'file_url' => $this->s3Disk->url($originalPath),
+            'file_url' => asset("storage/{$originalPath}"),
             'width' => $videoInfo['width'] ?? null,
             'height' => $videoInfo['height'] ?? null,
             'duration' => $videoInfo['duration'] ?? null,
             'thumbnail_path' => $thumbnailPath,
-            'thumbnail_url' => $thumbnailPath ? $this->s3Disk->url($thumbnailPath) : null,
+            'thumbnail_url' => $thumbnailPath ? asset("storage/{$thumbnailPath}") : null,
         ];
     }
 
@@ -163,12 +173,15 @@ class MediaProcessingService
      */
     protected function processDocument(UploadedFile $file, string $basePath, string $filename): array
     {
+        // Create directory if it doesn't exist
+        $this->ensureDirectoryExists("{$basePath}/documents");
+
         $documentPath = "{$basePath}/documents/{$filename}";
-        $this->s3Disk->putFileAs($basePath . '/documents', $file, $filename);
+        $this->localDisk->putFileAs($basePath . '/documents', $file, $filename);
 
         return [
             'file_path' => $documentPath,
-            'file_url' => $this->s3Disk->url($documentPath),
+            'file_url' => asset("storage/{$documentPath}"),
         ];
     }
 
@@ -178,6 +191,9 @@ class MediaProcessingService
     protected function generateVideoThumbnail(UploadedFile $file, string $basePath, string $filename): ?string
     {
         try {
+            // Create directory if it doesn't exist
+            $this->ensureDirectoryExists("{$basePath}/thumbnails");
+
             $thumbnailFilename = pathinfo($filename, PATHINFO_FILENAME) . '_thumb.jpg';
             $thumbnailPath = "{$basePath}/thumbnails/{$thumbnailFilename}";
 
@@ -187,12 +203,12 @@ class MediaProcessingService
             // $frame = $video->frame(FFMpeg\Coordinate\TimeCode::fromSeconds(1));
             // $tempThumbnailPath = tempnam(sys_get_temp_dir(), 'thumb') . '.jpg';
             // $frame->save($tempThumbnailPath);
-            // $this->s3Disk->put($thumbnailPath, file_get_contents($tempThumbnailPath));
+            // $this->localDisk->put($thumbnailPath, file_get_contents($tempThumbnailPath));
             // unlink($tempThumbnailPath);
 
             // For now, returning the path, assuming it will be generated
             // If FFMpeg is not set up, you might want to return null or handle it
-            // $this->s3Disk->put($thumbnailPath, ''); // Example: Put an empty file or placeholder
+            // $this->localDisk->put($thumbnailPath, ''); // Example: Put an empty file or placeholder
             return $thumbnailPath; // Or null if not implemented
         } catch (\Exception $e) {
             Log::warning('Thumbnail generation failed', ['file' => $filename, 'error' => $e->getMessage()]);
@@ -251,128 +267,144 @@ class MediaProcessingService
     }
 
     /**
-     * Delete media files from S3
+     * Delete media files from local storage
      */
     public function deleteMedia(array $filePaths): void
     {
         foreach ($filePaths as $path) {
-            if ($path && $this->s3Disk->exists($path)) {
-                $this->s3Disk->delete($path);
+            if ($path && $this->localDisk->exists($path)) {
+                $this->localDisk->delete($path);
             }
         }
     }
-
 
     /**
- * Process and upload a file
- *
- * @param \Illuminate\Http\UploadedFile $file
- * @param string $path
- * @param string $type
- * @return array
- */
-public function processUpload(UploadedFile $file, string $path, string $type = null): array
-{
-    $fileExtension = strtolower($file->getClientOriginalExtension());
-    $mimeType = $file->getMimeType();
-    $originalName = $file->getClientOriginalName();
+     * Process and upload a file
+     *
+     * @param \Illuminate\Http\UploadedFile $file
+     * @param string $path
+     * @param string $type
+     * @return array
+     */
+    public function processUpload(UploadedFile $file, string $path, string $type = null): array
+    {
+        $fileExtension = strtolower($file->getClientOriginalExtension());
+        $mimeType = $file->getMimeType();
+        $originalName = $file->getClientOriginalName();
 
-    // Generate unique filename
-    $filename = $this->generateFilename($fileExtension);
+        // Generate unique filename
+        $filename = $this->generateFilename($fileExtension);
 
-    // Determine file type if not provided
-    if (!$type) {
-        $type = $this->determineFileType($fileExtension, $mimeType);
-    }
-
-    $result = [
-        'type' => $type,
-        'original_name' => $originalName,
-        'file_size' => $file->getSize(),
-        'mime_type' => $mimeType,
-    ];
-
-    try {
-        // Upload the file to S3
-        $filePath = "{$path}/{$filename}";
-        $this->s3Disk->putFileAs($path, $file, $filename);
-
-        $result['file_path'] = $filePath;
-        $result['file_url'] = $this->s3Disk->url($filePath);
-
-        // For images, we can generate thumbnails
-        if ($type === 'image') {
-            try {
-                $image = $this->imageManager->read($file->getPathname());
-                $result['width'] = $image->width();
-                $result['height'] = $image->height();
-
-                // Generate thumbnail
-                $thumbnailPath = "{$path}/thumbnails/{$filename}";
-                $thumbnail = clone $image;
-                $thumbnail->cover(300, 300);
-                $thumbnailData = $thumbnail->encode(new JpegEncoder(quality: 80));
-                $this->s3Disk->put($thumbnailPath, $thumbnailData->toString());
-                $result['thumbnail_url'] = $this->s3Disk->url($thumbnailPath);
-            } catch (\Exception $e) {
-                // Log but continue if thumbnail generation fails
-                Log::warning('Thumbnail generation failed', [
-                    'file' => $originalName,
-                    'error' => $e->getMessage()
-                ]);
-            }
+        // Determine file type if not provided
+        if (!$type) {
+            $type = $this->determineFileType($fileExtension, $mimeType);
         }
 
-        // For videos, we can generate a thumbnail frame
-        if ($type === 'video') {
-            $thumbnailPath = $this->generateVideoThumbnail($file, $path, $filename);
-            if ($thumbnailPath) {
-                $result['thumbnail_url'] = $this->s3Disk->url($thumbnailPath);
+        $result = [
+            'type' => $type,
+            'original_name' => $originalName,
+            'file_size' => $file->getSize(),
+            'mime_type' => $mimeType,
+        ];
+
+        try {
+            // Create directory if it doesn't exist
+            $this->ensureDirectoryExists($path);
+
+            // Upload the file locally
+            $filePath = "{$path}/{$filename}";
+            $this->localDisk->putFileAs($path, $file, $filename);
+
+            $result['file_path'] = $filePath;
+            $result['file_url'] = asset("storage/{$filePath}");
+
+            // For images, we can generate thumbnails
+            if ($type === 'image') {
+                try {
+                    $image = $this->imageManager->read($file->getPathname());
+                    $result['width'] = $image->width();
+                    $result['height'] = $image->height();
+
+                    // Create directory if it doesn't exist
+                    $this->ensureDirectoryExists("{$path}/thumbnails");
+
+                    // Generate thumbnail
+                    $thumbnailPath = "{$path}/thumbnails/{$filename}";
+                    $thumbnail = clone $image;
+                    $thumbnail->cover(300, 300);
+                    $thumbnailData = $thumbnail->encode(new JpegEncoder(quality: 80));
+                    $this->localDisk->put($thumbnailPath, $thumbnailData->toString());
+                    $result['thumbnail_url'] = asset("storage/{$thumbnailPath}");
+                } catch (\Exception $e) {
+                    // Log but continue if thumbnail generation fails
+                    Log::warning('Thumbnail generation failed', [
+                        'file' => $originalName,
+                        'error' => $e->getMessage()
+                    ]);
+                }
             }
-        }
 
-        return $result;
-
-    } catch (\Exception $e) {
-        Log::error('File upload failed', [
-            'file' => $originalName,
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString()
-        ]);
-
-        throw new \Exception('Failed to upload file: ' . $e->getMessage());
-    }
-}
-
-
-public function deleteFile(string $filePath): bool
-{
-    try {
-        if ($filePath && $this->s3Disk->exists($filePath)) {
-            $this->s3Disk->delete($filePath);
-
-            // Also try to delete thumbnail if it exists
-            $pathInfo = pathinfo($filePath);
-            $thumbnailPath = $pathInfo['dirname'] . '/thumbnails/' . $pathInfo['basename'];
-            if ($this->s3Disk->exists($thumbnailPath)) {
-                $this->s3Disk->delete($thumbnailPath);
+            // For videos, we can generate a thumbnail frame
+            if ($type === 'video') {
+                $thumbnailPath = $this->generateVideoThumbnail($file, $path, $filename);
+                if ($thumbnailPath) {
+                    $result['thumbnail_url'] = asset("storage/{$thumbnailPath}");
+                }
             }
 
-            Log::info('File deleted successfully', ['file_path' => $filePath]);
-            return true;
+            return $result;
+
+        } catch (\Exception $e) {
+            Log::error('File upload failed', [
+                'file' => $originalName,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            throw new \Exception('Failed to upload file: ' . $e->getMessage());
         }
-
-        Log::warning('File not found for deletion', ['file_path' => $filePath]);
-        return false;
-
-    } catch (\Exception $e) {
-        Log::error('File deletion failed', [
-            'file_path' => $filePath,
-            'error' => $e->getMessage()
-        ]);
-
-        return false;
     }
-}
 
+    /**
+     * Ensure directory exists
+     */
+    protected function ensureDirectoryExists(string $path): void
+    {
+        if (!$this->localDisk->exists($path)) {
+            $this->localDisk->makeDirectory($path, 0755, true);
+        }
+    }
+
+    /**
+     * Delete a file
+     */
+    public function deleteFile(string $filePath): bool
+    {
+        try {
+            if ($filePath && $this->localDisk->exists($filePath)) {
+                $this->localDisk->delete($filePath);
+
+                // Also try to delete thumbnail if it exists
+                              $pathInfo = pathinfo($filePath);
+                $thumbnailPath = $pathInfo['dirname'] . '/thumbnails/' . $pathInfo['basename'];
+                if ($this->localDisk->exists($thumbnailPath)) {
+                    $this->localDisk->delete($thumbnailPath);
+                }
+
+                Log::info('File deleted successfully', ['file_path' => $filePath]);
+                return true;
+            }
+
+            Log::warning('File not found for deletion', ['file_path' => $filePath]);
+            return false;
+
+        } catch (\Exception $e) {
+            Log::error('File deletion failed', [
+                'file_path' => $filePath,
+                'error' => $e->getMessage()
+            ]);
+
+            return false;
+        }
+    }
 }
