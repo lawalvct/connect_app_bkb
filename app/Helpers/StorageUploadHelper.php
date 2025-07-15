@@ -4,15 +4,15 @@ namespace App\Helpers;
 
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\File;
 
 class StorageUploadHelper
 {
     /**
-     * Upload file to public storage
+     * Upload file to public/uploads directory
      *
      * @param UploadedFile $file
-     * @param string $folder Subfolder within storage/app/public
+     * @param string $folder Subfolder within public/uploads
      * @return array
      * @throws \Exception
      */
@@ -27,31 +27,43 @@ class StorageUploadHelper
             // Generate unique filename
             $filename = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
 
-            // Store file in the public disk under the specified folder
-            $path = $file->storeAs($folder, $filename, 'public');
+            // Set the upload directory path
+            $uploadDir = public_path('uploads/' . $folder);
 
-            if (!$path) {
-                throw new \Exception("Failed to store file");
+            // Ensure the directory exists
+            if (!File::exists($uploadDir)) {
+                File::makeDirectory($uploadDir, 0755, true);
             }
 
-            // Get the public URL
-            $url = Storage::disk('public')->url($path);
+            // Move the uploaded file to the destination
+            $file->move($uploadDir, $filename);
+
+            // Full path to the file
+            $fullPath = $uploadDir . '/' . $filename;
+
+            // Verify the file was uploaded successfully
+            if (!File::exists($fullPath)) {
+                throw new \Exception("File was not uploaded successfully");
+            }
+
+            // Generate URL
+            $url = 'uploads/' . $folder . '/' . $filename;
 
             // Log successful upload
             Log::info('File uploaded successfully', [
                 'filename' => $filename,
-                'path' => $path,
+                'path' => $fullPath,
                 'url' => $url
             ]);
 
             return [
                 'success' => true,
                 'filename' => $filename,
-                'path' => $path,
+                'path' => 'uploads/' . $folder . '/' . $filename,
                 'url' => $url,
                 'full_url' => asset($url),
-                'size' => $file->getSize(),
-                'mime_type' => $file->getMimeType() ?: 'application/octet-stream',
+                'size' => File::size($fullPath),
+                'mime_type' => File::mimeType($fullPath),
                 'original_name' => $file->getClientOriginalName(),
             ];
 

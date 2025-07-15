@@ -109,34 +109,47 @@ class UserResource extends JsonResource
         ];
     }
 
-    /**
-     * Get properly formatted profile URL
-     *
-     * @return string|null
-     */
-    protected function getProfileUrl()
-    {
-        if (!$this->profile) {
-            return null;
-        }
-
-        // If profile_url already contains a full URL (e.g. from social login)
-        if ($this->profile_url && filter_var($this->profile_url, FILTER_VALIDATE_URL)) {
-            return $this->profile_url;
-        }
-
-        // If profile_url is an S3 path (e.g., 'profiles/image.jpg') and profile is just the filename
-        if ($this->profile_url && $this->profile) {
-             // Assuming profile_url might be a directory path and profile is the filename
-            $path = trim($this->profile_url, '/') . '/' . $this->profile;
-            return Storage::disk(env('FILESYSTEM_DISK', 'public'))->url($path);
-        }
-
-        // If only profile (filename) is available, assume it's in a default 'profiles' S3 directory
-        if ($this->profile) {
-            return Storage::disk(env('FILESYSTEM_DISK', 'public'))->url('profiles/' . $this->profile);
-        }
-
+   /**
+ * Get properly formatted profile URL
+ *
+ * @return string|null
+ */
+protected function getProfileUrl()
+{
+    if (!$this->profile) {
         return null;
     }
+
+    // If profile_url already contains a full URL (e.g. from social login)
+    if ($this->profile_url && filter_var($this->profile_url, FILTER_VALIDATE_URL)) {
+        return $this->profile_url;
+    }
+
+    // If profile_url is provided and profile is just the filename
+    if ($this->profile_url && $this->profile) {
+        // Check if profile_url already contains 'uploads/'
+        if (strpos($this->profile_url, 'uploads/') !== false) {
+            // Direct path to public directory
+            return url($this->profile_url . $this->profile);
+        } else {
+            // Combine path and filename
+            $path = trim($this->profile_url, '/') . '/' . $this->profile;
+
+            // Check if this is a storage path or direct public path
+            if (strpos($this->profile_url, 'storage/') === 0) {
+                return Storage::disk(env('FILESYSTEM_DISK', 'public'))->url($path);
+            } else {
+                return url($path);
+            }
+        }
+    }
+
+    // If only profile (filename) is available, assume it's in a default 'uploads/profiles' directory
+    if ($this->profile) {
+        return url('uploads/profiles/' . $this->profile);
+    }
+
+    return null;
+}
+
 }

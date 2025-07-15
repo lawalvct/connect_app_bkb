@@ -75,7 +75,7 @@ public function register(RegisterRequest $request)
         // Prepare registration data
         $registrationData = $request->validated();
 
-        if ($request->hasFile('profile_image')) {
+       if ($request->hasFile('profile_image')) {
     try {
         $profileImage = $request->file('profile_image');
 
@@ -99,7 +99,7 @@ public function register(RegisterRequest $request)
 
         // Update the user data with the file information
         $registrationData['profile'] = $fileData['filename'];
-        $registrationData['profile_url'] = $fileData['url'];
+        $registrationData['profile_url'] = 'uploads/profiles/';
 
     } catch (\Exception $e) {
         Log::error('Profile image upload failed during registration', [
@@ -932,15 +932,15 @@ public function resendVerificationEmail(Request $request)
             ];
 
             // Handle profile image upload
-            if ($request->hasFile('profile_image') && $request->file('profile_image')->isValid()) {
-               try {
+          if ($request->hasFile('profile_image') && $request->file('profile_image')->isValid()) {
+    try {
         $fileData = StorageUploadHelper::uploadFile(
             $request->file('profile_image'),
             'profiles'
         );
 
         $updateData['profile'] = $fileData['filename'];
-        $updateData['profile_url'] = $fileData['url'];
+        $updateData['profile_url'] = 'uploads/profiles/';
 
         Log::info('Profile image uploaded in step 5', [
             'filename' => $fileData['filename'],
@@ -952,7 +952,7 @@ public function resendVerificationEmail(Request $request)
         ]);
         // Continue without profile image
     }
-            }
+}
 
             $user->update($updateData);
 
