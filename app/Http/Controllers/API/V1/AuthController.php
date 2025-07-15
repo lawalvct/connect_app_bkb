@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use App\Exceptions\AuthenticationException;
 use App\Helpers\S3UploadHelper;
+use App\Helpers\SymlinkUploadHelper;
 use Illuminate\Validation\ValidationException;
 use Laravel\Socialite\Facades\Socialite;
 use App\Mail\WelcomeEmail;
@@ -72,15 +73,35 @@ public function register(RegisterRequest $request)
         $registrationData = $request->validated();
 
         // Handle profile image upload if provided - this will be the primary image in users table
-        if ($request->hasFile('profile_image') && $request->file('profile_image')->isValid()) {
-            $fileData = S3UploadHelper::uploadFile(
-                $request->file('profile_image'),
-                'profiles'
-            );
+       // Replace lines 75-79 with:
+if ($request->hasFile('profile_image')) {
+    try {
+        $profileImage = $request->file('profile_image');
 
-            $registrationData['profile'] = $fileData['filename'];
-            $registrationData['profile_url'] = $fileData['url'];
+        // Validate file
+        if (!$profileImage->isValid()) {
+            return $this->sendError('Invalid profile image: ' . $profileImage->getErrorMessage(), null, 400);
         }
+
+        $fileData = SymlinkUploadHelper::uploadFile(
+            $profileImage,
+            'profiles'
+        );
+
+        // Update the user data with the file information
+        $registrationData['profile'] = $fileData['filename'];
+        $registrationData['profile_url'] = 'uploads/profiles/';
+
+    } catch (\Exception $e) {
+        Log::error('Profile image upload failed during registration', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+
+        // Continue registration without profile image
+        Log::info('Continuing registration without profile image');
+    }
+}
 
         // Process social circles if provided
         if ($request->has('social_circles')) {
