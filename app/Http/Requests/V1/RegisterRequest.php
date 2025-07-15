@@ -43,7 +43,7 @@ class RegisterRequest extends FormRequest
             'device_token' => 'nullable|string',
             'social_circles' => 'nullable|array',
             'social_circles.*' => 'exists:social_circles,id',
-            'profile_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:10048',
+            'profile_media' => 'nullable|file|mimes:jpeg,png,jpg,gif,mp4,mov,avi,wmv|max:100000',
           //  'recaptcha_token' => 'required|string',
             'website' => 'prohibited', // Honeypot field - should always be empty
         ];

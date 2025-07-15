@@ -17,7 +17,7 @@ class RegisterStep5Request extends FormRequest
     {
         return [
             'email' => 'required|email|exists:users,email',
-            'profile_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:10048',
+             'profile_media' => 'nullable|file|mimes:jpeg,png,jpg,gif,mp4,mov,avi,wmv|max:100000',
             'bio' => 'nullable|string|max:500',
         ];
     }
