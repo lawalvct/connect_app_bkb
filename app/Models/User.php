@@ -9,6 +9,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Storage;
 use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable implements MustVerifyEmail
@@ -119,6 +120,72 @@ class User extends Authenticatable implements MustVerifyEmail
         'deleted_at' => 'datetime',
     ];
 
+
+     /**
+     * Get the full profile URL
+     *
+     * @return string
+     */
+    public function getProfileUrlAttribute()
+    {
+        if (empty($this->profile)) {
+            return null;
+        }
+
+        // Check if the profile is already a full URL
+        if (filter_var($this->profile, FILTER_VALIDATE_URL)) {
+            return $this->profile;
+        }
+
+        // Check if the profile is a video file
+        $videoExtensions = ['mp4', 'mov', 'avi', 'wmv', 'flv', 'webm'];
+        $extension = pathinfo($this->profile, PATHINFO_EXTENSION);
+        $isVideo = in_array(strtolower($extension), $videoExtensions);
+
+        // Base path for profiles
+        $basePath = 'uploads/profiles/';
+
+        // Full URL with domain
+        $baseUrl = url('/');
+
+        // If using S3 or other cloud storage
+        if (config('filesystems.default') === 's3') {
+            return Storage::disk('s3')->url($basePath . $this->profile);
+        }
+
+        // For local storage
+        return $baseUrl . '/' . $basePath . $this->profile;
+    }
+
+     public function getAvatarUrlAttribute()
+    {
+        if (empty($this->avatar)) {
+            // Return default avatar
+            return url('/images/default-avatar.png');
+        }
+
+        // Check if the avatar is already a full URL
+        if (filter_var($this->avatar, FILTER_VALIDATE_URL)) {
+            return $this->avatar;
+        }
+
+        // Base path for avatars
+        $basePath = 'uploads/avatars/';
+
+        // Full URL with domain
+        $baseUrl = url('/');
+
+        // If using S3 or other cloud storage
+        if (config('filesystems.default') === 's3') {
+            return Storage::disk('s3')->url($basePath . $this->avatar);
+        }
+
+        // For local storage
+        return $baseUrl . '/' . $basePath . $this->avatar;
+    }
+
+
+
     /**
      * The "booted" method of the model.
      *
@@ -165,7 +232,9 @@ class User extends Authenticatable implements MustVerifyEmail
             ->withPivot(['deleted_at', 'deleted_flag'])
             ->wherePivot('deleted_flag', 'N')
             ->where('social_circles.deleted_flag', 'N')
-            ->where('social_circles.is_active', true);
+
+            ->where('social_circles.is_active', true)
+            ->whereNull('social_circles.deleted_at');
     }
 
     /**

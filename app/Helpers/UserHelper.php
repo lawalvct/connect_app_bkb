@@ -19,37 +19,79 @@ use Carbon\Carbon;
 
 class UserHelper
 {
-    // Add this method at the top of your UserHelper class to test
-    public static function getSocialCircleWiseUsers2($socialId, $currentUserId, $lastId = null, $countryId = null)
+    // Updated method to list users randomly
+    public static function getSocialCircleWiseUsers2($socialIds, $currentUserId, $lastId = null, $countryId = null, $limit = 10)
     {
+        \Log::info('getSocialCircleWiseUsers2 called with params:', [
+            'socialIds' => $socialIds,
+            'currentUserId' => $currentUserId,
+            'lastId' => $lastId,
+            'countryId' => $countryId,
+            'limit' => $limit
+        ]);
+
         $query = User::where('deleted_flag', 'N')
-        ->where('id', '!=', $currentUserId);
+            ->where('id', '!=', $currentUserId)
+            ->whereNull('deleted_at'); // Add this to be explicit
 
-if ($socialId) {
-$query->whereHas('socialCircles', function ($q) use ($socialId) {
-    $q->where('social_id', $socialId);
-});
-}
+        // Handle multiple social IDs
+        if (!empty($socialIds) && is_array($socialIds)) {
+            $query->whereHas('socialCircles', function ($q) use ($socialIds) {
+                $q->whereIn('social_circles.id', $socialIds); // Use social_circles.id instead of social_id
+            });
+        }
 
-if ($countryId) {
-$query->where('country_id', $countryId);
-}
+        if ($countryId) {
+            $query->where('country_id', $countryId);
+        }
 
-if ($lastId) {
-$query->where('id', '>', $lastId);
-}
+        // Exclude already swiped users
+        try {
+            $swipedUserIds = UserRequestsHelper::getSwipedUserIds($currentUserId);
+            if (!empty($swipedUserIds)) {
+                $query->whereNotIn('id', $swipedUserIds);
+                \Log::info('Excluded swiped users:', ['count' => count($swipedUserIds)]);
+            }
+        } catch (\Exception $e) {
+            \Log::error('Error getting swiped users:', ['error' => $e->getMessage()]);
+        }
 
-// Exclude already swiped users
-$swipedUserIds = UserRequestsHelper::getSwipedUserIds($currentUserId);
-if (!empty($swipedUserIds)) {
-$query->whereNotIn('id', $swipedUserIds);
-}
+        // Exclude blocked users
+        try {
+            $blockedUserIds = BlockUserHelper::blockUserList($currentUserId);
+            if (!empty($blockedUserIds)) {
+                $query->whereNotIn('id', $blockedUserIds);
+                \Log::info('Excluded blocked users:', ['count' => count($blockedUserIds)]);
+            }
+        } catch (\Exception $e) {
+            \Log::error('Error getting blocked users:', ['error' => $e->getMessage()]);
+        }
 
-return $query->with(['profileImages', 'country'])
-        ->orderBy('id')
-        ->limit(10)
-        ->get();
-}
+        // For pagination with random order, we need a different approach
+        if ($lastId) {
+            // When using random order, lastId-based pagination doesn't work well
+            // Instead, we'll use offset-based pagination or skip some records
+            $query->where('id', '>', $lastId);
+        }
+
+        // Get the SQL query for debugging
+        $sql = $query->toSql();
+        $bindings = $query->getBindings();
+        \Log::info('Final query:', ['sql' => $sql, 'bindings' => $bindings]);
+
+        // Get count before applying limit
+        $totalCount = $query->count();
+        \Log::info('Total users found before limit:', ['count' => $totalCount]);
+
+        $results = $query->with(['profileImages', 'country'])
+            ->inRandomOrder() // This will randomize the results
+            ->limit($limit)
+            ->get();
+
+        \Log::info('Final results:', ['count' => $results->count()]);
+
+        return $results;
+    }
 
     public static function getById($id)
     {
@@ -58,31 +100,37 @@ return $query->with(['profileImages', 'country'])
                    ->first();
     }
 
-    public static function getAllDetailByUserId($id)
-    {
-        $user = self::getById($id);
-        if (!$user) return null;
+public static function getAllDetailByUserId($id)
+{
+    $user = self::getById($id);
+    if (!$user) return null;
 
-        // Get profile data
-    //    $allProfileData = ProfileMultiUploadHelper::getbyId($user->id);
+    // Get profile data
+    // $allProfileData = ProfileMultiUploadHelper::getbyId($user->id);
 
-        // Get stats
-        $totalConnections = UserRequestsHelper::getConnectionCount($user->id);
-        $totalLikes = UserLikeHelper::getReceivedLikesCount($user->id);
-     //   $totalPosts = PostHelper::getTotalPostByUserId($user->id);
+    // Get stats
+    $totalConnections = UserRequestsHelper::getConnectionCount($user->id);
+    $totalLikes = UserLikeHelper::getReceivedLikesCount($user->id);
+    $totalPosts = PostHelper::getTotalPostByUserId($user->id);
 
-        // Get country info
-      //  $countryData = CountryHelper::getById($user->country_id);
+    // Get user's posts
+    $recentPosts = PostHelper::getPostsByUserId($user->id, 10, 0);
 
-        // Add computed fields
-        $user->total_connections = $totalConnections;
-        $user->total_likes = $totalLikes;
-       // $user->total_posts = $totalPosts;
-      //  $user->country_name = $countryData->country_name ?? '';
-      //  $user->multiple_profile = $allProfileData;
+    // Get country info
+    // $countryData = CountryHelper::getById($user->country_id);
 
-        return $user;
-    }
+    // Add computed fields
+    $user->total_connections = $totalConnections;
+    $user->total_likes = $totalLikes;
+    $user->total_posts = $totalPosts; // Uncommented this line
+    $user->recent_posts = $recentPosts; // Add recent posts to the user object
+    // $user->country_name = $countryData->country_name ?? '';
+    // $user->multiple_profile = $allProfileData;
+
+    return $user;
+}
+
+
 
     public static function getDiscoveryUsers($currentUserId, $socialId = null, $limit = 20, $excludeIds = [])
     {
