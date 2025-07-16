@@ -15,6 +15,7 @@ use App\Helpers\UserLikeHelper;
 use App\Helpers\UserSubscriptionHelper;
 use App\Helpers\Utility;
 use App\Helpers\BlockUserHelper;
+use App\Http\Resources\V1\CountryResource;
 use App\Models\User;
 use App\Models\UserRequest;
 use Illuminate\Http\Request;
@@ -88,44 +89,50 @@ class ConnectionController extends Controller
      * )
      */
     public function getUserDetailsById(Request $request, $id)
-    {
-        try {
-            $user = UserHelper::getAllDetailByUserId($id);
+{
+    try {
+        $user = UserHelper::getAllDetailByUserId($id);
 
-            if (!$user) {
-                return response()->json([
-                    'message' => 'User not found',
-                    'status' => 0,
-                    'data' => []
-                ], 404);
-            }
-
-            // Load relationships if not already loaded
-            if (!$user->relationLoaded('profileImages')) {
-                $user->load('profileImages');
-            }
-
-            $userData = Utility::convertString($user);
-
+        if (!$user) {
             return response()->json([
-                'message' => 'Successfully!',
-                'status' => 1,
-                'data' => [$userData]
-            ], $this->successStatus);
-        } catch (\Exception $e) {
-            \Log::error('Error getting user details by ID', [
-                'user_id' => $id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-
-            return response()->json([
-                'message' => 'An error occurred: ' . $e->getMessage(),
+                'message' => 'User not found',
                 'status' => 0,
                 'data' => []
-            ], $this->successStatus);
+            ], 404);
         }
+
+        // Load relationships if not already loaded
+        if (!$user->relationLoaded('profileImages')) {
+            $user->load(['profileImages', 'country']);
+        }
+
+        $userData = Utility::convertString($user);
+
+        // Add country details using CountryResource
+        if ($user->country) {
+            $userData['country_details'] = new CountryResource($user->country);
+        }
+
+        return response()->json([
+            'message' => 'Successfully!',
+            'status' => 1,
+            'data' => [$userData]
+        ], $this->successStatus);
+    } catch (\Exception $e) {
+        \Log::error('Error getting user details by ID', [
+            'user_id' => $id,
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+
+        return response()->json([
+            'message' => 'An error occurred: ' . $e->getMessage(),
+            'status' => 0,
+            'data' => []
+        ], $this->successStatus);
     }
+}
+
 
     /**
      * @OA\Get(
