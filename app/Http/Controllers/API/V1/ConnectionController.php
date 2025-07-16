@@ -48,6 +48,10 @@ class ConnectionController extends Controller
             $user = $request->user();
             $userDetails = UserHelper::getAllDetailByUserId($user->id);
 
+            if (!$userDetails->relationLoaded('profileImages')) {
+                $userDetails->load('profileImages');
+            }
+
             return response()->json([
                 'status' => 1,
                 'message' => 'User details retrieved successfully',
@@ -57,7 +61,8 @@ class ConnectionController extends Controller
         } catch (\Exception $e) {
             Log::error('Get user details failed', [
                 'user_id' => $request->user()->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
 
             return response()->json([
@@ -95,6 +100,11 @@ class ConnectionController extends Controller
                 ], 404);
             }
 
+            // Load relationships if not already loaded
+            if (!$user->relationLoaded('profileImages')) {
+                $user->load('profileImages');
+            }
+
             $userData = Utility::convertString($user);
 
             return response()->json([
@@ -103,6 +113,12 @@ class ConnectionController extends Controller
                 'data' => [$userData]
             ], $this->successStatus);
         } catch (\Exception $e) {
+            \Log::error('Error getting user details by ID', [
+                'user_id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
             return response()->json([
                 'message' => 'An error occurred: ' . $e->getMessage(),
                 'status' => 0,

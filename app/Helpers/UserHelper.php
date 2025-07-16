@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\URL;
 use App\Models\User;
 use App\Helpers\CountryHelper;
 use App\Helpers\PostHelper;
-
+use App\Helpers\SocialCircleHelper;
 use App\Helpers\UserRequestsHelper;
 use App\Helpers\UserSubscriptionHelper;
 use App\Helpers\BlockUserHelper;
@@ -83,7 +83,7 @@ class UserHelper
         $totalCount = $query->count();
         \Log::info('Total users found before limit:', ['count' => $totalCount]);
 
-        $results = $query->with(['profileImages', 'country'])
+        $results = $query->with(['profileImages', 'country', 'socialCircles'])
             ->inRandomOrder() // This will randomize the results
             ->limit($limit)
             ->get();
@@ -116,6 +116,9 @@ public static function getAllDetailByUserId($id)
     // Get user's posts
     $recentPosts = PostHelper::getPostsByUserId($user->id, 10, 0);
 
+    // Get user's social circles
+    $socialCircles = SocialCircleHelper::getUserSocialCircles($user->id);
+
     // Get country info
     // $countryData = CountryHelper::getById($user->country_id);
 
@@ -124,6 +127,7 @@ public static function getAllDetailByUserId($id)
     $user->total_likes = $totalLikes;
     $user->total_posts = $totalPosts; // Uncommented this line
     $user->recent_posts = $recentPosts; // Add recent posts to the user object
+    $user->social_circles = $socialCircles;
     // $user->country_name = $countryData->country_name ?? '';
     // $user->multiple_profile = $allProfileData;
 
