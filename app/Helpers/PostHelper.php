@@ -356,25 +356,25 @@ class PostHelper
     /**
      * Get trending posts
      */
-    public static function getTrendingPosts($limit = 10, $days = 7)
-    {
-        try {
-            $dateFrom = Carbon::now()->subDays($days);
+    // public static function getTrendingPosts($limit = 10, $days = 7)
+    // {
+    //     try {
+    //         $dateFrom = Carbon::now()->subDays($days);
 
-            return Post::where('is_published', true)
-                ->where('published_at', '>=', $dateFrom)
-                ->whereNull('deleted_at')
-                ->with(['user', 'media', 'socialCircle'])
-                ->orderByRaw('(likes_count + comments_count + shares_count) DESC')
-                ->limit($limit)
-                ->get();
-        } catch (\Exception $e) {
-            Log::error('Error getting trending posts', [
-                'error' => $e->getMessage()
-            ]);
-            return collect();
-        }
-    }
+    //         return Post::where('is_published', true)
+    //             ->where('published_at', '>=', $dateFrom)
+    //             ->whereNull('deleted_at')
+    //             ->with(['user', 'media', 'socialCircle'])
+    //             ->orderByRaw('(likes_count + comments_count + shares_count) DESC')
+    //             ->limit($limit)
+    //             ->get();
+    //     } catch (\Exception $e) {
+    //         Log::error('Error getting trending posts', [
+    //             'error' => $e->getMessage()
+    //         ]);
+    //         return collect();
+    //     }
+    // }
 
     /**
      * Get posts for user's feed based on social circles
@@ -576,6 +576,83 @@ class PostHelper
                 'error' => $e->getMessage()
             ]);
             return false;
+        }
+    }
+
+ /**
+     * Get posts count for this month
+     *
+     * @param int $userId
+     * @return int
+     */
+    public static function getPostsThisMonth($userId)
+    {
+        try {
+            return Post::where('user_id', $userId)
+                ->where('is_published', true)
+                ->whereMonth('published_at', Carbon::now()->month)
+                ->whereYear('published_at', Carbon::now()->year)
+                ->count();
+        } catch (\Exception $e) {
+            \Log::error('Error getting posts this month', [
+                'user_id' => $userId,
+                'error' => $e->getMessage()
+            ]);
+            return 0;
+        }
+    }
+
+
+
+    /**
+     * Get posts count for this week
+     *
+     * @param int $userId
+     * @return int
+     */
+    public static function getPostsThisWeek($userId)
+    {
+        try {
+            return Post::where('user_id', $userId)
+                ->where('is_published', true)
+                ->whereBetween('published_at', [
+                    Carbon::now()->startOfWeek(),
+                    Carbon::now()->endOfWeek()
+                ])
+                ->count();
+        } catch (\Exception $e) {
+            \Log::error('Error getting posts this week', [
+                'user_id' => $userId,
+                'error' => $e->getMessage()
+            ]);
+            return 0;
+        }
+    }
+
+
+     /**
+     * Get trending posts
+     *
+     * @param int $limit
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public static function getTrendingPosts($limit = 10)
+    {
+        try {
+            return Post::with([
+                'user:id,name,username,profile,profile_url',
+                'socialCircle:id,name,color'
+            ])
+            ->where('is_published', true)
+            ->where('published_at', '>=', Carbon::now()->subDays(7))
+            ->orderByRaw('(likes_count + comments_count + shares_count) DESC')
+            ->limit($limit)
+            ->get();
+        } catch (\Exception $e) {
+            \Log::error('Error getting trending posts', [
+                'error' => $e->getMessage()
+            ]);
+            return collect();
         }
     }
 }

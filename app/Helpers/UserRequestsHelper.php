@@ -353,4 +353,26 @@ class UserRequestsHelper
     {
         return UserRequests::find($requestId);
     }
+
+    /**
+     * Get pending requests count for a user
+     *
+     * @param int $userId
+     * @return int
+     */
+    public static function getPendingRequestsCount($userId)
+    {
+        try {
+            return DB::table('user_requests')
+                ->where('receiver_id', $userId)
+                ->where('status', 'pending')
+                ->count();
+        } catch (\Exception $e) {
+            \Log::error('Error getting pending requests count', [
+                'user_id' => $userId,
+                'error' => $e->getMessage()
+            ]);
+            return 0;
+        }
+    }
 }
