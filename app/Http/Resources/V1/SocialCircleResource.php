@@ -18,7 +18,8 @@ class SocialCircleResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'description' => $this->description,
-          'icon' => 'https://connectapp.ogitechconsults.ng/public'. '/' . $this->logo_url . $this->logo,
+         'icon' => config('app.url') . '/' . $this->logo_url . $this->logo,
+
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

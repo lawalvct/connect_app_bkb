@@ -113,14 +113,11 @@ class SocialCircle extends Model
     }
 
     /**
-     * Order by the order_by field.
-     *
-     * @param  \Illuminate\Database\Eloquent\Builder  $query
-     * @return \Illuminate\Database\Eloquent\Builder
+     * Scope to order social circles by their defined order
      */
     public function scopeOrdered($query)
     {
-        return $query->orderBy('social_circles.order_by');
+        return $query->orderBy('order_by');
     }
 
     /**

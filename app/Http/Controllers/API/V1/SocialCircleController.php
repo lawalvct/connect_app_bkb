@@ -16,7 +16,7 @@ class SocialCircleController extends BaseController
      */
     public function index()
     {
-        $socialCircles = SocialCircle::all();
+         $socialCircles = SocialCircle::ordered()->get();
 
         return $this->sendResponse('Social circles retrieved successfully', [
             'social_circles' => SocialCircleResource::collection($socialCircles),
