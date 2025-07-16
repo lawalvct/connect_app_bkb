@@ -370,12 +370,27 @@ class ConnectionController extends Controller
             // Get updated swipe stats
             $swipeStats = UserHelper::getSwipeStats($user->id);
 
+            // Get a random user from the same social circle
+            $randomUser = null;
+            if (isset($data['social_id']) && !empty($data['social_id'])) {
+                $randomUser = UserHelper::getRandomUserFromSocialCircle(
+                    $data['social_id'],
+                    $user->id,
+                    [$data['user_id']] // Exclude the user we just swiped on
+                );
+
+                if ($randomUser) {
+                    $randomUser = Utility::convertString($randomUser);
+                }
+            }
+
             return response()->json([
                 'status' => 1,
                 'message' => 'Connection request sent successfully',
                 'data' => [
                     'request_id' => $result['request_id'],
-                    'swipe_stats' => $swipeStats // Remove SwipeStatsResource for now
+                    'swipe_stats' => $swipeStats,
+                    'suggested_user' => $randomUser // Add random user from same social circle
                 ]
             ], 201);
 

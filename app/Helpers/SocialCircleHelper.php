@@ -232,4 +232,38 @@ class SocialCircleHelper
             return false;
         }
     }
+
+    /**
+     * Get users from a specific social circle
+     *
+     * @param int $socialCircleId
+     * @param int $limit
+     * @param array $excludeUserIds
+     * @return \Illuminate\Database\Eloquent\Collection
+     */
+    public static function getUsersFromSocialCircle(int $socialCircleId, int $limit = 10, array $excludeUserIds = [])
+    {
+        try {
+            $query = User::whereHas('socialCircles', function ($q) use ($socialCircleId) {
+                    $q->where('social_circles.id', $socialCircleId)
+                      ->where('user_social_circles.deleted_flag', 'N');
+                })
+                ->where('users.deleted_flag', 'N')
+                ->whereNull('users.deleted_at');
+
+            if (!empty($excludeUserIds)) {
+                $query->whereNotIn('users.id', $excludeUserIds);
+            }
+
+            return $query->with(['profileImages', 'country'])
+                ->limit($limit)
+                ->get();
+        } catch (\Exception $e) {
+            \Log::error('Error getting users from social circle', [
+                'social_circle_id' => $socialCircleId,
+                'error' => $e->getMessage()
+            ]);
+            return collect();
+        }
+    }
 }

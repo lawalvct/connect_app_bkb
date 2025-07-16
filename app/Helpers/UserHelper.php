@@ -326,4 +326,80 @@ public static function getAllDetailByUserId($id)
             ->orderBy('swipe_date', 'desc')
             ->get();
     }
+
+    /**
+     * Get a random user from a specific social circle
+     *
+     * @param int $socialCircleId
+     * @param int $currentUserId
+     * @param array $excludeUserIds
+     * @return User|null
+     */
+    public static function getRandomUserFromSocialCircle($socialCircleId, $currentUserId, $excludeUserIds = [])
+    {
+        try {
+            \Log::info('Getting random user from social circle', [
+                'social_circle_id' => $socialCircleId,
+                'current_user_id' => $currentUserId,
+                'exclude_user_ids' => $excludeUserIds
+            ]);
+
+            // Make sure we exclude the current user
+            $excludeUserIds[] = $currentUserId;
+            $excludeUserIds = array_unique($excludeUserIds);
+
+            // Get swiped user IDs to exclude
+            $swipedUserIds = UserRequestsHelper::getSwipedUserIds($currentUserId);
+            if (!empty($swipedUserIds)) {
+                $excludeUserIds = array_merge($excludeUserIds, $swipedUserIds);
+            }
+
+            // Get blocked user IDs to exclude
+            $blockedUserIds = BlockUserHelper::blockUserList($currentUserId);
+            if (!empty($blockedUserIds)) {
+                $excludeUserIds = array_merge($excludeUserIds, $blockedUserIds);
+            }
+
+            // Remove duplicates
+            $excludeUserIds = array_unique($excludeUserIds);
+
+            // Build the query
+            $query = User::where('deleted_flag', 'N')
+                ->whereNull('deleted_at')
+                ->where('id', '!=', $currentUserId)
+                ->whereNotIn('id', $excludeUserIds);
+
+            // Filter by social circle
+            $query->whereHas('socialCircles', function ($q) use ($socialCircleId) {
+                $q->where('social_circles.id', $socialCircleId)
+                  ->where('user_social_circles.deleted_flag', 'N');
+            });
+
+            // Get a random user
+            $randomUser = $query->with(['profileImages', 'country', 'socialCircles'])
+                ->inRandomOrder()
+                ->first();
+
+            if ($randomUser) {
+                \Log::info('Found random user from social circle', [
+                        'user_id' => $randomUser->id,
+                        'name' => $randomUser->name
+                ]);
+
+                // Get additional user details
+                $randomUser = self::getAllDetailByUserId($randomUser->id);
+            } else {
+                \Log::info('No random user found in social circle');
+            }
+
+            return $randomUser;
+        } catch (\Exception $e) {
+            \Log::error('Error getting random user from social circle', [
+                'social_circle_id' => $socialCircleId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return null;
+        }
+    }
 }
