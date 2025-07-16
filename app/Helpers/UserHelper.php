@@ -21,77 +21,85 @@ class UserHelper
 {
     // Updated method to list users randomly
     public static function getSocialCircleWiseUsers2($socialIds, $currentUserId, $lastId = null, $countryId = null, $limit = 10)
-    {
-        \Log::info('getSocialCircleWiseUsers2 called with params:', [
-            'socialIds' => $socialIds,
-            'currentUserId' => $currentUserId,
-            'lastId' => $lastId,
-            'countryId' => $countryId,
-            'limit' => $limit
-        ]);
+{
+    \Log::info('getSocialCircleWiseUsers2 called with params:', [
+        'socialIds' => $socialIds,
+        'currentUserId' => $currentUserId,
+        'lastId' => $lastId,
+        'countryId' => $countryId,
+        'limit' => $limit
+    ]);
 
-        $query = User::where('deleted_flag', 'N')
-            ->where('id', '!=', $currentUserId)
-            ->whereNull('deleted_at'); // Add this to be explicit
+    $query = User::where('deleted_flag', 'N')
+        ->where('id', '!=', $currentUserId)
+        ->whereNull('deleted_at'); // Add this to be explicit
 
-        // Handle multiple social IDs
-        if (!empty($socialIds) && is_array($socialIds)) {
-            $query->whereHas('socialCircles', function ($q) use ($socialIds) {
-                $q->whereIn('social_circles.id', $socialIds); // Use social_circles.id instead of social_id
-            });
-        }
-
-        if ($countryId) {
-            $query->where('country_id', $countryId);
-        }
-
-        // Exclude already swiped users
-        try {
-            $swipedUserIds = UserRequestsHelper::getSwipedUserIds($currentUserId);
-            if (!empty($swipedUserIds)) {
-                $query->whereNotIn('id', $swipedUserIds);
-                \Log::info('Excluded swiped users:', ['count' => count($swipedUserIds)]);
-            }
-        } catch (\Exception $e) {
-            \Log::error('Error getting swiped users:', ['error' => $e->getMessage()]);
-        }
-
-        // Exclude blocked users
-        try {
-            $blockedUserIds = BlockUserHelper::blockUserList($currentUserId);
-            if (!empty($blockedUserIds)) {
-                $query->whereNotIn('id', $blockedUserIds);
-                \Log::info('Excluded blocked users:', ['count' => count($blockedUserIds)]);
-            }
-        } catch (\Exception $e) {
-            \Log::error('Error getting blocked users:', ['error' => $e->getMessage()]);
-        }
-
-        // For pagination with random order, we need a different approach
-        if ($lastId) {
-            // When using random order, lastId-based pagination doesn't work well
-            // Instead, we'll use offset-based pagination or skip some records
-            $query->where('id', '>', $lastId);
-        }
-
-        // Get the SQL query for debugging
-        $sql = $query->toSql();
-        $bindings = $query->getBindings();
-        \Log::info('Final query:', ['sql' => $sql, 'bindings' => $bindings]);
-
-        // Get count before applying limit
-        $totalCount = $query->count();
-        \Log::info('Total users found before limit:', ['count' => $totalCount]);
-
-        $results = $query->with(['profileImages', 'country', 'socialCircles'])
-            ->inRandomOrder() // This will randomize the results
-            ->limit($limit)
-            ->get();
-
-        \Log::info('Final results:', ['count' => $results->count()]);
-
-        return $results;
+    // Handle multiple social IDs
+    if (!empty($socialIds) && is_array($socialIds)) {
+        $query->whereHas('socialCircles', function ($q) use ($socialIds) {
+            $q->whereIn('social_circles.id', $socialIds); // Use social_circles.id instead of social_id
+        });
     }
+
+    if ($countryId) {
+        $query->where('country_id', $countryId);
+    }
+
+    // Exclude already swiped users
+    try {
+        $swipedUserIds = UserRequestsHelper::getSwipedUserIds($currentUserId);
+        if (!empty($swipedUserIds)) {
+            $query->whereNotIn('id', $swipedUserIds);
+            \Log::info('Excluded swiped users:', ['count' => count($swipedUserIds)]);
+        }
+    } catch (\Exception $e) {
+        \Log::error('Error getting swiped users:', ['error' => $e->getMessage()]);
+    }
+
+    // Exclude blocked users
+    try {
+        $blockedUserIds = BlockUserHelper::blockUserList($currentUserId);
+        if (!empty($blockedUserIds)) {
+            $query->whereNotIn('id', $blockedUserIds);
+            \Log::info('Excluded blocked users:', ['count' => count($blockedUserIds)]);
+        }
+    } catch (\Exception $e) {
+        \Log::error('Error getting blocked users:', ['error' => $e->getMessage()]);
+    }
+
+    // For pagination with random order, we need a different approach
+    if ($lastId) {
+        // When using random order, lastId-based pagination doesn't work well
+        // Instead, we'll use offset-based pagination or skip some records
+        $query->where('id', '>', $lastId);
+    }
+
+    // Get the SQL query for debugging
+    $sql = $query->toSql();
+    $bindings = $query->getBindings();
+    \Log::info('Final query:', ['sql' => $sql, 'bindings' => $bindings]);
+
+    // Get count before applying limit
+    $totalCount = $query->count();
+    \Log::info('Total users found before limit:', ['count' => $totalCount]);
+
+    $results = $query->with(['profileImages', 'country', 'socialCircles'])
+        ->inRandomOrder() // This will randomize the results
+        ->limit($limit)
+        ->get();
+
+    \Log::info('Final results:', ['count' => $results->count()]);
+
+    // Add connection counts for each user
+    foreach ($results as $user) {
+        $user->total_connections = UserRequestsHelper::getConnectionCount($user->id);
+
+        // Check if the current user is connected to this user
+        $user->is_connected_to_current_user = UserRequestsHelper::areUsersConnected($currentUserId, $user->id);
+    }
+
+    return $results;
+}
 
     public static function getById($id)
     {

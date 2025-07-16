@@ -88,17 +88,74 @@ class UserRequestsHelper
         });
     }
 
-    public static function getConnectionCount($userId)
-    {
-        return UserRequest::where(function ($query) use ($userId) {
-                $query->where('sender_id', $userId)
-                      ->orWhere('receiver_id', $userId);
-            })
-            ->where('status', 'accepted')
-            ->where('sender_status', 'accepted')
-            ->where('receiver_status', 'accepted')
-            ->count();
-    }
+          /**
+           * Check if two users are connected
+           *
+           * @param int $userId1
+           * @param int $userId2
+           * @return bool
+           */
+          public static function areUsersConnected($userId1, $userId2)
+          {
+              try {
+                  return DB::table('user_requests')
+                      ->where(function($query) use ($userId1, $userId2) {
+                          $query->where(function($q) use ($userId1, $userId2) {
+                              $q->where('sender_id', $userId1)
+                                ->where('receiver_id', $userId2);
+                          })->orWhere(function($q) use ($userId1, $userId2) {
+                              $q->where('sender_id', $userId2)
+                                ->where('receiver_id', $userId1);
+                          });
+                      })
+                      ->where('status', 'accepted')
+                      ->where('sender_status', 'accepted')
+                      ->where('receiver_status', 'accepted')
+                      ->exists();
+              } catch (\Exception $e) {
+                  \Log::error('Error checking if users are connected', [
+                      'user_id_1' => $userId1,
+                      'user_id_2' => $userId2,
+                      'error' => $e->getMessage()
+                  ]);
+                  return false;
+              }
+          }
+
+          /**
+           * Get connection count for a user
+           *
+           * @param int $userId
+           * @return int
+           */
+          public static function getConnectionCount($userId)
+          {
+              try {
+                  // Count connections where user is sender
+                  $senderCount = DB::table('user_requests')
+                      ->where('sender_id', $userId)
+                      ->where('status', 'accepted')
+                      ->where('sender_status', 'accepted')
+                      ->where('receiver_status', 'accepted')
+                      ->count();
+
+                  // Count connections where user is receiver
+                  $receiverCount = DB::table('user_requests')
+                      ->where('receiver_id', $userId)
+                      ->where('status', 'accepted')
+                      ->where('sender_status', 'accepted')
+                      ->where('receiver_status', 'accepted')
+                      ->count();
+
+                  return $senderCount + $receiverCount;
+              } catch (\Exception $e) {
+                  \Log::error('Error getting connection count', [
+                      'user_id' => $userId,
+                      'error' => $e->getMessage()
+                  ]);
+                  return 0;
+              }
+          }
 
     public static function acceptRequest($requestId, $userId)
     {

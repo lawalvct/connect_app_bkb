@@ -175,130 +175,139 @@ class ConnectionController extends Controller
      * )
      */
     public function getUsersBySocialCircle(Request $request)
-    {
+{
+    $validator = Validator::make($request->all(), [
+        'social_id' => 'required|array',
+        'social_id.*' => 'integer',
+        'country_id' => 'nullable|integer',
+        'last_id' => 'nullable|integer',
+        'limit' => 'nullable|integer|min:1|max:50'
+    ]);
 
-        $validator = Validator::make($request->all(), [
-            'social_id' => 'required|array',
-            'social_id.*' => 'integer',
-            'country_id' => 'nullable|integer',
-            'last_id' => 'nullable|integer',
-            'limit' => 'nullable|integer|min:1|max:50'
+    if ($validator->fails()) {
+        return response()->json([
+            'message' => $validator->errors()->first(),
+            'status' => 0,
+            'data' => []
+        ], $this->successStatus);
+    }
+
+    try {
+        $user = $request->user(); // Get current authenticated user
+        $socialIds = $request->input('social_id', []);
+        $countryId = $request->input('country_id');
+        $lastId = $request->input('last_id');
+        $limit = $request->input('limit', 10);
+
+        \Log::info('getUsersBySocialCircle called:', [
+            'user_id' => $user->id,
+            'social_ids' => $socialIds,
+            'country_id' => $countryId,
+            'last_id' => $lastId,
+            'limit' => $limit
         ]);
 
-        if ($validator->fails()) {
-            return response()->json([
-                'message' => $validator->errors()->first(),
-                'status' => 0,
-                'data' => []
-            ], $this->successStatus);
-        }
+        // Debug: Check if user exists in the social circle
+        $userInCircle = DB::table('user_social_circles')
+            ->where('user_id', $user->id)
+            ->whereIn('social_id', $socialIds)
+            ->where('deleted_flag', 'N')
+            ->exists();
 
-        try {
-            $user = $request->user(); // Get current authenticated user
-            $socialIds = $request->input('social_id', []);
-            $countryId = $request->input('country_id');
-            $lastId = $request->input('last_id');
-            $limit = $request->input('limit', 10);
+        \Log::info('Current user in social circle:', ['exists' => $userInCircle]);
 
+        // Debug: Count total users in social circles
+        $totalUsersInCircles = DB::table('users')
+            ->join('user_social_circles', 'users.id', '=', 'user_social_circles.user_id')
+            ->whereIn('user_social_circles.social_id', $socialIds)
+            ->where('users.deleted_flag', 'N')
+            ->where('user_social_circles.deleted_flag', 'N')
+            ->where('users.id', '!=', $user->id)
+            ->whereNull('users.deleted_at')
+            ->count();
 
-            \Log::info('getUsersBySocialCircle called:', [
-                'user_id' => $user->id,
-                'social_ids' => $socialIds,
-                'country_id' => $countryId,
-                'last_id' => $lastId,
-                'limit' => $limit
-            ]);
+        \Log::info('Total users in social circles (excluding current user):', ['count' => $totalUsersInCircles]);
 
-            // Debug: Check if user exists in the social circle
-            $userInCircle = DB::table('user_social_circles')
-                ->where('user_id', $user->id)
-                ->whereIn('social_id', $socialIds)
-                ->where('deleted_flag', 'N')
-                ->exists();
-
-            \Log::info('Current user in social circle:', ['exists' => $userInCircle]);
-
-            // Debug: Count total users in social circles
-            $totalUsersInCircles = DB::table('users')
+        // Debug: Count users with country filter
+        if ($countryId) {
+            $usersWithCountry = DB::table('users')
                 ->join('user_social_circles', 'users.id', '=', 'user_social_circles.user_id')
                 ->whereIn('user_social_circles.social_id', $socialIds)
                 ->where('users.deleted_flag', 'N')
                 ->where('user_social_circles.deleted_flag', 'N')
                 ->where('users.id', '!=', $user->id)
+                ->where('users.country_id', $countryId)
                 ->whereNull('users.deleted_at')
                 ->count();
 
-            \Log::info('Total users in social circles (excluding current user):', ['count' => $totalUsersInCircles]);
+            \Log::info('Users with country filter:', ['count' => $usersWithCountry]);
+        }
 
-            // Debug: Count users with country filter
-            if ($countryId) {
-                $usersWithCountry = DB::table('users')
-                    ->join('user_social_circles', 'users.id', '=', 'user_social_circles.user_id')
-                    ->whereIn('user_social_circles.social_id', $socialIds)
-                    ->where('users.deleted_flag', 'N')
-                    ->where('user_social_circles.deleted_flag', 'N')
-                    ->where('users.id', '!=', $user->id)
-                    ->where('users.country_id', $countryId)
-                    ->whereNull('users.deleted_at')
-                    ->count();
+        // Pass the current user ID to the function
+        $getData = UserHelper::getSocialCircleWiseUsers2($socialIds, $user->id, $lastId, $countryId, $limit);
 
-                \Log::info('Users with country filter:', ['count' => $usersWithCountry]);
-            }
+        \Log::info('Results from UserHelper:', ['count' => $getData->count()]);
 
-            // Pass the current user ID to the function
-            $getData = UserHelper::getSocialCircleWiseUsers2($socialIds, $user->id, $lastId, $countryId, $limit);
+        if (count($getData) != 0) {
+            // Add connection count for each user
+            $getData = $getData->map(function($userItem) use ($user) {
+                // Get connection count for this user
+                $connectionCount = UserRequestsHelper::getConnectionCount($userItem->id);
+                $userItem->total_connections = $connectionCount;
 
-            \Log::info('Results from UserHelper:', ['count' => $getData->count()]);
+                // Check if the current user is connected to this user
+                $isConnected = UserRequestsHelper::areUsersConnected($user->id, $userItem->id);
+                $userItem->is_connected_to_current_user = $isConnected;
 
-            if (count($getData) != 0) {
-                $getData = Utility::convertString($getData);
-                return response()->json([
-                    'message' => 'Successfully!',
-                    'status' => 1,
+                return $userItem;
+            });
 
-                    'data' => $getData,
-                    'debug' => [
-                        'total_in_circles' => $totalUsersInCircles,
-                        'user_in_circle' => $userInCircle,
-                        'filters_applied' => [
-                            'country_id' => $countryId,
-                            'social_ids' => $socialIds,
-                            'current_user_excluded' => $user->id
-                        ]
-                    ]
-                ], $this->successStatus);
-            } else {
-                return response()->json([
-                    'message' => "No users available.",
-                    'status' => 0,
-
-                    'data' => [],
-                    'debug' => [
-                        'total_in_circles' => $totalUsersInCircles,
-                        'user_in_circle' => $userInCircle,
-                        'possible_reasons' => [
-                            'All users already swiped',
-                            'All users blocked',
-                            'No users in specified social circles',
-                            'No users matching country filter'
-                        ]
-                    ]
-
-                ], $this->successStatus);
-            }
-        } catch (\Exception $e) {
-            \Log::error('getUsersBySocialCircle error:', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
+            $getData = Utility::convertString($getData);
 
             return response()->json([
-                'message' => 'An error occurred: ' . $e->getMessage(),
+                'message' => 'Successfully!',
+                'status' => 1,
+                'data' => $getData,
+                'debug' => [
+                    'total_in_circles' => $totalUsersInCircles,
+                    'user_in_circle' => $userInCircle,
+                    'filters_applied' => [
+                        'country_id' => $countryId,
+                        'social_ids' => $socialIds,
+                        'current_user_excluded' => $user->id
+                    ]
+                ]
+            ], $this->successStatus);
+        } else {
+            return response()->json([
+                'message' => "No users available.",
                 'status' => 0,
-                'data' => []
+                'data' => [],
+                'debug' => [
+                    'total_in_circles' => $totalUsersInCircles,
+                    'user_in_circle' => $userInCircle,
+                    'possible_reasons' => [
+                        'All users already swiped',
+                        'All users blocked',
+                        'No users in specified social circles',
+                        'No users matching country filter'
+                    ]
+                ]
             ], $this->successStatus);
         }
+    } catch (\Exception $e) {
+        \Log::error('getUsersBySocialCircle error:', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+
+        return response()->json([
+            'message' => 'An error occurred: ' . $e->getMessage(),
+            'status' => 0,
+            'data' => []
+        ], $this->successStatus);
     }
+}
 
     /**
      * @OA\Post(
@@ -865,6 +874,7 @@ class ConnectionController extends Controller
      */
     public function getIncomingRequests(Request $request): JsonResponse
     {
+
         try {
             $user = $request->user();
 

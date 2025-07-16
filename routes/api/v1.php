@@ -159,6 +159,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // These don't need rate limiting
         Route::get('/requests', [ConnectionController::class, 'getConnectionRequests']);
+        Route::get('/incoming', [ConnectionController::class, 'getIncomingRequests']);
         Route::post('/request/{id}/respond', [ConnectionController::class, 'respondToRequest']);
         Route::get('/', [ConnectionController::class, 'getConnectedUsers']);
         Route::post('/{id}/disconnect', [ConnectionController::class, 'disconnect']);
