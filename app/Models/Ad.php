@@ -40,7 +40,9 @@ class Ad extends Model
         'stopped_at',
         'deleted_flag',
         'created_by',
-        'updated_by'
+        'updated_by',
+    'target_countries',
+    'target_social_circles',
     ];
 
     protected $casts = [
@@ -56,7 +58,9 @@ class Ad extends Model
         'reviewed_at' => 'datetime',
         'activated_at' => 'datetime',
         'paused_at' => 'datetime',
-        'stopped_at' => 'datetime'
+        'stopped_at' => 'datetime',
+        'target_countries' => 'array',
+        'target_social_circles' => 'array',
     ];
 
     protected $appends = [
@@ -102,11 +106,11 @@ class Ad extends Model
     // Get social circles by IDs stored in ad_placement JSON
     public function getPlacementSocialCirclesAttribute()
     {
-        if (empty($this->ad_placement)) {
+        if (empty($this->target_social_circles)) {
             return collect();
         }
 
-        return SocialCircle::whereIn('id', $this->ad_placement)->get();
+        return SocialCircle::whereIn('id', $this->target_social_circles)->get();
     }
 
     // Scopes
@@ -138,14 +142,14 @@ class Ad extends Model
     // Scope for ads that should appear in specific social circles
     public function scopeForSocialCircle($query, $socialCircleId)
     {
-        return $query->whereJsonContains('ad_placement', $socialCircleId);
+        return $query->whereJsonContains('target_social_circles', $socialCircleId);
     }
 
     public function scopeForSocialCircles($query, $socialCircleIds)
     {
         return $query->where(function ($q) use ($socialCircleIds) {
             foreach ($socialCircleIds as $socialCircleId) {
-                $q->orWhereJsonContains('ad_placement', $socialCircleId);
+                $q->orWhereJsonContains('target_social_circles', $socialCircleId);
             }
         });
     }
@@ -265,8 +269,65 @@ class Ad extends Model
     {
         return $this->status === 'active'
             && $this->admin_status === 'approved'
-            && in_array($socialCircleId, $this->ad_placement ?? [])
+            && in_array($socialCircleId, $this->target_social_circles ?? [])
             && $this->start_date <= now()
             && $this->end_date >= now();
+    }
+
+    /**
+     * Get ads for a user during discovery/swiping
+     */
+    public static function getAdsForDiscovery($userId, $limit = 1)
+    {
+        $user = User::find($userId);
+        if (!$user) return collect();
+
+        // Get user's social circles
+        $userSocialCircles = $user->socialCircles()->pluck('social_circles.id')->toArray();
+
+        return self::where('status', 'active')
+            ->where('admin_status', 'approved')
+            ->where('deleted_flag', 'N')
+            ->where('start_date', '<=', now())
+            ->where('end_date', '>=', now())
+            ->where(function($query) use ($userSocialCircles, $user) {
+                // Match social circles
+                $query->where(function($q) use ($userSocialCircles) {
+                    foreach ($userSocialCircles as $circleId) {
+                        $q->orWhereJsonContains('target_social_circles', $circleId);
+                    }
+                });
+
+                // Match demographics
+                $query->where(function($q) use ($user) {
+                    // Age targeting
+                    if ($user->age) {
+                        $q->where(function($ageQuery) use ($user) {
+                            $ageQuery->whereRaw('JSON_EXTRACT(target_audience, "$.age_min") <= ?', [$user->age])
+                                    ->whereRaw('JSON_EXTRACT(target_audience, "$.age_max") >= ?', [$user->age]);
+                        });
+                    }
+
+                    // Gender targeting
+                    if ($user->gender) {
+                        $q->where(function($genderQuery) use ($user) {
+                            $genderQuery->whereRaw('JSON_EXTRACT(target_audience, "$.gender") = ?', [$user->gender])
+                                       ->orWhereRaw('JSON_EXTRACT(target_audience, "$.gender") = ?', ['all']);
+                        });
+                    }
+
+                    // Country targeting
+                    if ($user->country_id) {
+                        $q->where(function($countryQuery) use ($user) {
+                            $countryQuery->whereJsonContains('target_countries', $user->country_id)
+                                        ->orWhereJsonContains('target_audience->locations', $user->country->code ?? '')
+                                        ->orWhereJsonContains('target_audience->locations', $user->country->name ?? '');
+                        });
+                    }
+                });
+            })
+            ->inRandomOrder()
+            ->limit($limit)
+            ->get();
     }
 }

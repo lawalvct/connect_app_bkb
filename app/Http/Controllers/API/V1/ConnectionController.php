@@ -255,6 +255,25 @@ class ConnectionController extends Controller
 
         \Log::info('Results from UserHelper:', ['count' => $getData->count()]);
 
+        // After getting users, check if it's time to show an ad
+        $swipeCount = UserSwipe::getTodayRecord($user->id)->total_swipes ?? 0;
+
+        // Show ad after every 10 swipes
+        if ($swipeCount > 0 && $swipeCount % 10 === 0) {
+            $ads = Ad::getAdsForDiscovery($user->id, 1);
+            if ($ads->isNotEmpty()) {
+                // Insert ad into the response
+                $adData = [
+                    'type' => 'advertisement',
+                    'ad_data' => $ads->first(),
+                    'is_ad' => true
+                ];
+
+                // Add ad to response
+                $getData = $getData->push($adData);
+            }
+        }
+
         if (count($getData) != 0) {
             // Add connection count for each user
             $getData = $getData->map(function($userItem) use ($user) {

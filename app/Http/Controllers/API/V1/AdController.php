@@ -76,8 +76,8 @@ class AdController extends BaseController
 
             // Manually load social circles for each ad
             foreach ($recentAds as $ad) {
-                if (!empty($ad->ad_placement)) {
-                    $ad->social_circles = SocialCircle::whereIn('id', $ad->ad_placement)->get();
+                if (!empty($ad->target_social_circles)) {
+                    $ad->social_circles = SocialCircle::whereIn('id', $ad->target_social_circles)->get();
                 } else {
                     $ad->social_circles = collect();
                 }
@@ -170,7 +170,7 @@ class AdController extends BaseController
     private function getAdPerformanceBySocialCircle($socialCircleId, $dateFrom = null)
     {
         try {
-            $query = Ad::whereJsonContains('ad_placement', $socialCircleId)
+            $query = Ad::whereJsonContains('target_social_circles', $socialCircleId)
                 ->where('deleted_flag', 'N');
 
             if ($dateFrom) {
@@ -238,8 +238,8 @@ class AdController extends BaseController
 
             // Manually load social circles for each ad
             foreach ($ads as $ad) {
-                if (!empty($ad->ad_placement)) {
-                    $ad->social_circles = SocialCircle::whereIn('id', $ad->ad_placement)->get();
+                if (!empty($ad->target_social_circles)) {
+                    $ad->social_circles = SocialCircle::whereIn('id', $ad->target_social_circles)->get();
                 } else {
                     $ad->social_circles = collect();
                 }
@@ -314,7 +314,7 @@ class AdController extends BaseController
      *             @OA\Property(property="description", type="string"),
      *             @OA\Property(property="call_to_action", type="string"),
      *             @OA\Property(property="destination_url", type="string"),
-     *             @OA\Property(property="ad_placement", type="array", @OA\Items(type="integer")),
+     *             @OA\Property(property="target_social_circles", type="array", @OA\Items(type="integer")),
      *             @OA\Property(property="start_date", type="string", format="date"),
      *             @OA\Property(property="end_date", type="string", format="date"),
      *             @OA\Property(property="budget", type="number"),
@@ -328,6 +328,18 @@ class AdController extends BaseController
      */
     public function store(Request $request)
     {
+        $request->merge([
+    'target_impressions' => 10000,
+    'target_audience' => [
+        'age_min' => 18,
+        'age_max' => 65,
+        'gender' => 'all',
+        'locations' => ['US', 'UK', 'CA'],
+        'interests' => ['social', 'networking'],
+
+    ],
+       'call_to_action' => 'Shop Now on Connect App',
+]);
         try {
             $user = $request->user();
 
@@ -337,9 +349,9 @@ class AdController extends BaseController
                 'type' => 'required|string|in:banner,video,text,carousel',
                 'description' => 'required|string',
                 'call_to_action' => 'required|string|max:50',
-                'destination_url' => 'required|url',
-                'ad_placement' => 'required|array|min:1',
-                'ad_placement.*' => 'integer|exists:social_circles,id',
+                'destination_url' => 'nullable|url',
+                'target_social_circles' => 'required|array|min:1',
+                'target_social_circles.*' => 'integer|exists:social_circles,id',
                 'start_date' => 'required|date|after_or_equal:today',
                 'end_date' => 'required|date|after:start_date',
                 'budget' => 'required|numeric|min:10',
@@ -351,7 +363,9 @@ class AdController extends BaseController
                 'target_audience.gender' => 'required|string|in:male,female,all',
                 'target_audience.locations' => 'required|array',
                 'target_audience.interests' => 'required|array',
-                'media_files' => 'nullable|array'
+                'media_files' => 'nullable|array',
+                'target_countries' => 'nullable|array',
+    'target_countries.*' => 'integer|exists:countries,id',
             ]);
 
             // Handle media files if provided
@@ -377,7 +391,7 @@ class AdController extends BaseController
                 'media_files' => $mediaFiles,
                 'call_to_action' => $validated['call_to_action'],
                 'destination_url' => $validated['destination_url'],
-                'ad_placement' => $validated['ad_placement'],
+                'target_social_circles' => $validated['target_social_circles'],
                 'start_date' => $validated['start_date'],
                 'end_date' => $validated['end_date'],
                 'target_audience' => $validated['target_audience'],
@@ -396,7 +410,7 @@ class AdController extends BaseController
             ]);
 
             // Load social circles
-            $ad->social_circles = SocialCircle::whereIn('id', $ad->ad_placement)->get();
+            $ad->social_circles = SocialCircle::whereIn('id', $ad->target_social_circles)->get();
 
             return response()->json([
                 'success' => true,
@@ -462,7 +476,7 @@ class AdController extends BaseController
             }
 
             // Load social circles
-            $ad->social_circles = SocialCircle::whereIn('id', $ad->ad_placement ?? [])->get();
+            $ad->social_circles = SocialCircle::whereIn('id', $ad->target_social_circles ?? [])->get();
 
             return response()->json([
                 'success' => true,
@@ -475,7 +489,7 @@ class AdController extends BaseController
                     'media_files' => $ad->media_files,
                     'call_to_action' => $ad->call_to_action,
                     'destination_url' => $ad->destination_url,
-                    'ad_placement' => $ad->ad_placement,
+                    'target_social_circles' => $ad->target_social_circles,
                     'start_date' => $ad->start_date->format('Y-m-d'),
                     'end_date' => $ad->end_date->format('Y-m-d'),
                     'target_audience' => $ad->target_audience,
@@ -533,7 +547,7 @@ class AdController extends BaseController
      *             @OA\Property(property="description", type="string"),
      *             @OA\Property(property="call_to_action", type="string"),
      *             @OA\Property(property="destination_url", type="string"),
-     *             @OA\Property(property="ad_placement", type="array", @OA\Items(type="integer")),
+     *             @OA\Property(property="target_social_circles", type="array", @OA\Items(type="integer")),
      *             @OA\Property(property="start_date", type="string", format="date"),
      *             @OA\Property(property="end_date", type="string", format="date"),
      *             @OA\Property(property="budget", type="number"),
@@ -576,8 +590,8 @@ class AdController extends BaseController
                 'description' => 'sometimes|string',
                 'call_to_action' => 'sometimes|string|max:50',
                 'destination_url' => 'sometimes|url',
-                'ad_placement' => 'sometimes|array|min:1',
-                'ad_placement.*' => 'integer|exists:social_circles,id',
+                'target_social_circles' => 'sometimes|array|min:1',
+                'target_social_circles.*' => 'integer|exists:social_circles,id',
                 'start_date' => 'sometimes|date|after_or_equal:today',
                 'end_date' => 'sometimes|date|after:start_date',
                 'budget' => 'sometimes|numeric|min:10',
@@ -619,7 +633,7 @@ class AdController extends BaseController
 
             // Load social circles
             $ad->refresh();
-            $ad->social_circles = SocialCircle::whereIn('id', $ad->ad_placement ?? [])->get();
+            $ad->social_circles = SocialCircle::whereIn('id', $ad->target_social_circles ?? [])->get();
 
             return response()->json([
                 'success' => true,
@@ -632,7 +646,7 @@ class AdController extends BaseController
                     'media_files' => $ad->media_files,
                     'call_to_action' => $ad->call_to_action,
                     'destination_url' => $ad->destination_url,
-                    'ad_placement' => $ad->ad_placement,
+                    'target_social_circles' => $ad->target_social_circles,
                     'start_date' => $ad->start_date->format('Y-m-d'),
                     'end_date' => $ad->end_date->format('Y-m-d'),
                     'target_audience' => $ad->target_audience,
@@ -912,8 +926,8 @@ class AdController extends BaseController
 
             // Get social circle performance
             $socialCirclePerformance = [];
-            if (!empty($ad->ad_placement)) {
-                foreach ($ad->ad_placement as $circleId) {
+            if (!empty($ad->target_social_circles)) {
+                foreach ($ad->target_social_circles as $circleId) {
                     $circle = SocialCircle::find($circleId);
                     if ($circle) {
                         // Here you would get actual analytics per social circle
@@ -1221,14 +1235,14 @@ class AdController extends BaseController
 
             // Filter by social circle if provided
             if ($socialCircleId) {
-                $query->whereJsonContains('ad_placement', $socialCircleId);
+                $query->whereJsonContains('target_social_circles', $socialCircleId);
             } else {
                 // Get user's social circles
                 $userSocialCircleIds = $user->socialCircles()->pluck('social_id')->toArray();
                 if (!empty($userSocialCircleIds)) {
                     $query->where(function ($q) use ($userSocialCircleIds) {
                         foreach ($userSocialCircleIds as $circleId) {
-                            $q->orWhereJsonContains('ad_placement', $circleId);
+                            $q->orWhereJsonContains('target_social_circles', $circleId);
                         }
                     });
                 }
@@ -1239,7 +1253,7 @@ class AdController extends BaseController
 
             // Load social circles for each ad
             foreach ($ads as $ad) {
-                $ad->social_circles = SocialCircle::whereIn('id', $ad->ad_placement ?? [])->get();
+                $ad->social_circles = SocialCircle::whereIn('id', $ad->target_social_circles ?? [])->get();
             }
 
             return response()->json([
@@ -1393,7 +1407,7 @@ public function export(Request $request)
  *             @OA\Property(property="description", type="string"),
  *             @OA\Property(property="call_to_action", type="string"),
  *             @OA\Property(property="destination_url", type="string"),
- *             @OA\Property(property="ad_placement", type="array", @OA\Items(type="integer")),
+ *             @OA\Property(property="target_social_circles", type="array", @OA\Items(type="integer")),
  *             @OA\Property(property="media_files", type="array", @OA\Items(type="string")),
  *             @OA\Property(property="target_audience", type="object")
  *         )
@@ -1413,8 +1427,8 @@ public function preview(Request $request)
             'description' => 'required|string',
             'call_to_action' => 'required|string|max:50',
             'destination_url' => 'required|url',
-            'ad_placement' => 'required|array|min:1',
-            'ad_placement.*' => 'integer|exists:social_circles,id',
+            'target_social_circles' => 'required|array|min:1',
+            'target_social_circles.*' => 'integer|exists:social_circles,id',
             'media_files' => 'nullable|array',
             'target_audience' => 'required|array',
         ]);
@@ -1425,8 +1439,8 @@ public function preview(Request $request)
 
         // Get social circles for preview
         $socialCircles = [];
-        if (!empty($request->ad_placement)) {
-            $socialCircles = SocialCircle::whereIn('id', $request->ad_placement)->get();
+        if (!empty($request->target_social_circles)) {
+            $socialCircles = SocialCircle::whereIn('id', $request->target_social_circles)->get();
         }
 
         // Create a temporary ad object for preview
@@ -1436,7 +1450,7 @@ public function preview(Request $request)
             'description' => $request->description,
             'call_to_action' => $request->call_to_action,
             'destination_url' => $request->destination_url,
-            'ad_placement' => $request->ad_placement,
+            'target_social_circles' => $request->target_social_circles,
             'media_files' => $request->media_files,
             'target_audience' => $request->target_audience,
         ]);
@@ -1461,7 +1475,7 @@ public function preview(Request $request)
                 ];
             }),
             'preview_timestamp' => now()->toISOString(),
-            'estimated_reach' => AdHelper::estimateAdReach($request->ad_placement, $request->target_audience),
+            'estimated_reach' => AdHelper::estimateAdReach($request->target_social_circles, $request->target_audience),
         ];
 
         return $this->sendResponse('Advertisement preview generated successfully', $previewData);
@@ -1493,7 +1507,7 @@ public function getAdsForSocialCircle(Request $request, $socialCircleId)
 
         // Load social circles for each ad
         foreach ($ads as $ad) {
-            $ad->social_circles = SocialCircle::whereIn('id', $ad->ad_placement ?? [])->get();
+            $ad->social_circles = SocialCircle::whereIn('id', $ad->target_social_circles ?? [])->get();
         }
 
         return $this->sendResponse('Ads retrieved successfully', [
@@ -1558,7 +1572,7 @@ public function getAdsForSocialCircles(Request $request)
 
         // Load social circles for each ad
         foreach ($ads as $ad) {
-            $ad->social_circles = SocialCircle::whereIn('id', $ad->ad_placement ?? [])->get();
+            $ad->social_circles = SocialCircle::whereIn('id', $ad->target_social_circles ?? [])->get();
         }
 
         return $this->sendResponse('Ads retrieved successfully', [
