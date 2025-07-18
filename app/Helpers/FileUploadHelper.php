@@ -462,4 +462,135 @@ class FileUploadHelper
     {
         self::$manager = new ImageManager(new $driverClass());
     }
+
+    /**
+     * Upload ad media file
+     *
+     * @param \Illuminate\Http\UploadedFile $file
+     * @param int $userId
+     * @param int|null $adId
+     * @return array
+     */
+    /**
+ * Upload ad media file
+ *
+ * @param \Illuminate\Http\UploadedFile $file
+ * @param int $userId
+ * @param int|null $adId
+ * @return array
+ */
+public static function uploadAdMedia($file, $userId, $adId = null)
+{
+    try {
+        // Create directory if it doesn't exist
+        $uploadPath = 'uploads/ads/' . $userId;
+        $fullPath = public_path($uploadPath);
+
+        if (!file_exists($fullPath)) {
+            mkdir($fullPath, 0755, true);
+        }
+
+        // Generate unique filename
+        $filename = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+
+        // Move file to the specified directory
+        $file->move($fullPath, $filename);
+
+        // Get file metadata
+        $fileSize = filesize($fullPath . '/' . $filename);
+        $mimeType = $file->getClientMimeType();
+        $isImage = strpos($mimeType, 'image') !== false;
+
+        // Get image dimensions if it's an image
+        $width = null;
+        $height = null;
+        $thumbnailUrl = null;
+
+        if ($isImage) {
+            try {
+                $manager = self::getImageManager();
+                $image = $manager->read($fullPath . '/' . $filename);
+                $width = $image->width();
+                $height = $image->height();
+
+                // Create thumbnail for images
+                $thumbnailPath = $uploadPath . '/thumbnails';
+                $thumbnailFullPath = public_path($thumbnailPath);
+
+                if (!file_exists($thumbnailFullPath)) {
+                    mkdir($thumbnailFullPath, 0755, true);
+                }
+
+                $thumbnailFilename = 'thumb_' . $filename;
+
+                // Create thumbnail (300x300 max, maintain aspect ratio)
+                $thumbnail = $image->resize(300, 300, function ($constraint) {
+                    $constraint->aspectRatio();
+                    $constraint->upsize();
+                });
+
+                // Encode thumbnail based on original file extension
+                $extension = strtolower($file->getClientOriginalExtension());
+                $encodedThumbnail = match($extension) {
+                    'jpg', 'jpeg' => $thumbnail->encode(new JpegEncoder(quality: 80)),
+                    'png' => $thumbnail->encode(new PngEncoder()),
+                    'webp' => $thumbnail->encode(new WebpEncoder(quality: 80)),
+                    default => $thumbnail->encode(new JpegEncoder(quality: 80))
+                };
+
+                // Save thumbnail
+                file_put_contents($thumbnailFullPath . '/' . $thumbnailFilename, $encodedThumbnail->toString());
+
+                $thumbnailUrl = url($thumbnailPath . '/' . $thumbnailFilename);
+
+            } catch (\Exception $e) {
+                \Log::warning('Failed to process image dimensions or create thumbnail', [
+                    'error' => $e->getMessage(),
+                    'file' => $filename
+                ]);
+
+                // Fallback to getimagesize
+                try {
+                    list($width, $height) = getimagesize($fullPath . '/' . $filename);
+                } catch (\Exception $e2) {
+                    \Log::warning('Failed to get image dimensions with getimagesize', [
+                        'error' => $e2->getMessage(),
+                        'file' => $filename
+                    ]);
+                }
+            }
+        } else {
+            // For videos, we could generate a thumbnail frame, but that's more complex
+            // For now, just set thumbnail to null
+            $thumbnailUrl = null;
+        }
+
+        // Create file URL
+        $fileUrl = url($uploadPath . '/' . $filename);
+
+        return [
+            'path' => $uploadPath . '/' . $filename,
+            'url' => $fileUrl,
+            'thumbnail_url' => $thumbnailUrl,
+            'type' => $mimeType,
+            'size' => $fileSize,
+            'width' => $width,
+            'height' => $height,
+            'original_name' => $file->getClientOriginalName(),
+            'ad_id' => $adId,
+            'user_id' => $userId,
+            'created_at' => now()->toDateTimeString()
+        ];
+    } catch (\Exception $e) {
+        \Log::error('Ad media upload failed', [
+            'error' => $e->getMessage(),
+            'file' => $file->getClientOriginalName(),
+            'user_id' => $userId,
+            'ad_id' => $adId
+        ]);
+
+        throw new \Exception('Failed to upload ad media: ' . $e->getMessage());
+    }
+}
+
 }

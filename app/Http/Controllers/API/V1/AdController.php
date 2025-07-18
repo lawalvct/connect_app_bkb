@@ -15,6 +15,7 @@ use App\Http\Requests\V1\CreateAdRequest;
 use App\Http\Requests\V1\UpdateAdRequest;
 use App\Http\Resources\V1\AdResource;
 use App\Helpers\AdHelper;
+use App\Helpers\FileUploadHelper;
 use App\Helpers\NombaPyamentHelper;
 use App\Models\AdPayment;
 use App\Models\SocialCircle;
@@ -328,127 +329,159 @@ class AdController extends BaseController
      *     @OA\Response(response=201, description="Advertisement created successfully")
      * )
      */
-    public function store(Request $request)
-    {
+   /**
+ * @OA\Post(
+ *     path="/api/v1/ads",
+ *     summary="Create a new advertisement",
+ *     tags={"Advertising"},
+ *     security={{"bearerAuth":{}}},
+ *     @OA\RequestBody(
+ *         required=true,
+ *         @OA\JsonContent(
+ *             @OA\Property(property="ad_name", type="string"),
+ *             @OA\Property(property="type", type="string"),
+ *             @OA\Property(property="description", type="string"),
+ *             @OA\Property(property="call_to_action", type="string"),
+ *             @OA\Property(property="destination_url", type="string"),
+ *             @OA\Property(property="target_social_circles", type="array", @OA\Items(type="integer")),
+ *             @OA\Property(property="start_date", type="string", format="date"),
+ *             @OA\Property(property="end_date", type="string", format="date"),
+ *             @OA\Property(property="budget", type="number"),
+ *             @OA\Property(property="daily_budget", type="number"),
+ *             @OA\Property(property="target_impressions", type="integer"),
+ *             @OA\Property(property="target_audience", type="object")
+ *         )
+ *     ),
+ *     @OA\Response(response=201, description="Advertisement created successfully")
+ * )
+ */
+public function store(Request $request)
+{
+
         $request->merge([
-    'target_impressions' => 10000,
-    'target_audience' => [
-        'age_min' => 18,
-        'age_max' => 65,
-        'gender' => 'all',
-        'locations' => ['US', 'UK', 'CA'],
-        'interests' => ['social', 'networking'],
+        'target_impressions' => 10000,
+        'target_audience' => [
+            'age_min' => 18,
+            'age_max' => 65,
+            'gender' => 'all',
+            'locations' => ['US', 'UK', 'CA'],
+            'interests' => ['social', 'networking'],
+        ],
+        'call_to_action' => 'Shop Now on Connect App',
+    ]);
 
-    ],
-       'call_to_action' => 'Shop Now on Connect App',
-]);
-        try {
-            $user = $request->user();
+    try {
+        $user = $request->user();
 
-            // Validate request
-            $validated = $request->validate([
-                'ad_name' => 'required|string|max:255',
-                'type' => 'required|string|in:banner,video,text,carousel',
-                'description' => 'required|string',
-                'call_to_action' => 'required|string|max:50',
-                'destination_url' => 'nullable|url',
-                'target_social_circles' => 'required|array|min:1',
-                'target_social_circles.*' => 'integer|exists:social_circles,id',
-                'start_date' => 'required|date|after_or_equal:today',
-                'end_date' => 'required|date|after:start_date',
-                'budget' => 'required|numeric|min:10',
-                'daily_budget' => 'required|numeric',
-                'target_impressions' => 'required|integer|min:1000',
-                'target_audience' => 'required|array',
-                'target_audience.age_min' => 'required|integer|min:13|max:100',
-                'target_audience.age_max' => 'required|integer|min:13|max:100|gte:target_audience.age_min',
-                'target_audience.gender' => 'required|string|in:male,female,all',
-                'target_audience.locations' => 'required|array',
-                'target_audience.interests' => 'required|array',
-                'media_files' => 'nullable|array',
-                'target_countries' => 'nullable|array',
-    'target_countries.*' => 'integer|exists:countries,id',
-            ]);
+        // Validate request
+        $validated = $request->validate([
+            'ad_name' => 'required|string|max:255',
+            'type' => 'required|string|in:banner,video,text,carousel',
+            'description' => 'required|string',
+            'call_to_action' => 'required|string|max:50',
+            'destination_url' => 'nullable|url',
+            'target_social_circles' => 'required|array|min:1',
+            'target_social_circles.*' => 'integer|exists:social_circles,id',
+            'start_date' => 'required|date|after_or_equal:today',
+            'end_date' => 'required|date|after:start_date',
+            'budget' => 'required|numeric|min:10',
+            'daily_budget' => 'required|numeric',
+            'target_impressions' => 'required|integer|min:1000',
+            'target_audience' => 'required|array',
+            'target_audience.age_min' => 'required|integer|min:13|max:100',
+            'target_audience.age_max' => 'required|integer|min:13|max:100|gte:target_audience.age_min',
+            'target_audience.gender' => 'required|string|in:male,female,all',
+            'target_audience.locations' => 'required|array',
+            'target_audience.interests' => 'required|array',
+            'media_files' => 'required|array',
+            'media_files.*' => 'file|mimes:jpeg,png,jpg,gif,mp4,avi,mov|max:20480', // 20MB max
+            'target_countries' => 'nullable|array',
+            'target_countries.*' => 'integer|exists:countries,id',
+        ]);
 
-            // Handle media files if provided
-            $mediaFiles = [];
-            if ($request->hasFile('media_files')) {
-                foreach ($request->file('media_files') as $file) {
-                    $path = $file->store('ads/' . $user->id, 'public');
-                    $mediaFiles[] = [
-                        'path' => $path,
-                        'url' => asset('storage/' . $path),
-                        'type' => $file->getClientMimeType(),
-                        'size' => $file->getSize()
-                    ];
-                }
+        // Create ad first without media files
+        $ad = Ad::create([
+            'user_id' => $user->id,
+            'ad_name' => $validated['ad_name'],
+            'type' => $validated['type'],
+            'description' => $validated['description'],
+            'call_to_action' => $validated['call_to_action'],
+            'destination_url' => $validated['destination_url'] ?? null,
+            'target_social_circles' => $validated['target_social_circles'],
+            'start_date' => $validated['start_date'],
+            'end_date' => $validated['end_date'],
+            'target_audience' => $validated['target_audience'],
+            'budget' => $validated['budget'],
+            'daily_budget' => $validated['daily_budget'],
+            'target_impressions' => $validated['target_impressions'],
+            'current_impressions' => 0,
+            'clicks' => 0,
+            'conversions' => 0,
+            'cost_per_click' => 0,
+            'total_spent' => 0,
+            'status' => 'draft',
+            'admin_status' => 'pending',
+            'created_by' => $user->id,
+            'deleted_flag' => 'N'
+        ]);
+
+        // Handle media files if provided
+        $mediaFiles = [];
+        if ($request->hasFile('media_files')) {
+            foreach ($request->file('media_files') as $file) {
+                // Upload file using FileUploadHelper
+                $mediaFile = FileUploadHelper::uploadAdMedia($file, $user->id, $ad->id);
+                $mediaFiles[] = $mediaFile;
             }
 
-            // Create ad
-            $ad = Ad::create([
-                'user_id' => $user->id,
-                'ad_name' => $validated['ad_name'],
-                'type' => $validated['type'],
-                'description' => $validated['description'],
-                'media_files' => $mediaFiles,
-                'call_to_action' => $validated['call_to_action'],
-                'destination_url' => $validated['destination_url'],
-                'target_social_circles' => $validated['target_social_circles'],
-                'start_date' => $validated['start_date'],
-                'end_date' => $validated['end_date'],
-                'target_audience' => $validated['target_audience'],
-                'budget' => $validated['budget'],
-                'daily_budget' => $validated['daily_budget'],
-                'target_impressions' => $validated['target_impressions'],
-                'current_impressions' => 0,
-                'clicks' => 0,
-                'conversions' => 0,
-                'cost_per_click' => 0,
-                'total_spent' => 0,
-                'status' => 'draft',
-                'admin_status' => 'pending',
-                'created_by' => $user->id,
-                'deleted_flag' => 'N'
-            ]);
-
-            // Load social circles
-            $ad->social_circles = SocialCircle::whereIn('id', $ad->target_social_circles)->get();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Advertisement created successfully',
-                'data' => [
-                    'id' => $ad->id,
-                    'ad_name' => $ad->ad_name,
-                    'type' => $ad->type,
-                    'description' => $ad->description,
-                    'media_files' => $ad->media_files,
-                    'call_to_action' => $ad->call_to_action,
-                    'destination_url' => $ad->destination_url,
-                    'start_date' => $ad->start_date->format('Y-m-d'),
-                    'end_date' => $ad->end_date->format('Y-m-d'),
-                    'budget' => (float) $ad->budget,
-                    'daily_budget' => (float) $ad->daily_budget,
-                    'target_impressions' => (int) $ad->target_impressions,
-                    'status' => $ad->status,
-                    'admin_status' => $ad->admin_status,
-                    'social_circles' => $ad->social_circles->map(function ($circle) {
-                        return [
-                            'id' => $circle->id,
-                            'name' => $circle->name,
-                            'color' => $circle->color ?? '#3498db'
-                        ];
-                    }),
-                    'created_at' => $ad->created_at->toISOString()
-                ]
-            ], 201);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to create advertisement: ' . $e->getMessage()
-            ], 500);
+            // Update ad with media files
+            $ad->update(['media_files' => $mediaFiles]);
         }
+
+        // Load social circles
+        $ad->social_circles = SocialCircle::whereIn('id', $ad->target_social_circles)->get();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Advertisement created successfully',
+            'data' => [
+                'id' => $ad->id,
+                'ad_name' => $ad->ad_name,
+                'type' => $ad->type,
+                'description' => $ad->description,
+                'media_files' => $ad->media_files,
+                'call_to_action' => $ad->call_to_action,
+                'destination_url' => $ad->destination_url,
+                'start_date' => $ad->start_date->format('Y-m-d'),
+                'end_date' => $ad->end_date->format('Y-m-d'),
+                'budget' => (float) $ad->budget,
+                'daily_budget' => (float) $ad->daily_budget,
+                'target_impressions' => (int) $ad->target_impressions,
+                'status' => $ad->status,
+                'admin_status' => $ad->admin_status,
+                'social_circles' => $ad->social_circles->map(function ($circle) {
+                    return [
+                        'id' => $circle->id,
+                        'name' => $circle->name,
+                        'color' => $circle->color ?? '#3498db'
+                    ];
+                }),
+                'created_at' => $ad->created_at->toISOString()
+            ]
+        ], 201);
+    } catch (\Exception $e) {
+        \Log::error('Ad creation failed', [
+            'user_id' => $request->user()->id,
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to create advertisement: ' . $e->getMessage()
+        ], 500);
     }
+}
 
     /**
      * @OA\Get(
