@@ -2418,4 +2418,235 @@ public function getPaymentHistory(Request $request, $id)
     }
 }
 
+
+
+/**
+ * @OA\Get(
+ *     path="/api/v1/ads/analytics/impressions-overtime",
+ *     summary="Get impressions overtime data for line chart",
+ *     tags={"Advertising"},
+ *     security={{"bearerAuth":{}}},
+ *     @OA\Parameter(name="year", in="query", required=true, @OA\Schema(type="integer", example=2024)),
+ *     @OA\Parameter(name="ad_id", in="query", @OA\Schema(type="integer", description="Specific ad ID (optional)")),
+ *     @OA\Response(response=200, description="Impressions overtime data retrieved successfully")
+ * )
+ */
+public function getImpressionsOvertime(Request $request)
+{
+    try {
+        $user = $request->user();
+
+        $validator = Validator::make($request->all(), [
+            'year' => 'required|integer|min:2020|max:' . (date('Y') + 1),
+            'ad_id' => 'nullable|integer|exists:ads,id'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation Error',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $year = $request->input('year');
+        $adId = $request->input('ad_id');
+
+        // If ad_id is provided, verify it belongs to the user
+        if ($adId) {
+            $ad = Ad::where('id', $adId)
+                ->where('user_id', $user->id)
+                ->where('deleted_flag', 'N')
+                ->first();
+
+            if (!$ad) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Advertisement not found or access denied'
+                ], 404);
+            }
+        }
+
+        // Get impressions overtime data
+        $data = AdHelper::getImpressionsOvertime($user->id, $year, $adId);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Impressions overtime data retrieved successfully',
+            'data' => $data
+        ]);
+
+    } catch (\Exception $e) {
+        \Log::error('Failed to get impressions overtime data', [
+            'user_id' => $request->user()->id,
+            'year' => $request->input('year'),
+            'ad_id' => $request->input('ad_id'),
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to retrieve impressions overtime data: ' . $e->getMessage()
+        ], 500);
+    }
+}
+
+/**
+ * @OA\Get(
+ *     path="/api/v1/ads/analytics/available-years",
+ *     summary="Get available years for analytics",
+ *     tags={"Advertising"},
+ *     security={{"bearerAuth":{}}},
+ *     @OA\Response(response=200, description="Available years retrieved successfully")
+ * )
+ */
+public function getAvailableYears(Request $request)
+{
+    try {
+        $user = $request->user();
+
+        // Get years from user's ads
+        $years = Ad::where('user_id', $user->id)
+            ->where('deleted_flag', 'N')
+            ->selectRaw('DISTINCT YEAR(created_at) as year')
+            ->orderBy('year', 'desc')
+            ->pluck('year')
+            ->toArray();
+
+        // Add current year if not present
+        $currentYear = (int) date('Y');
+          if (!in_array($currentYear, $years)) {
+            array_unshift($years, $currentYear);
+        }
+
+        // Sort years in descending order
+        rsort($years);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Available years retrieved successfully',
+            'data' => [
+                'years' => $years,
+                'default_year' => $currentYear,
+                'total_years' => count($years)
+            ]
+        ]);
+
+    } catch (\Exception $e) {
+        \Log::error('Failed to get available years', [
+            'user_id' => $request->user()->id,
+            'error' => $e->getMessage()
+        ]);
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to retrieve available years: ' . $e->getMessage()
+        ], 500);
+    }
+}
+
+/**
+ * @OA\Get(
+ *     path="/api/v1/ads/analytics/comparison",
+ *     summary="Compare impressions between two years",
+ *     tags={"Advertising"},
+ *     security={{"bearerAuth":{}}},
+ *     @OA\Parameter(name="year1", in="query", required=true, @OA\Schema(type="integer")),
+ *     @OA\Parameter(name="year2", in="query", required=true, @OA\Schema(type="integer")),
+ *     @OA\Parameter(name="ad_id", in="query", @OA\Schema(type="integer")),
+ *     @OA\Response(response=200, description="Comparison data retrieved successfully")
+ * )
+ */
+public function getYearComparison(Request $request)
+{
+    try {
+        $user = $request->user();
+
+        $validator = Validator::make($request->all(), [
+            'year1' => 'required|integer|min:2020|max:' . (date('Y') + 1),
+            'year2' => 'required|integer|min:2020|max:' . (date('Y') + 1) . '|different:year1',
+            'ad_id' => 'nullable|integer|exists:ads,id'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation Error',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $year1 = $request->input('year1');
+        $year2 = $request->input('year2');
+        $adId = $request->input('ad_id');
+
+        // Get data for both years
+        $data1 = AdHelper::getImpressionsOvertime($user->id, $year1, $adId);
+        $data2 = AdHelper::getImpressionsOvertime($user->id, $year2, $adId);
+
+        // Calculate growth/decline
+        $comparison = [
+            'year1' => $year1,
+            'year2' => $year2,
+            'data1' => $data1,
+            'data2' => $data2,
+            'growth_analysis' => [
+                'impressions_growth' => $this->calculateGrowth(
+                    $data1['summary']['total_impressions'] ?? 0,
+                    $data2['summary']['total_impressions'] ?? 0
+                ),
+                'clicks_growth' => $this->calculateGrowth(
+                    $data1['summary']['total_clicks'] ?? 0,
+                    $data2['summary']['total_clicks'] ?? 0
+                ),
+                'conversions_growth' => $this->calculateGrowth(
+                    $data1['summary']['total_conversions'] ?? 0,
+                    $data2['summary']['total_conversions'] ?? 0
+                ),
+                'ctr_change' => $this->calculateChange(
+                    $data1['summary']['average_ctr'] ?? 0,
+                    $data2['summary']['average_ctr'] ?? 0
+                )
+            ]
+        ];
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Year comparison data retrieved successfully',
+            'data' => $comparison
+        ]);
+
+    } catch (\Exception $e) {
+        \Log::error('Failed to get year comparison data', [
+            'user_id' => $request->user()->id,
+            'error' => $e->getMessage()
+        ]);
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to retrieve comparison data: ' . $e->getMessage()
+        ], 500);
+    }
+}
+
+/**
+ * Helper method to calculate growth percentage
+ */
+private function calculateGrowth($oldValue, $newValue)
+{
+    if ($oldValue == 0) {
+        return $newValue > 0 ? 100 : 0;
+    }
+
+    return round((($newValue - $oldValue) / $oldValue) * 100, 2);
+}
+
+/**
+ * Helper method to calculate change
+ */
+private function calculateChange($oldValue, $newValue)
+{
+    return round($newValue - $oldValue, 2);
+}
 }

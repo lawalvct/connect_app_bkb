@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 
 class Ad extends Model
 {
@@ -363,5 +364,47 @@ class Ad extends Model
     public function latestPayment()
     {
         return $this->hasOne(AdPayment::class)->latest();
+    }
+
+    /**
+     * Get impressions data grouped by month for a specific year
+     */
+    public function getMonthlyImpressions($year)
+    {
+        // This would work if you have detailed analytics table
+        return $this->hasMany(AdAnalytic::class)
+            ->whereYear('date', $year)
+            ->selectRaw('MONTH(date) as month, SUM(impressions) as total_impressions')
+            ->groupBy('month')
+            ->orderBy('month')
+            ->get();
+    }
+
+    /**
+     * Check if ad was active in a specific month/year
+     */
+    public function wasActiveInMonth($year, $month)
+    {
+        $startOfMonth = Carbon::create($year, $month, 1)->startOfMonth();
+        $endOfMonth = Carbon::create($year, $month, 1)->endOfMonth();
+
+        return $this->start_date <= $endOfMonth && $this->end_date >= $startOfMonth;
+    }
+
+    /**
+     * Get performance metrics for a specific period
+     */
+    public function getPerformanceMetrics($startDate, $endDate)
+    {
+        // This is a simplified version - you'd implement based on your analytics table
+        return [
+            'impressions' => $this->current_impressions,
+            'clicks' => $this->clicks,
+            'conversions' => $this->conversions,
+            'ctr' => $this->ctr,
+            'conversion_rate' => $this->conversion_rate ?? 0,
+            'cost_per_click' => $this->clicks > 0 ? $this->total_spent / $this->clicks : 0,
+            'cost_per_conversion' => $this->conversions > 0 ? $this->total_spent / $this->conversions : 0
+        ];
     }
 }

@@ -3,7 +3,9 @@
 namespace App\Helpers;
 
 use App\Models\Ad;
+use App\Models\SocialCircle;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class AdHelper
 {
@@ -132,27 +134,27 @@ class AdHelper
     /**
      * Get active ads for specific social circles
      */
-    public static function getAdsForSocialCircles($socialCircleIds, $limit = 5)
-    {
-        if (empty($socialCircleIds)) {
-            return collect();
-        }
+    // public static function getAdsForSocialCircles($socialCircleIds, $limit = 5)
+    // {
+    //     if (empty($socialCircleIds)) {
+    //         return collect();
+    //     }
 
-        return Ad::where('status', 'active')
-            ->where('admin_status', 'approved')
-            ->where('start_date', '<=', now())
-            ->where('end_date', '>=', now())
-            ->where('deleted_flag', 'N')
-            ->where(function ($query) use ($socialCircleIds) {
-                foreach ($socialCircleIds as $socialCircleId) {
-                    $query->orWhereJsonContains('ad_placement', $socialCircleId);
-                }
-            })
-            ->with(['user', 'placementSocialCircles'])
-            ->inRandomOrder() // Randomize ad display
-            ->limit($limit)
-            ->get();
-    }
+    //     return Ad::where('status', 'active')
+    //         ->where('admin_status', 'approved')
+    //         ->where('start_date', '<=', now())
+    //         ->where('end_date', '>=', now())
+    //         ->where('deleted_flag', 'N')
+    //         ->where(function ($query) use ($socialCircleIds) {
+    //             foreach ($socialCircleIds as $socialCircleId) {
+    //                 $query->orWhereJsonContains('ad_placement', $socialCircleId);
+    //             }
+    //         })
+    //         ->with(['user', 'placementSocialCircles'])
+    //         ->inRandomOrder() // Randomize ad display
+    //         ->limit($limit)
+    //         ->get();
+    // }
 
     /**
      * Get ads for a single social circle
@@ -292,66 +294,66 @@ class AdHelper
  * @param array $targetAudience
  * @return array
  */
-public static function estimateAdReach($adPlacement, $targetAudience)
-{
-    // This is a placeholder implementation
-    // In a real application, you would calculate this based on actual user data
+// public static function estimateAdReach($adPlacement, $targetAudience)
+// {
+//     // This is a placeholder implementation
+//     // In a real application, you would calculate this based on actual user data
 
-    $totalUsers = 0;
-    $matchingUsers = 0;
+//     $totalUsers = 0;
+//     $matchingUsers = 0;
 
-    // Get total users in the selected social circles
-    if (!empty($adPlacement)) {
-        foreach ($adPlacement as $circleId) {
-            // Get count of users in this social circle
-            $circleUsers = \DB::table('user_social_circle')
-                ->where('social_id', $circleId)
-                ->count();
+//     // Get total users in the selected social circles
+//     if (!empty($adPlacement)) {
+//         foreach ($adPlacement as $circleId) {
+//             // Get count of users in this social circle
+//             $circleUsers = \DB::table('user_social_circle')
+//                 ->where('social_id', $circleId)
+//                 ->count();
 
-            $totalUsers += $circleUsers;
-        }
-    }
+//             $totalUsers += $circleUsers;
+//         }
+//     }
 
-    // Calculate matching users based on target audience criteria
-    if (!empty($targetAudience)) {
-        $query = \DB::table('users')
-            ->join('user_social_circle', 'users.id', '=', 'user_social_circle.user_id')
-            ->whereIn('user_social_circle.social_id', $adPlacement)
-            ->where('users.deleted_flag', 'N');
+//     // Calculate matching users based on target audience criteria
+//     if (!empty($targetAudience)) {
+//         $query = \DB::table('users')
+//             ->join('user_social_circle', 'users.id', '=', 'user_social_circle.user_id')
+//             ->whereIn('user_social_circle.social_id', $adPlacement)
+//             ->where('users.deleted_flag', 'N');
 
-        // Apply age filter if provided
-        if (isset($targetAudience['age_min']) && isset($targetAudience['age_max'])) {
-            $query->whereRaw('TIMESTAMPDIFF(YEAR, users.date_of_birth, CURDATE()) >= ?', [$targetAudience['age_min']])
-                  ->whereRaw('TIMESTAMPDIFF(YEAR, users.date_of_birth, CURDATE()) <= ?', [$targetAudience['age_max']]);
-        }
+//         // Apply age filter if provided
+//         if (isset($targetAudience['age_min']) && isset($targetAudience['age_max'])) {
+//             $query->whereRaw('TIMESTAMPDIFF(YEAR, users.date_of_birth, CURDATE()) >= ?', [$targetAudience['age_min']])
+//                   ->whereRaw('TIMESTAMPDIFF(YEAR, users.date_of_birth, CURDATE()) <= ?', [$targetAudience['age_max']]);
+//         }
 
-        // Apply gender filter if provided
-        if (isset($targetAudience['gender']) && $targetAudience['gender'] !== 'all') {
-            $query->where('users.gender', $targetAudience['gender']);
-        }
+//         // Apply gender filter if provided
+//         if (isset($targetAudience['gender']) && $targetAudience['gender'] !== 'all') {
+//             $query->where('users.gender', $targetAudience['gender']);
+//         }
 
-        // Apply location filter if provided
-        if (isset($targetAudience['locations']) && !empty($targetAudience['locations'])) {
-            $query->whereIn('users.country_id', $targetAudience['locations']);
-        }
+//         // Apply location filter if provided
+//         if (isset($targetAudience['locations']) && !empty($targetAudience['locations'])) {
+//             $query->whereIn('users.country_id', $targetAudience['locations']);
+//         }
 
-        $matchingUsers = $query->distinct('users.id')->count('users.id');
-    }
+//         $matchingUsers = $query->distinct('users.id')->count('users.id');
+//     }
 
-    // Calculate estimated metrics
-    $estimatedImpressions = $matchingUsers * 5; // Assume each user sees the ad 5 times
-    $estimatedClicks = round($estimatedImpressions * 0.02); // Assume 2% CTR
-    $estimatedConversions = round($estimatedClicks * 0.1); // Assume 10% conversion rate
+//     // Calculate estimated metrics
+//     $estimatedImpressions = $matchingUsers * 5; // Assume each user sees the ad 5 times
+//     $estimatedClicks = round($estimatedImpressions * 0.02); // Assume 2% CTR
+//     $estimatedConversions = round($estimatedClicks * 0.1); // Assume 10% conversion rate
 
-    return [
-        'total_users' => $totalUsers,
-        'matching_users' => $matchingUsers,
-        'estimated_impressions' => $estimatedImpressions,
-        'estimated_clicks' => $estimatedClicks,
-        'estimated_conversions' => $estimatedConversions,
-        'estimated_ctr' => $estimatedImpressions > 0 ? round(($estimatedClicks / $estimatedImpressions) * 100, 2) : 0,
-    ];
-}
+//     return [
+//         'total_users' => $totalUsers,
+//         'matching_users' => $matchingUsers,
+//         'estimated_impressions' => $estimatedImpressions,
+//         'estimated_clicks' => $estimatedClicks,
+//         'estimated_conversions' => $estimatedConversions,
+//         'estimated_ctr' => $estimatedImpressions > 0 ? round(($estimatedClicks / $estimatedImpressions) * 100, 2) : 0,
+//     ];
+// }
 
 private function getAdPerformanceBySocialCircle($socialCircleId, $dateFrom = null, $userId = null)
 {
@@ -386,5 +388,270 @@ private function getAdPerformanceBySocialCircle($socialCircleId, $dateFrom = nul
     }
 }
 
+
+/**
+     * Get impressions data for line chart by year
+     *
+     * @param int $userId
+     * @param int $year
+     * @param int|null $adId - specific ad ID (optional)
+     * @return array
+     */
+    public static function getImpressionsOvertime($userId, $year, $adId = null)
+    {
+        try {
+            // Base query for user's ads
+            $query = Ad::where('user_id', $userId)
+                ->where('deleted_flag', 'N');
+
+            // Filter by specific ad if provided
+            if ($adId) {
+                $query->where('id', $adId);
+            }
+
+            // Get ads created in the specified year or active during the year
+            $query->where(function($q) use ($year) {
+                $q->whereYear('created_at', $year)
+                  ->orWhere(function($subQ) use ($year) {
+                      $subQ->whereYear('start_date', '<=', $year)
+                           ->whereYear('end_date', '>=', $year);
+                  });
+            });
+
+            $ads = $query->get();
+
+            // Initialize months array
+            $months = [
+                1 => 'January', 2 => 'February', 3 => 'March', 4 => 'April',
+                5 => 'May', 6 => 'June', 7 => 'July', 8 => 'August',
+                9 => 'September', 10 => 'October', 11 => 'November', 12 => 'December'
+            ];
+
+            $impressionsData = [];
+            $clicksData = [];
+            $conversionsData = [];
+
+            // Initialize all months with 0
+            foreach ($months as $monthNum => $monthName) {
+                $impressionsData[] = [
+                    'month' => $monthName,
+                    'month_number' => $monthNum,
+                    'impressions' => 0,
+                    'clicks' => 0,
+                    'conversions' => 0,
+                    'ctr' => 0
+                ];
+            }
+
+            // If we have detailed tracking table (ad_analytics), use it
+            if (self::hasAnalyticsTable()) {
+                $analyticsData = self::getDetailedAnalytics($userId, $year, $adId);
+
+                foreach ($analyticsData as $data) {
+                    $monthIndex = $data->month - 1; // Array is 0-indexed
+                    $impressionsData[$monthIndex]['impressions'] = (int) $data->total_impressions;
+                    $impressionsData[$monthIndex]['clicks'] = (int) $data->total_clicks;
+                    $impressionsData[$monthIndex]['conversions'] = (int) $data->total_conversions;
+                    $impressionsData[$monthIndex]['ctr'] = $data->total_impressions > 0
+                        ? round(($data->total_clicks / $data->total_impressions) * 100, 2)
+                        : 0;
+                }
+            } else {
+                // Fallback: Distribute current stats across months based on ad activity
+                foreach ($ads as $ad) {
+                    $adStartMonth = max(1, Carbon::parse($ad->start_date)->month);
+                    $adEndMonth = min(12, Carbon::parse($ad->end_date)->month);
+
+                    // Simple distribution across active months
+                    $activeMonths = $adEndMonth - $adStartMonth + 1;
+                    $impressionsPerMonth = $activeMonths > 0 ? $ad->current_impressions / $activeMonths : 0;
+                    $clicksPerMonth = $activeMonths > 0 ? $ad->clicks / $activeMonths : 0;
+                    $conversionsPerMonth = $activeMonths > 0 ? $ad->conversions / $activeMonths : 0;
+
+                    for ($month = $adStartMonth; $month <= $adEndMonth; $month++) {
+                        $monthIndex = $month - 1;
+                        $impressionsData[$monthIndex]['impressions'] += (int) $impressionsPerMonth;
+                        $impressionsData[$monthIndex]['clicks'] += (int) $clicksPerMonth;
+                        $impressionsData[$monthIndex]['conversions'] += (int) $conversionsPerMonth;
+
+                        // Recalculate CTR
+                        if ($impressionsData[$monthIndex]['impressions'] > 0) {
+                            $impressionsData[$monthIndex]['ctr'] = round(
+                                ($impressionsData[$monthIndex]['clicks'] / $impressionsData[$monthIndex]['impressions']) * 100,
+                                2
+                            );
+                        }
+                    }
+                }
+            }
+
+            return [
+                'year' => $year,
+                'data' => $impressionsData,
+                'summary' => [
+                    'total_impressions' => array_sum(array_column($impressionsData, 'impressions')),
+                    'total_clicks' => array_sum(array_column($impressionsData, 'clicks')),
+                    'total_conversions' => array_sum(array_column($impressionsData, 'conversions')),
+                    'average_ctr' => self::calculateAverageCTR($impressionsData),
+                    'peak_month' => self::getPeakMonth($impressionsData),
+                    'total_ads' => $ads->count()
+                ]
+            ];
+
+        } catch (\Exception $e) {
+            \Log::error('Error getting impressions overtime data', [
+                'user_id' => $userId,
+                'year' => $year,
+                'ad_id' => $adId,
+                'error' => $e->getMessage()
+            ]);
+
+            return [
+                'year' => $year,
+                'data' => [],
+                'summary' => [],
+                'error' => $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Check if we have a detailed analytics table
+     */
+    private static function hasAnalyticsTable()
+    {
+        try {
+            return DB::getSchemaBuilder()->hasTable('ad_analytics');
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Get detailed analytics from ad_analytics table
+     */
+    private static function getDetailedAnalytics($userId, $year, $adId = null)
+    {
+        $query = DB::table('ad_analytics')
+            ->join('ads', 'ad_analytics.ad_id', '=', 'ads.id')
+            ->where('ads.user_id', $userId)
+            ->whereYear('ad_analytics.date', $year)
+            ->select(
+                DB::raw('MONTH(ad_analytics.date) as month'),
+                DB::raw('SUM(ad_analytics.impressions) as total_impressions'),
+                DB::raw('SUM(ad_analytics.clicks) as total_clicks'),
+                DB::raw('SUM(ad_analytics.conversions) as total_conversions')
+            )
+            ->groupBy(DB::raw('MONTH(ad_analytics.date)'))
+            ->orderBy('month');
+
+        if ($adId) {
+            $query->where('ads.id', $adId);
+        }
+
+        return $query->get();
+    }
+
+    /**
+     * Calculate average CTR across all months
+     */
+    private static function calculateAverageCTR($data)
+    {
+        $totalImpressions = array_sum(array_column($data, 'impressions'));
+        $totalClicks = array_sum(array_column($data, 'clicks'));
+
+        return $totalImpressions > 0 ? round(($totalClicks / $totalImpressions) * 100, 2) : 0;
+    }
+
+    /**
+     * Get the month with highest impressions
+     */
+    private static function getPeakMonth($data)
+    {
+        $maxImpressions = 0;
+        $peakMonth = null;
+
+        foreach ($data as $monthData) {
+            if ($monthData['impressions'] > $maxImpressions) {
+                $maxImpressions = $monthData['impressions'];
+                $peakMonth = $monthData['month'];
+            }
+        }
+
+        return [
+            'month' => $peakMonth,
+            'impressions' => $maxImpressions
+        ];
+    }
+
+
+
+    /**
+     * Get ads for multiple social circles
+     */
+    public static function getAdsForSocialCircles($socialCircleIds, $limit = 5)
+    {
+        return Ad::where('status', 'active')
+            ->where('admin_status', 'approved')
+            ->where('deleted_flag', 'N')
+            ->where('start_date', '<=', now())
+            ->where('end_date', '>=', now())
+            ->where(function($query) use ($socialCircleIds) {
+                foreach ($socialCircleIds as $circleId) {
+                    $query->orWhereJsonContains('target_social_circles', $circleId);
+                }
+            })
+            ->inRandomOrder()
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
+     * Estimate ad reach based on social circles and audience
+     */
+    public static function estimateAdReach($socialCircleIds, $targetAudience)
+    {
+        try {
+            // This is a simplified estimation
+            // In a real app, you'd have more sophisticated reach calculation
+
+            $baseReach = 0;
+
+            foreach ($socialCircleIds as $circleId) {
+                $circle = SocialCircle::find($circleId);
+                if ($circle) {
+                    // Estimate based on social circle size
+                    $circleUserCount = $circle->users()->count();
+                    $baseReach += $circleUserCount;
+                }
+            }
+
+            // Apply audience filters (simplified)
+            $ageRange = $targetAudience['age_max'] - $targetAudience['age_min'];
+            $ageMultiplier = min(1.0, $ageRange / 50); // Broader age range = higher reach
+
+            $genderMultiplier = $targetAudience['gender'] === 'all' ? 1.0 : 0.5;
+
+            $estimatedReach = (int) ($baseReach * $ageMultiplier * $genderMultiplier);
+
+            return [
+                'estimated_reach' => $estimatedReach,
+                'confidence' => 'medium', // low, medium, high
+                'factors' => [
+                    'social_circles' => count($socialCircleIds),
+                    'age_range' => $ageRange,
+                    'gender_targeting' => $targetAudience['gender'],
+                    'location_count' => count($targetAudience['locations'] ?? [])
+                ]
+            ];
+
+        } catch (\Exception $e) {
+            return [
+                'estimated_reach' => 0,
+                'confidence' => 'low',
+                'error' => $e->getMessage()
+            ];
+        }
+    }
 
 }

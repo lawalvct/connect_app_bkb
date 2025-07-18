@@ -298,18 +298,23 @@ Route::prefix('discover')->group(function () {
 
 
         Route::post('/{id}/payment', [AdController::class, 'initiatePayment']);
-    Route::get('/{id}/payment/{paymentId}/status', [AdController::class, 'getPaymentStatus']);
-    Route::post('/{id}/payment/{paymentId}/verify', [AdController::class, 'verifyPayment']);
-    Route::get('/{id}/payments', [AdController::class, 'getPaymentHistory']);
+        Route::get('/{id}/payment/{paymentId}/status', [AdController::class, 'getPaymentStatus']);
+        Route::post('/{id}/payment/{paymentId}/verify', [AdController::class, 'verifyPayment']);
+        Route::get('/{id}/payments', [AdController::class, 'getPaymentHistory']);
 
-    // Webhook routes (no auth middleware)
-    Route::post('/payment/webhook/nomba', [AdController::class, 'handleNombaWebhook'])
-        ->withoutMiddleware(['auth:sanctum'])
-        ->name('ads.payment.callback.nomba');
-    Route::post('/payment/webhook/stripe', [AdController::class, 'handleStripeWebhook'])
-        ->withoutMiddleware(['auth:sanctum']);
+                // Webhook routes (no auth middleware)
+                Route::post('/payment/webhook/nomba', [AdController::class, 'handleNombaWebhook'])
+                ->withoutMiddleware(['auth:sanctum'])
+                ->name('ads.payment.callback.nomba');
+                Route::post('/payment/webhook/stripe', [AdController::class, 'handleStripeWebhook'])
+                ->withoutMiddleware(['auth:sanctum']);
 
-
+            // Analytics routes
+            Route::prefix('analytics')->group(function () {
+                Route::get('impressions-overtime', [AdController::class, 'getImpressionsOvertime']);
+                Route::get('available-years', [AdController::class, 'getAvailableYears']);
+                Route::get('comparison', [AdController::class, 'getYearComparison']);
+            });
     });
 
      // Ad Tracking Routes (for recording impressions and clicks)
@@ -318,6 +323,7 @@ Route::prefix('discover')->group(function () {
         Route::post('/{id}/click', [AdController::class, 'trackClick']);
          Route::post('/{id}/conversion', [AdController::class, 'trackConversion']);
     });
+
 
       // Get ads for social circle feeds
       Route::get('social-circles/{id}/ads', [AdController::class, 'getAdsForSocialCircle']);
