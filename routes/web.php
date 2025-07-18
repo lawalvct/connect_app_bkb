@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\API\V1\AdController;
 use App\Http\Controllers\API\V1\AuthController;
 use App\Http\Controllers\API\V1\SubscriptionController;
 use Illuminate\Support\Facades\Route;
@@ -27,3 +28,10 @@ Route::get('api/v1/auth/google/callback', [AuthController::class, 'handleGoogleC
 
 
 Route::get('/payment/callback', [SubscriptionController::class, 'handleNombaCallbackWeb'])->name('payment.callback.web');
+
+
+//for ads redirection
+    Route::get('/payment/{payment}/success', [AdController::class, 'paymentSuccess'])
+        ->name('ads.payment.success');
+    Route::get('/payment/{payment}/cancel', [AdController::class, 'paymentCancel'])
+        ->name('ads.payment.cancel');

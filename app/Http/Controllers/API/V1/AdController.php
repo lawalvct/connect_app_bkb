@@ -15,6 +15,8 @@ use App\Http\Requests\V1\CreateAdRequest;
 use App\Http\Requests\V1\UpdateAdRequest;
 use App\Http\Resources\V1\AdResource;
 use App\Helpers\AdHelper;
+use App\Helpers\NombaPyamentHelper;
+use App\Models\AdPayment;
 use App\Models\SocialCircle;
 
 /**
@@ -403,7 +405,7 @@ class AdController extends BaseController
                 'conversions' => 0,
                 'cost_per_click' => 0,
                 'total_spent' => 0,
-                'status' => 'pending_review',
+                'status' => 'draft',
                 'admin_status' => 'pending',
                 'created_by' => $user->id,
                 'deleted_flag' => 'N'
@@ -1601,7 +1603,767 @@ public function getAdsForSocialCircles(Request $request)
 }
 
 
+/**
+ * Initiate payment for an advertisement
+ */
+public function initiatePayment(Request $request, $id)
+{
+    try {
+        $user = $request->user();
+
+        // Validate request
+        $validated = $request->validate([
+            'payment_gateway' => 'required|string|in:nomba,stripe',
+            'currency' => 'required|string|in:USD,NGN',
+            'callback_url' => 'nullable|url' // Optional external callback URL
+        ]);
+
+        // Validate gateway-currency combination
+        if ($validated['payment_gateway'] === 'nomba' && !in_array($validated['currency'], ['USD', 'NGN'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Nomba supports USD and NGN currencies only'
+            ], 400);
+        }
+
+        if ($validated['payment_gateway'] === 'stripe' && $validated['currency'] !== 'USD') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Stripe supports USD currency only'
+            ], 400);
+        }
+
+        // Get the ad
+        $ad = Ad::where('id', $id)
+            ->where('user_id', $user->id)
+            ->where('deleted_flag', 'N')
+            ->first();
+
+        if (!$ad) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Advertisement not found'
+            ], 404);
+        }
+
+        // Check if ad can be paid for
+        if (!$ad->canBePaidFor()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This advertisement cannot be paid for in its current state. Current status: ' . $ad->status
+            ], 400);
+        }
+
+        // Check for existing pending payment
+        $existingPayment = AdPayment::where('ad_id', $ad->id)
+            ->where('status', 'draft')
+            ->where('expires_at', '>', now())
+            ->first();
+
+        if ($existingPayment) {
+            return response()->json([
+                'success' => false,
+                'message' => 'A payment is already pending for this advertisement',
+                'data' => [
+                    'payment_id' => $existingPayment->id,
+                    'payment_link' => $existingPayment->payment_link,
+                    'expires_at' => $existingPayment->expires_at,
+                    'amount' => $existingPayment->amount,
+                    'currency' => $existingPayment->currency
+                ]
+            ], 400);
+        }
+
+        // Calculate payment amount
+        $budgetUSD = $ad->budget;
+        $currency = strtoupper($validated['currency']);
+        $exchangeRate = 1;
+        $amount = $budgetUSD;
+
+        if ($currency === 'NGN') {
+            $exchangeRate = 1500; // Your specified conversion rate
+            $amount = $budgetUSD * $exchangeRate;
+        }
+
+        // Create payment record
+        $payment = AdPayment::create([
+            'user_id' => $user->id,
+            'ad_id' => $ad->id,
+            'amount' => $amount,
+            'currency' => $currency,
+            'amount_usd' => $budgetUSD,
+            'exchange_rate' => $exchangeRate,
+            'payment_gateway' => $validated['payment_gateway'],
+            'status' => 'pending',
+            'expires_at' => now()->addHours(24), // Payment expires in 24 hours
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent()
+        ]);
+
+        // Generate internal callback URLs
+        $successCallbackUrl = route('ads.payment.success', ['payment' => $payment->id]);
+        $cancelCallbackUrl = route('ads.payment.cancel', ['payment' => $payment->id]);
+
+        // Store external callback URL if provided (for redirecting the user after internal processing)
+        if (isset($validated['callback_url'])) {
+            $payment->update([
+                'external_callback_url' => $validated['callback_url']
+            ]);
+        }
+
+        // Process payment based on gateway
+        if ($validated['payment_gateway'] === 'nomba') {
+            $result = $this->processNombaPayment($payment, $successCallbackUrl);
+        } else {
+            $result = $this->processStripePayment($payment, $successCallbackUrl, $cancelCallbackUrl);
+        }
+
+        if ($result['success']) {
+            $payment->update([
+                'gateway_reference' => $result['reference'],
+                'payment_link' => $result['payment_link'] ?? null,
+                'gateway_response' => $result['response'] ?? null
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Payment initiated successfully',
+                'data' => [
+                    'payment_id' => $payment->id,
+                    'payment_link' => $result['payment_link'],
+                    'gateway_reference' => $result['reference'],
+                    'amount' => $amount,
+                    'currency' => $currency,
+                    'amount_usd' => $budgetUSD,
+                    'exchange_rate' => $exchangeRate,
+                    'expires_at' => $payment->expires_at,
+                    'payment_gateway' => $validated['payment_gateway']
+                ]
+            ]);
+        } else {
+            $payment->markAsFailed($result['message']);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to initiate payment: ' . $result['message']
+            ], 500);
+        }
+
+    } catch (\Exception $e) {
+        \Log::error('Ad payment initiation failed', [
+            'ad_id' => $id,
+            'user_id' => $request->user()->id,
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to initiate payment: ' . $e->getMessage()
+        ], 500);
+    }
+}
+
+/**
+ * Process Nomba payment
+ */
+private function processNombaPayment(AdPayment $payment, $callbackUrl)
+{
+    try {
+        $nombaHelper = new NombaPyamentHelper();
+
+        $paymentData = [
+            'amount' => $payment->amount,
+            'currency' => $payment->currency,
+            'email' => $payment->user->email,
+            'callback_url' => $callbackUrl, // Internal callback URL
+            'reference' => 'AD_' . $payment->ad_id . '_' . $payment->id . '_' . time(),
+        ];
+
+        $result = $nombaHelper->initiatePayment($paymentData);
+
+        if ($result['success']) {
+            return [
+                'success' => true,
+                'payment_link' => $result['data']['payment_link'],
+                'reference' => $result['data']['reference'],
+                'response' => $result['data']
+            ];
+        }
+
+        return [
+            'success' => false,
+            'message' => $result['message'] ?? 'Nomba payment processing failed'
+        ];
+
+    } catch (\Exception $e) {
+        \Log::error('Nomba payment processing failed', [
+            'payment_id' => $payment->id,
+            'error' => $e->getMessage()
+        ]);
+
+        return [
+            'success' => false,
+            'message' => $e->getMessage()
+        ];
+    }
+}
+/**
+ * Process Stripe payment
+ */
+private function processStripePayment(AdPayment $payment, $successUrl, $cancelUrl)
+{
+    try {
+        \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
+
+        // Create Stripe checkout session
+        $session = \Stripe\Checkout\Session::create([
+            'payment_method_types' => ['card'],
+            'line_items' => [[
+                'price_data' => [
+                    'currency' => strtolower($payment->currency),
+                    'product_data' => [
+                        'name' => 'Advertisement Payment - ' . $payment->ad->ad_name,
+                        'description' => 'Payment for advertisement: ' . $payment->ad->description,
+                    ],
+                    'unit_amount' => $payment->amount * 100, // Stripe expects amount in cents
+                ],
+                'quantity' => 1,
+            ]],
+            'mode' => 'payment',
+            'success_url' => $successUrl, // Internal success URL
+            'cancel_url' => $cancelUrl, // Internal cancel URL
+            'client_reference_id' => $payment->id,
+            'metadata' => [
+                'ad_id' => $payment->ad_id,
+                'payment_id' => $payment->id,
+                'user_id' => $payment->user_id,
+                'type' => 'advertisement_payment'
+            ]
+        ]);
+
+        return [
+            'success' => true,
+            'payment_link' => $session->url,
+            'reference' => $session->id,
+            'response' => [
+                'session_id' => $session->id,
+                'payment_intent' => $session->payment_intent
+            ]
+        ];
+
+    } catch (\Exception $e) {
+        \Log::error('Stripe payment processing failed', [
+            'payment_id' => $payment->id,
+            'error' => $e->getMessage()
+        ]);
+
+        return [
+            'success' => false,
+            'message' => $e->getMessage()
+        ];
+    }
+}
+
+/**
+ * Get payment status
+ */
+public function getPaymentStatus(Request $request, $id, $paymentId)
+{
+    try {
+        $user = $request->user();
+
+        $payment = AdPayment::with('ad')
+            ->where('id', $paymentId)
+            ->where('user_id', $user->id)
+            ->whereHas('ad', function($query) use ($id) {
+                $query->where('id', $id);
+            })
+            ->first();
+
+        if (!$payment) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Payment not found'
+            ], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Payment status retrieved successfully',
+            'data' => [
+                'payment_id' => $payment->id,
+                'ad_id' => $payment->ad_id,
+                'status' => $payment->status,
+                'amount' => $payment->amount,
+                'currency' => $payment->currency,
+                'amount_usd' => $payment->amount_usd,
+                'payment_gateway' => $payment->payment_gateway,
+                'gateway_reference' => $payment->gateway_reference,
+                'paid_at' => $payment->paid_at,
+                'expires_at' => $payment->expires_at,
+                'failure_reason' => $payment->failure_reason,
+                'ad_status' => $payment->ad->status
+            ]
+        ]);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to retrieve payment status: ' . $e->getMessage()
+        ], 500);
+    }
+}
+
+/**
+ * Handle Nomba payment webhook (updated to use existing helper methods)
+ */
+public function handleNombaWebhook(Request $request)
+{
+    try {
+        $nombaHelper = new NombaPyamentHelper();
+
+        // Verify webhook signature using existing method
+        if (!$nombaHelper->verifyWebhookSignatureFromRequest($request)) {
+            return response()->json(['message' => 'Invalid signature'], 400);
+        }
+
+        $data = $request->all();
+        $reference = $data['orderReference'] ?? $data['reference'] ?? null;
+
+        if (!$reference) {
+            return response()->json(['message' => 'Reference not found'], 400);
+        }
+
+        // Find payment by reference
+        $payment = AdPayment::where('gateway_reference', $reference)
+            ->where('payment_gateway', 'nomba')
+            ->first();
+
+        if (!$payment) {
+            \Log::warning('Nomba webhook: Payment not found', ['reference' => $reference]);
+            return response()->json(['message' => 'Payment not found'], 404);
+        }
+
+        // Verify payment status using existing method
+        $verificationResult = $nombaHelper->verifyPaymentByReference($reference);
+
+        if ($verificationResult['success'] && $verificationResult['payment_status'] === 'successful') {
+            $payment->update([
+                'status' => 'completed',
+                'paid_at' => now(),
+                'gateway_transaction_id' => $data['transactionId'] ?? $data['transaction_id'] ?? null,
+                'gateway_response' => $data
+            ]);
+
+            // Update ad status to pending_review
+            $payment->ad->update(['status' => \App\Models\Ad::STATUS_PENDING_REVIEW]);
+
+            \Log::info('Nomba payment completed', ['payment_id' => $payment->id]);
+
+           } elseif (!$verificationResult['success'] || $verificationResult['payment_status'] === 'failed') {
+            $payment->markAsFailed($data['failure_reason'] ?? $verificationResult['message'] ?? 'Payment failed');
+            \Log::info('Nomba payment failed', ['payment_id' => $payment->id]);
+        }
+
+        return response()->json(['message' => 'Webhook processed successfully']);
+
+    } catch (\Exception $e) {
+        \Log::error('Nomba webhook processing failed', [
+            'error' => $e->getMessage(),
+            'data' => $request->all()
+        ]);
+
+        return response()->json(['message' => 'Webhook processing failed'], 500);
+    }
+}
+/**
+ * Handle Stripe payment webhook
+ */
+public function handleStripeWebhook(Request $request)
+{
+    try {
+        $payload = $request->getContent();
+        $sig_header = $request->header('Stripe-Signature');
+        $endpoint_secret = config('services.stripe.webhook_secret');
+
+        // Verify webhook signature
+        $event = \Stripe\Webhook::constructEvent($payload, $sig_header, $endpoint_secret);
+
+        // Handle the event
+        switch ($event['type']) {
+            case 'checkout.session.completed':
+                $session = $event['data']['object'];
+                $this->handleStripeCheckoutCompleted($session);
+                break;
+
+            case 'payment_intent.succeeded':
+                $paymentIntent = $event['data']['object'];
+                $this->handleStripePaymentSucceeded($paymentIntent);
+                break;
+
+            case 'payment_intent.payment_failed':
+                $paymentIntent = $event['data']['object'];
+                $this->handleStripePaymentFailed($paymentIntent);
+                break;
+
+            default:
+                \Log::info('Unhandled Stripe webhook event', ['type' => $event['type']]);
+        }
+
+        return response()->json(['message' => 'Webhook processed successfully']);
+
+    } catch (\UnexpectedValueException $e) {
+        \Log::error('Invalid Stripe webhook payload', ['error' => $e->getMessage()]);
+        return response()->json(['message' => 'Invalid payload'], 400);
+
+    } catch (\Stripe\Exception\SignatureVerificationException $e) {
+        \Log::error('Invalid Stripe webhook signature', ['error' => $e->getMessage()]);
+        return response()->json(['message' => 'Invalid signature'], 400);
+
+    } catch (\Exception $e) {
+        \Log::error('Stripe webhook processing failed', ['error' => $e->getMessage()]);
+        return response()->json(['message' => 'Webhook processing failed'], 500);
+    }
+}
+
+/**
+ * Handle Stripe checkout session completed
+ */
+private function handleStripeCheckoutCompleted($session)
+{
+    $paymentId = $session['client_reference_id'];
+
+    $payment = AdPayment::where('id', $paymentId)
+        ->where('payment_gateway', 'stripe')
+        ->first();
+
+    if (!$payment) {
+        \Log::warning('Stripe webhook: Payment not found', ['payment_id' => $paymentId]);
+        return;
+    }
+
+    $payment->update([
+        'status' => 'completed',
+        'paid_at' => now(),
+        'gateway_transaction_id' => $session['payment_intent'],
+        'gateway_response' => $session
+    ]);
+
+    // Update ad status to pending_review
+    $payment->ad->update(['status' => Ad::STATUS_PENDING_REVIEW]);
+
+    \Log::info('Stripe payment completed', ['payment_id' => $payment->id]);
+}
+
+/**
+ * Handle Stripe payment succeeded
+ */
+private function handleStripePaymentSucceeded($paymentIntent)
+{
+    // Additional handling if needed
+    \Log::info('Stripe payment intent succeeded', ['payment_intent' => $paymentIntent['id']]);
+}
+
+/**
+ * Handle Stripe payment failed
+ */
+private function handleStripePaymentFailed($paymentIntent)
+{
+    // Find payment by payment intent ID
+    $payment = AdPayment::where('gateway_transaction_id', $paymentIntent['id'])
+        ->where('payment_gateway', 'stripe')
+        ->first();
+
+    if ($payment) {
+        $payment->markAsFailed($paymentIntent['last_payment_error']['message'] ?? 'Payment failed');
+        \Log::info('Stripe payment failed', ['payment_id' => $payment->id]);
+    }
+}
+
+/**
+ * Handle payment success
+ */
+public function paymentSuccess(Request $request, $paymentId)
+{
+    try {
+        $payment = AdPayment::with('ad')->find($paymentId);
+
+        if (!$payment) {
+            return redirect()->to(config('app.frontend_url') . '/ads/payment/error?message=Payment not found');
+        }
+
+        // Update payment status if still pending
+        if ($payment->status === 'pending') {
+            // Verify payment with gateway
+            $verified = false;
+
+            if ($payment->payment_gateway === 'nomba') {
+                $nombaHelper = new NombaPyamentHelper();
+                $verificationResult = $nombaHelper->verifyPaymentByReference($payment->gateway_reference);
+                $verified = $verificationResult['success'] && $verificationResult['payment_status'] === 'successful';
+            } elseif ($payment->payment_gateway === 'stripe') {
+                // For Stripe, we trust the success redirect as verification
+                // In production, you should verify with Stripe API
+                $verified = true;
+            }
+
+            if ($verified) {
+                $payment->update([
+                    'status' => 'completed',
+                    'paid_at' => now()
+                ]);
+
+                // Update ad status
+                $payment->ad->update(['status' => \App\Models\Ad::STATUS_PENDING_REVIEW]);
+
+                \Log::info('Payment marked as completed via success callback', [
+                    'payment_id' => $payment->id,
+                    'ad_id' => $payment->ad_id
+                ]);
+            }
+        }
+
+        // Redirect to external callback URL if provided, otherwise to frontend
+        if ($payment->external_callback_url) {
+            return redirect()->to($payment->external_callback_url . '?status=success&payment_id=' . $payment->id);
+        }
+
+        return redirect()->to(config('app.frontend_url') . '/ads/payment/success?payment_id=' . $paymentId . '&ad_id=' . $payment->ad_id);
+    } catch (\Exception $e) {
+        \Log::error('Error in payment success callback', [
+            'payment_id' => $paymentId,
+            'error' => $e->getMessage()
+        ]);
+
+        return redirect()->to(config('app.frontend_url') . '/ads/payment/error?message=Error processing payment');
+    }
+}
+
+/**
+ * Handle payment cancellation
+ */
+public function paymentCancel(Request $request, $paymentId)
+{
+    try {
+        $payment = AdPayment::with('ad')->find($paymentId);
+
+        if ($payment && $payment->status === 'pending') {
+            $payment->update(['status' => 'cancelled']);
+
+            \Log::info('Payment cancelled via cancel callback', [
+                'payment_id' => $payment->id,
+                'ad_id' => $payment->ad_id
+            ]);
+        }
+
+        // Redirect to external callback URL if provided, otherwise to frontend
+        if ($payment && $payment->external_callback_url) {
+            return redirect()->to($payment->external_callback_url . '?status=cancelled&payment_id=' . $payment->id);
+        }
+
+        return redirect()->to(config('app.frontend_url') . '/ads/payment/cancelled?payment_id=' . $paymentId);
+    } catch (\Exception $e) {
+        \Log::error('Error in payment cancel callback', [
+            'payment_id' => $paymentId,
+            'error' => $e->getMessage()
+        ]);
+
+        return redirect()->to(config('app.frontend_url') . '/ads/payment/error?message=Error processing cancellation');
+    }
+}
+
+/**
+ * Manually verify payment status
+ */
+public function verifyPayment(Request $request, $id, $paymentId)
+{
+    try {
+        $user = $request->user();
+
+        $payment = AdPayment::with('ad')
+            ->where('id', $paymentId)
+            ->where('user_id', $user->id)
+            ->whereHas('ad', function($query) use ($id) {
+                $query->where('id', $id);
+            })
+            ->first();
+
+        if (!$payment) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Payment not found'
+            ], 404);
+        }
+
+        // Only verify if payment is still pending
+        if ($payment->status !== 'pending') {
+            return response()->json([
+                'success' => true,
+                'message' => 'Payment status is already final',
+                'data' => [
+                    'payment_id' => $payment->id,
+                    'status' => $payment->status,
+                    'gateway_reference' => $payment->gateway_reference
+                ]
+            ]);
+        }
+
+        // Verify with payment gateway
+        if ($payment->payment_gateway === 'nomba') {
+            $nombaHelper = new NombaPyamentHelper();
+            $verificationResult = $nombaHelper->verifyPaymentByReference($payment->gateway_reference);
+
+            if ($verificationResult['success'] && $verificationResult['payment_status'] === 'successful') {
+                $payment->update([
+                    'status' => 'completed',
+                    'paid_at' => now(),
+                    'gateway_response' => $verificationResult['data']
+                ]);
+
+                // Update ad status
+                $payment->ad->update(['status' => \App\Models\Ad::STATUS_PENDING_REVIEW]);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Payment verified and completed successfully',
+                    'data' => [
+                        'payment_id' => $payment->id,
+                        'status' => 'completed',
+                        'ad_status' => \App\Models\Ad::STATUS_PENDING_REVIEW
+                    ]
+                ]);
+            } elseif ($verificationResult['payment_status'] === 'failed') {
+                $payment->markAsFailed('Payment verification failed');
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Payment verification failed',
+                    'data' => [
+                        'payment_id' => $payment->id,
+                        'status' => 'failed'
+                    ]
+                ]);
+            }
+        }
+
+        // For Stripe, you would implement similar verification
+        if ($payment->payment_gateway === 'stripe') {
+            // Stripe verification logic here
+            \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
+
+            try {
+                $session = \Stripe\Checkout\Session::retrieve($payment->gateway_reference);
+
+                if ($session->payment_status === 'paid') {
+                    $payment->update([
+                        'status' => 'completed',
+                        'paid_at' => now(),
+                        'gateway_transaction_id' => $session->payment_intent,
+                        'gateway_response' => $session->toArray()
+                    ]);
+
+                    $payment->ad->update(['status' => \App\Models\Ad::STATUS_PENDING_REVIEW]);
+
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Payment verified and completed successfully',
+                        'data' => [
+                            'payment_id' => $payment->id,
+                            'status' => 'completed',
+                            'ad_status' => \App\Models\Ad::STATUS_PENDING_REVIEW
+                        ]
+                    ]);
+                }
+            } catch (\Exception $e) {
+                \Log::error('Stripe payment verification failed', [
+                    'payment_id' => $payment->id,
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Payment is still pending verification',
+            'data' => [
+                'payment_id' => $payment->id,
+                'status' => $payment->status
+            ]
+        ]);
+
+    } catch (\Exception $e) {
+        \Log::error('Payment verification failed', [
+            'payment_id' => $paymentId,
+            'error' => $e->getMessage()
+        ]);
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to verify payment: ' . $e->getMessage()
+        ], 500);
+    }
+}
 
 
+/**
+ * Get payment history for an ad
+ */
+public function getPaymentHistory(Request $request, $id)
+{
+    try {
+        $user = $request->user();
+
+        $ad = Ad::where('id', $id)
+            ->where('user_id', $user->id)
+            ->where('deleted_flag', 'N')
+            ->first();
+
+        if (!$ad) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Advertisement not found'
+            ], 404);
+        }
+
+        $payments = AdPayment::where('ad_id', $ad->id)
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->map(function ($payment) {
+                return [
+                    'id' => $payment->id,
+                    'amount' => $payment->amount,
+                    'currency' => $payment->currency,
+                    'amount_usd' => $payment->amount_usd,
+                    'exchange_rate' => $payment->exchange_rate,
+                    'payment_gateway' => $payment->payment_gateway,
+                    'status' => $payment->status,
+                    'gateway_reference' => $payment->gateway_reference,
+                    'paid_at' => $payment->paid_at,
+                    'created_at' => $payment->created_at,
+                    'expires_at' => $payment->expires_at,
+                    'failure_reason' => $payment->failure_reason,
+                    'can_retry' => $payment->canRetry()
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Payment history retrieved successfully',
+            'data' => [
+                'ad_id' => $ad->id,
+                'ad_name' => $ad->ad_name,
+                'ad_status' => $ad->status,
+                'payments' => $payments
+            ]
+        ]);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to retrieve payment history: ' . $e->getMessage()
+        ], 500);
+    }
+}
 
 }

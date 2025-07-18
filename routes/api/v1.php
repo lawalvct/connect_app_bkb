@@ -295,6 +295,21 @@ Route::prefix('discover')->group(function () {
         // Analytics and preview
         Route::get('/{id}/preview', [AdController::class, 'preview']);
         Route::get('/{id}/analytics', [AdController::class, 'analytics']);
+
+
+        Route::post('/{id}/payment', [AdController::class, 'initiatePayment']);
+    Route::get('/{id}/payment/{paymentId}/status', [AdController::class, 'getPaymentStatus']);
+    Route::post('/{id}/payment/{paymentId}/verify', [AdController::class, 'verifyPayment']);
+    Route::get('/{id}/payments', [AdController::class, 'getPaymentHistory']);
+
+    // Webhook routes (no auth middleware)
+    Route::post('/payment/webhook/nomba', [AdController::class, 'handleNombaWebhook'])
+        ->withoutMiddleware(['auth:sanctum'])
+        ->name('ads.payment.callback.nomba');
+    Route::post('/payment/webhook/stripe', [AdController::class, 'handleStripeWebhook'])
+        ->withoutMiddleware(['auth:sanctum']);
+
+
     });
 
      // Ad Tracking Routes (for recording impressions and clicks)

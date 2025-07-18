@@ -12,6 +12,7 @@ use Illuminate\Support\Str;
 use Auth;
 use Mail;
 use App\Models\Setting;
+use Illuminate\Support\Facades\Log;
 
 class NombaPyamentHelper {
 
@@ -197,21 +198,163 @@ class NombaPyamentHelper {
     }
 
     /**
- * Generate webhook signature for Nomba setup
- */
-public function generateWebhookSignature($payload, $secret)
-{
-    return hash_hmac('sha256', $payload, $secret);
-}
+     * Generate webhook signature for Nomba setup
+     */
+    public function generateWebhookSignature($payload, $secret)
+    {
+        return hash_hmac('sha256', $payload, $secret);
+    }
 
-/**
- * Verify incoming webhook signature
- */
-public function verifyWebhookSignature($payload, $signature, $secret)
-{
-    $expectedSignature = $this->generateWebhookSignature($payload, $secret);
-    return hash_equals($expectedSignature, $signature);
-}
+    /**
+     * Verify incoming webhook signature
+     */
+    public function verifyWebhookSignature($payload, $signature, $secret)
+    {
+        $expectedSignature = $this->generateWebhookSignature($payload, $secret);
+        return hash_equals($expectedSignature, $signature);
+    }
 
+    /**
+     * NEW: Initiate payment for advertisements (uses existing processPayment method)
+     */
+    public function initiatePayment($paymentData)
+    {
+        try {
+            $result = $this->processPayment(
+                $paymentData['amount'],
+                $paymentData['currency'],
+                $paymentData['email'],
+                $paymentData['callback_url'],
+                $paymentData['reference']
+            );
 
+            if ($result['status']) {
+                return [
+                    'success' => true,
+                    'message' => 'Payment initiated successfully',
+                    'data' => [
+                        'checkout_url' => $result['checkoutLink'],
+                        'payment_link' => $result['checkoutLink'],
+                        'reference' => $result['orderReference'],
+                        'currency' => $result['currency'],
+                        'amount' => $result['amount']
+                    ]
+                ];
+            }
+
+            return [
+                'success' => false,
+                'message' => $result['message'] ?? 'Payment initiation failed'
+            ];
+
+        } catch (\Exception $e) {
+            Log::error('Nomba payment initiation exception', [
+                'error' => $e->getMessage(),
+                'payment_data' => $paymentData
+            ]);
+
+            return [
+                'success' => false,
+                'message' => 'Payment service unavailable'
+            ];
+        }
+    }
+
+    /**
+     * NEW: Verify webhook signature using settings
+     */
+    public function verifyWebhookSignatureFromRequest($request)
+    {
+        try {
+            $signature = $request->header('X-Nomba-Signature');
+            $payload = $request->getContent();
+
+            // Get webhook secret from settings
+            $webhookSecret = Setting::where(['slug' => 'nombaWebhookSecret'])->first();
+
+            if (!$webhookSecret || !$webhookSecret->value) {
+                Log::warning('Nomba webhook secret not found in settings');
+                return false;
+            }
+
+            return $this->verifyWebhookSignature($payload, $signature, $webhookSecret->value);
+
+        } catch (\Exception $e) {
+            Log::error('Webhook signature verification failed', [
+                'error' => $e->getMessage()
+            ]);
+            return false;
+        }
+    }
+
+    /**
+     * NEW: Process refund using existing token system
+     */
+    public function processRefund($transactionId, $amount, $reason = null)
+    {
+        try {
+            $tokenData = $this->nombaAccessToken();
+
+            if (!$tokenData) {
+                return [
+                    'success' => false,
+                    'message' => 'Failed to get access token'
+                ];
+            }
+
+            $AccountId = $tokenData['accountId'];
+            $accessToken = $tokenData['accessToken'];
+
+            $response = Http::withHeaders([
+                'accountId' => $AccountId,
+                'Content-Type' => 'application/json',
+                'Accept' => 'application/json',
+                'Authorization' => 'Bearer ' . $accessToken,
+            ])->post('https://api.nomba.com/v1/transaction/refund', [
+                'transactionId' => $transactionId,
+                'amount' => $amount,
+                'reason' => $reason ?? 'Advertisement refund'
+            ]);
+
+            $result = $response->json();
+
+            if ($response->successful() && isset($result['data'])) {
+                return [
+                    'success' => true,
+                    'data' => $result['data']
+                ];
+            }
+
+            return [
+                'success' => false,
+                'message' => $result['message'] ?? 'Refund processing failed'
+            ];
+
+        } catch (\Exception $e) {
+            Log::error('Nomba refund processing failed', [
+                'transaction_id' => $transactionId,
+                'error' => $e->getMessage()
+            ]);
+
+            return [
+                'success' => false,
+                'message' => 'Refund service unavailable'
+            ];
+        }
+    }
+
+    /**
+     * NEW: Enhanced verify payment method that works with existing verifyPayment
+     */
+    public function verifyPaymentByReference($reference)
+    {
+        $result = $this->verifyPayment($reference);
+
+        return [
+            'success' => $result['status'],
+            'data' => $result['data'] ?? null,
+            'payment_status' => $result['payment_status'] ?? 'unknown',
+            'message' => $result['message'] ?? null
+        ];
+    }
 }

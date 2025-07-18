@@ -330,4 +330,38 @@ class Ad extends Model
             ->limit($limit)
             ->get();
     }
+
+
+
+    // Update or add the status enum values
+    public const STATUS_DRAFT = 'draft';
+    public const STATUS_PENDING_REVIEW = 'pending_review';
+    public const STATUS_APPROVED = 'approved';
+    public const STATUS_ACTIVE = 'active';
+    public const STATUS_PAUSED = 'paused';
+    public const STATUS_REJECTED = 'rejected';
+    public const STATUS_STOPPED = 'stopped';
+
+    // Add scope for draft ads
+    public function scopeDraft($query)
+    {
+        return $query->where('status', self::STATUS_DRAFT);
+    }
+
+    // Add method to check if ad can be paid for
+    public function canBePaidFor()
+    {
+        return in_array($this->status, [self::STATUS_DRAFT, 'unpaid', 'payment_failed']);
+    }
+
+    // Relationship with payments
+    public function payments()
+    {
+        return $this->hasMany(AdPayment::class);
+    }
+
+    public function latestPayment()
+    {
+        return $this->hasOne(AdPayment::class)->latest();
+    }
 }
