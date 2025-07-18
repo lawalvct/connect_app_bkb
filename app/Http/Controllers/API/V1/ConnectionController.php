@@ -18,6 +18,7 @@ use App\Helpers\BlockUserHelper;
 use App\Http\Resources\V1\CountryResource;
 use App\Models\User;
 use App\Models\UserRequest;
+use App\Models\UserSwipe;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
