@@ -286,6 +286,10 @@ class ConnectionController extends Controller
                 $isConnected = UserRequestsHelper::areUsersConnected($user->id, $userItem->id);
                 $userItem->is_connected_to_current_user = $isConnected;
 
+                 // Add country details using CountryResource
+                if ($userItem->country) {
+                    $userItem->country_details = new CountryResource($userItem->country);
+                }
                 return $userItem;
             });
 
