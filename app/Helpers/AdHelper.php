@@ -251,27 +251,38 @@ class AdHelper
     /**
      * Get ad performance summary for social circles
      */
-    public static function getAdPerformanceBySocialCircle($socialCircleId, $dateFrom = null, $dateTo = null)
-    {
-        $query = Ad::forSocialCircle($socialCircleId);
+//    private function getAdPerformanceBySocialCircle($socialCircleId, $dateFrom = null, $userId = null)
+// {
+//     try {
+//         $query = Ad::whereJsonContains('target_social_circles', $socialCircleId)
+//             ->where('deleted_flag', 'N');
 
-        if ($dateFrom) {
-            $query->where('created_at', '>=', $dateFrom);
-        }
+//         // IMPORTANT: Filter by user ID to ensure only authenticated user's data
+//         if ($userId) {
+//             $query->where('user_id', $userId);
+//         }
 
-        if ($dateTo) {
-            $query->where('created_at', '<=', $dateTo);
-        }
+//         if ($dateFrom) {
+//             $query->where('created_at', '>=', $dateFrom);
+//         }
 
-        return $query->selectRaw('
-            COUNT(*) as total_ads,
-            SUM(current_impressions) as total_impressions,
-            SUM(clicks) as total_clicks,
-            SUM(conversions) as total_conversions,
-            SUM(total_spent) as total_spent,
-            AVG(CASE WHEN current_impressions > 0 THEN (clicks / current_impressions) * 100 ELSE 0 END) as avg_ctr
-        ')->first();
-    }
+//         return $query->selectRaw('
+//             COUNT(*) as total_ads,
+//             SUM(current_impressions) as total_impressions,
+//             SUM(clicks) as total_clicks,
+//             SUM(conversions) as total_conversions,
+//             SUM(total_spent) as total_spent,
+//             AVG(CASE WHEN current_impressions > 0 THEN (clicks / current_impressions) * 100 ELSE 0 END) as avg_ctr
+//         ')->first();
+//     } catch (\Exception $e) {
+//         \Log::error('Error getting ad performance by social circle', [
+//             'social_circle_id' => $socialCircleId,
+//             'user_id' => $userId,
+//             'error' => $e->getMessage()
+//         ]);
+//         return null;
+//     }
+// }
 
 
     /**
@@ -342,7 +353,38 @@ public static function estimateAdReach($adPlacement, $targetAudience)
     ];
 }
 
+private function getAdPerformanceBySocialCircle($socialCircleId, $dateFrom = null, $userId = null)
+{
+    try {
+        $query = Ad::whereJsonContains('target_social_circles', $socialCircleId)
+            ->where('deleted_flag', 'N');
 
+        // IMPORTANT: Filter by user ID to ensure only authenticated user's data
+        if ($userId) {
+            $query->where('user_id', $userId);
+        }
+
+        if ($dateFrom) {
+            $query->where('created_at', '>=', $dateFrom);
+        }
+
+        return $query->selectRaw('
+            COUNT(*) as total_ads,
+            SUM(current_impressions) as total_impressions,
+            SUM(clicks) as total_clicks,
+            SUM(conversions) as total_conversions,
+            SUM(total_spent) as total_spent,
+            AVG(CASE WHEN current_impressions > 0 THEN (clicks / current_impressions) * 100 ELSE 0 END) as avg_ctr
+        ')->first();
+    } catch (\Exception $e) {
+        \Log::error('Error getting ad performance by social circle', [
+            'social_circle_id' => $socialCircleId,
+            'user_id' => $userId,
+            'error' => $e->getMessage()
+        ]);
+        return null;
+    }
+}
 
 
 }

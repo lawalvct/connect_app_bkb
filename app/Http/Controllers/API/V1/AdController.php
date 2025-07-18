@@ -28,144 +28,163 @@ use App\Models\SocialCircle;
  */
 class AdController extends BaseController
 {
-    /**
-     * @OA\Get(
-     *     path="/api/v1/ads/dashboard",
-     *     summary="Get advertising dashboard data",
-     *     tags={"Advertising"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(name="period", in="query", @OA\Schema(type="string", enum={"today", "week", "month", "all"})),
-     *     @OA\Response(response=200, description="Dashboard data retrieved successfully")
-     * )
-     */
-    public function dashboard(Request $request)
-    {
-        try {
-            $user = $request->user();
-            $period = $request->input('period', 'month');
 
-            // Define date range based on period
-            $dateFrom = match($period) {
-                'today' => now()->startOfDay(),
-                'week' => now()->startOfWeek(),
-                'month' => now()->startOfMonth(),
-                default => null
-            };
+ /** @OA\Get(
+ *     path="/api/v1/ads/dashboard",
+ *     summary="Get advertising dashboard data",
+ *     tags={"Advertising"},
+ *     security={{"bearerAuth":{}}},
+ *     @OA\Parameter(name="period", in="query", @OA\Schema(type="string", enum={"today", "week", "month", "all"})),
+ *     @OA\Response(response=200, description="Dashboard data retrieved successfully")
+ * )
+ */
+public function dashboard(Request $request)
+{
+    try {
+        $user = $request->user();
+        $period = $request->input('period', 'month');
 
-            $query = Ad::where('user_id', $user->id)->where('deleted_flag', 'N');
+        // Define date range based on period
+        $dateFrom = match($period) {
+            'today' => now()->startOfDay(),
+            'week' => now()->startOfWeek(),
+            'month' => now()->startOfMonth(),
+            default => null
+        };
 
-            if ($dateFrom) {
-                $query->where('created_at', '>=', $dateFrom);
+        // Base query - ONLY for authenticated user's ads
+        $query = Ad::where('user_id', $user->id)
+            ->where('deleted_flag', 'N');
+
+        if ($dateFrom) {
+            $query->where('created_at', '>=', $dateFrom);
+        }
+
+        // Get summary statistics - ONLY for authenticated user
+        $stats = $query->selectRaw('
+            COUNT(*) as total_ads,
+            COUNT(CASE WHEN status = "active" THEN 1 END) as active_ads,
+            COUNT(CASE WHEN status = "pending_review" THEN 1 END) as pending_ads,
+            COUNT(CASE WHEN admin_status = "rejected" THEN 1 END) as rejected_ads,
+            SUM(current_impressions) as total_impressions,
+            SUM(clicks) as total_clicks,
+            SUM(conversions) as total_conversions,
+            SUM(total_spent) as total_spent,
+            SUM(budget) as total_budget,
+            AVG(CASE WHEN current_impressions > 0 THEN (clicks / current_impressions) * 100 ELSE 0 END) as avg_ctr
+        ')->first();
+
+        // Get recent ads - ONLY for authenticated user
+        $recentAdsQuery = Ad::where('user_id', $user->id)
+            ->where('deleted_flag', 'N');
+
+        if ($dateFrom) {
+            $recentAdsQuery->where('created_at', '>=', $dateFrom);
+        }
+
+        $recentAds = $recentAdsQuery->orderBy('created_at', 'desc')
+            ->limit(5)
+            ->get();
+
+        // Manually load social circles for each ad
+        foreach ($recentAds as $ad) {
+            if (!empty($ad->target_social_circles)) {
+                $ad->social_circles = SocialCircle::whereIn('id', $ad->target_social_circles)->get();
+            } else {
+                $ad->social_circles = collect();
             }
+        }
 
-            // Get summary statistics
-            $stats = $query->selectRaw('
-                COUNT(*) as total_ads,
-                COUNT(CASE WHEN status = "active" THEN 1 END) as active_ads,
-                COUNT(CASE WHEN status = "pending_review" THEN 1 END) as pending_ads,
-                COUNT(CASE WHEN admin_status = "rejected" THEN 1 END) as rejected_ads,
-                SUM(current_impressions) as total_impressions,
-                SUM(clicks) as total_clicks,
-                SUM(conversions) as total_conversions,
-                SUM(total_spent) as total_spent,
-                SUM(budget) as total_budget,
-                AVG(CASE WHEN current_impressions > 0 THEN (clicks / current_impressions) * 100 ELSE 0 END) as avg_ctr
-            ')->first();
+        // Get performance by social circle - ONLY for authenticated user's ads
+        $socialCirclePerformance = [];
+        $userSocialCircles = $user->socialCircles;
 
-            // Get recent ads
-            $recentAds = $query->orderBy('created_at', 'desc')
-                ->limit(5)
-                ->get();
-
-            // Manually load social circles for each ad
-            foreach ($recentAds as $ad) {
-                if (!empty($ad->target_social_circles)) {
-                    $ad->social_circles = SocialCircle::whereIn('id', $ad->target_social_circles)->get();
-                } else {
-                    $ad->social_circles = collect();
+        if ($userSocialCircles && $userSocialCircles->count() > 0) {
+            foreach ($userSocialCircles as $circle) {
+                $circleStats = $this->getAdPerformanceBySocialCircle($circle->id, $dateFrom, $user->id);
+                if ($circleStats && $circleStats->total_ads > 0) {
+                    $socialCirclePerformance[] = [
+                        'social_circle' => [
+                            'id' => $circle->id,
+                            'name' => $circle->name,
+                            'color' => $circle->color ?? '#3498db'
+                        ],
+                        'stats' => [
+                            'total_ads' => (int) $circleStats->total_ads,
+                            'total_impressions' => (int) $circleStats->total_impressions,
+                            'total_clicks' => (int) $circleStats->total_clicks,
+                            'total_conversions' => (int) $circleStats->total_conversions,
+                            'total_spent' => (float) $circleStats->total_spent,
+                            'avg_ctr' => round((float) $circleStats->avg_ctr, 2)
+                        ]
+                    ];
                 }
             }
+        }
 
-            // Get performance by social circle
-            $socialCirclePerformance = [];
-            $userSocialCircles = $user->socialCircles;
+        return response()->json([
+            'success' => true,
+            'message' => 'Dashboard data retrieved successfully',
+            'data' => [
+                'summary' => [
+                    'total_ads' => (int) ($stats->total_ads ?? 0),
+                    'active_ads' => (int) ($stats->active_ads ?? 0),
+                    'pending_ads' => (int) ($stats->pending_ads ?? 0),
+                    'rejected_ads' => (int) ($stats->rejected_ads ?? 0),
+                    'total_impressions' => (int) ($stats->total_impressions ?? 0),
+                    'total_clicks' => (int) ($stats->total_clicks ?? 0),
+                    'total_conversions' => (int) ($stats->total_conversions ?? 0),
+                    'total_spent' => (float) ($stats->total_spent ?? 0),
 
-            if ($userSocialCircles && $userSocialCircles->count() > 0) {
-                foreach ($userSocialCircles as $circle) {
-                    $circleStats = $this->getAdPerformanceBySocialCircle($circle->id, $dateFrom);
-                    if ($circleStats && $circleStats->total_ads > 0) {
-                        $socialCirclePerformance[] = [
-                            'social_circle' => [
+                    'total_budget' => (float) ($stats->total_budget ?? 0),
+                    'remaining_budget' => (float) ($stats->total_budget - $stats->total_spent ?? 0),
+                    'avg_ctr' => round((float) ($stats->avg_ctr ?? 0), 2),
+                    'budget_utilization' => ($stats->total_budget ?? 0) > 0 ?
+                        round((($stats->total_spent ?? 0) / ($stats->total_budget ?? 0)) * 100, 2) : 0
+                ],
+                'recent_ads' => $recentAds->map(function ($ad) {
+                    return [
+                        'id' => $ad->id,
+                        'ad_name' => $ad->ad_name,
+                        'type' => $ad->type,
+                        'status' => $ad->status,
+                        'admin_status' => $ad->admin_status,
+                        'budget' => (float) $ad->budget,
+                        'total_spent' => (float) $ad->total_spent,
+                        'current_impressions' => (int) $ad->current_impressions,
+                        'clicks' => (int) $ad->clicks,
+                        'ctr' => $ad->ctr,
+                        'progress_percentage' => $ad->progress_percentage,
+                        'social_circles' => $ad->social_circles->map(function ($circle) {
+                            return [
                                 'id' => $circle->id,
                                 'name' => $circle->name,
                                 'color' => $circle->color ?? '#3498db'
-                            ],
-                            'stats' => [
-                                'total_ads' => (int) $circleStats->total_ads,
-                                'total_impressions' => (int) $circleStats->total_impressions,
-                                'total_clicks' => (int) $circleStats->total_clicks,
-                                'total_conversions' => (int) $circleStats->total_conversions,
-                                'total_spent' => (float) $circleStats->total_spent,
-                                'avg_ctr' => round((float) $circleStats->avg_ctr, 2)
-                            ]
-                        ];
-                    }
-                }
-            }
+                            ];
+                        }),
+                        'created_at' => $ad->created_at ? $ad->created_at->toISOString() : null
+                    ];
+                }),
+                'social_circle_performance' => $socialCirclePerformance,
+                'period' => $period,
+                'user_id' => $user->id // Add user ID for verification
+            ]
+        ]);
 
-            return response()->json([
-                'success' => true,
-                'message' => 'Dashboard data retrieved successfully',
-                'data' => [
-                    'summary' => [
-                        'total_ads' => (int) $stats->total_ads,
-                        'active_ads' => (int) $stats->active_ads,
-                        'pending_ads' => (int) $stats->pending_ads,
-                        'rejected_ads' => (int) $stats->rejected_ads,
-                        'total_impressions' => (int) $stats->total_impressions,
-                        'total_clicks' => (int) $stats->total_clicks,
-                        'total_conversions' => (int) $stats->total_conversions,
-                        'total_spent' => (float) $stats->total_spent,
-                        'total_budget' => (float) $stats->total_budget,
-                        'avg_ctr' => round((float) $stats->avg_ctr, 2),
-                        'budget_utilization' => $stats->total_budget > 0 ?
-                            round((($stats->total_spent / $stats->total_budget) * 100), 2) : 0
-                    ],
-                    'recent_ads' => $recentAds->map(function ($ad) {
-                        return [
-                            'id' => $ad->id,
-                            'ad_name' => $ad->ad_name,
-                            'type' => $ad->type,
-                            'status' => $ad->status,
-                            'admin_status' => $ad->admin_status,
-                            'budget' => (float) $ad->budget,
-                            'total_spent' => (float) $ad->total_spent,
-                            'current_impressions' => (int) $ad->current_impressions,
-                            'clicks' => (int) $ad->clicks,
-                            'ctr' => $ad->ctr,
-                            'progress_percentage' => $ad->progress_percentage,
-                            'social_circles' => $ad->social_circles->map(function ($circle) {
-                                return [
-                                    'id' => $circle->id,
-                                    'name' => $circle->name,
-                                    'color' => $circle->color ?? '#3498db'
-                                ];
-                            }),
-                         'created_at' => $ad->created_at ? $ad->created_at->toISOString() : null
-                        ];
-                    }),
-                    'social_circle_performance' => $socialCirclePerformance,
-                    'period' => $period
-                ]
-            ]);
+    } catch (\Exception $e) {
+        \Log::error('Dashboard data retrieval failed', [
+            'user_id' => $request->user()->id,
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
 
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to retrieve dashboard data: ' . $e->getMessage()
-            ], 500);
-        }
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to retrieve dashboard data: ' . $e->getMessage()
+        ], 500);
     }
+}
+
 
     /**
      * Helper method to get ad performance by social circle
@@ -1213,6 +1232,7 @@ public function store(Request $request)
      */
     public function trackConversion(Request $request, $id)
     {
+
         try {
             $ad = Ad::where('id', $id)
                 ->where('status', 'active')
@@ -1230,7 +1250,6 @@ public function store(Request $request)
             // Increment conversions
             $ad->increment('conversions');
 
-            // In a real app, you would also log the conversion with more details
 
             return response()->json([
                 'success' => true,

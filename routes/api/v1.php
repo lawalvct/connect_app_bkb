@@ -316,6 +316,7 @@ Route::prefix('discover')->group(function () {
      Route::prefix('ads/tracking')->group(function () {
         Route::post('/{id}/impression', [AdController::class, 'trackImpression']);
         Route::post('/{id}/click', [AdController::class, 'trackClick']);
+         Route::post('/{id}/conversion', [AdController::class, 'trackConversion']);
     });
 
       // Get ads for social circle feeds
