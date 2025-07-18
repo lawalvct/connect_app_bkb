@@ -412,7 +412,7 @@ public function store(Request $request)
             'target_audience.gender' => 'required|string|in:male,female,all',
             'target_audience.locations' => 'required|array',
             'target_audience.interests' => 'required|array',
-            'media_files' => 'required|array',
+            'media_files' => 'nullable|array',
             'media_files.*' => 'file|mimes:jpeg,png,jpg,gif,mp4,avi,mov|max:20480', // 20MB max
             'target_countries' => 'nullable|array',
             'target_countries.*' => 'integer|exists:countries,id',
