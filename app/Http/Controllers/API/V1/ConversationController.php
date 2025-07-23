@@ -12,27 +12,26 @@ use Illuminate\Support\Facades\Validator;
 
 class ConversationController extends BaseController
 {
-    /**
-     * Get user's conversations
-     */
-    public function index(Request $request)
-    {
-        try {
-            $conversations = $request->user()
-                ->conversations()
-                ->with(['users', 'latestMessage.user'])
-                ->get();
 
-            return $this->sendResponse('Conversations retrieved successfully', [
-                'conversations' => ConversationResource::collection($conversations),
-                'user_timezone' => $user->getTimezone(),
-                'server_time' => now()->toISOString(),
-                'user_time' => TimezoneHelper::convertToUserTimezone(now(), $user)->toISOString(),
-            ]);
-        } catch (\Exception $e) {
-            return $this->sendError('Failed to retrieve conversations', $e->getMessage(), 500);
-        }
+public function index(Request $request)
+{
+    try {
+        $user = $request->user();
+        $conversations = $user
+            ->conversations()
+            ->with(['users', 'latestMessage.user'])
+            ->get();
+
+        return $this->sendResponse('Conversations retrieved successfully', [
+            'conversations' => ConversationResource::collection($conversations),
+            'user_timezone' => $user->getTimezone(),
+            'server_time' => now()->toISOString(),
+            'user_time' => TimezoneHelper::convertToUserTimezone(now(), $user)->toISOString(),
+        ]);
+    } catch (\Exception $e) {
+        return $this->sendError('Failed to retrieve conversations', $e->getMessage(), 500);
     }
+}
 
     /**
      * Create a new conversation
