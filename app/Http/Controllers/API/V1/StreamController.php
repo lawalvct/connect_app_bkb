@@ -1,0 +1,611 @@
+<?php
+
+namespace App\Http\Controllers\API\V1;
+
+use App\Helpers\AgoraHelper;
+use App\Http\Controllers\API\BaseController;
+use App\Models\Stream;
+use App\Models\StreamChat;
+use App\Models\StreamViewer;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Storage;
+
+class StreamController extends BaseController
+{
+    /**
+     * Create/Schedule a new stream (Admin only)
+     */
+    public function store(Request $request)
+    {
+        try {
+            // Check if user has admin role
+            if (!$request->user()->hasRole('admin')) {
+                return $this->sendError('Unauthorized. Only admins can create streams.', null, 403);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'title' => 'required|string|max:255',
+                'description' => 'nullable|string|max:1000',
+                'banner_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120', // 5MB max
+                'scheduled_at' => 'nullable|date|after:now',
+                'is_paid' => 'boolean',
+                'price' => 'required_if:is_paid,true|numeric|min:0',
+                'currency' => 'string|in:USD,NGN|max:3',
+                'max_viewers' => 'nullable|integer|min:1',
+            ]);
+
+            if ($validator->fails()) {
+                return $this->sendError('Validation Error', $validator->errors(), 422);
+            }
+
+            $data = $validator->validated();
+            $data['user_id'] = $request->user()->id;
+            $data['channel_name'] = 'stream_' . time() . '_' . Str::random(8);
+            $data['currency'] = $data['currency'] ?? 'USD';
+
+            // Handle banner image upload
+            if ($request->hasFile('banner_image')) {
+                $path = $request->file('banner_image')->store('stream-banners', 'public');
+                $data['banner_image'] = $path;
+                $data['banner_image_url'] = Storage::url($path);
+            }
+
+            $stream = Stream::create($data);
+
+            return $this->sendResponse('Stream created successfully', [
+                'stream' => $this->formatStreamResponse($stream->load('user'))
+            ], 201);
+
+        } catch (\Exception $e) {
+            return $this->sendError('Failed to create stream', $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Start a stream (Admin only)
+     */
+    public function start(Request $request, $id)
+    {
+        try {
+            $stream = Stream::find($id);
+
+            if (!$stream) {
+                return $this->sendError('Stream not found', null, 404);
+            }
+
+            // Check if user is the stream owner
+            if ($stream->user_id !== $request->user()->id) {
+                return $this->sendError('Unauthorized. You can only start your own streams.', null, 403);
+            }
+
+            if ($stream->status !== 'upcoming') {
+                return $this->sendError('Stream cannot be started. Current status: ' . $stream->status, null, 400);
+            }
+
+            // Generate Agora token for the streamer
+            $agoraUid = StreamViewer::generateAgoraUid();
+            $agoraToken = AgoraHelper::generateRtcToken($stream->channel_name, (int)$agoraUid, 7200, 'publisher'); // 2 hours
+
+            if (!$agoraToken) {
+                return $this->sendError('Failed to generate streaming token', null, 500);
+            }
+
+            $stream->start();
+
+            return $this->sendResponse('Stream started successfully', [
+                'stream' => $this->formatStreamResponse($stream->load('user')),
+                'agora_config' => [
+                    'app_id' => AgoraHelper::getAppId(),
+                    'channel_name' => $stream->channel_name,
+                    'agora_uid' => $agoraUid,
+                    'token' => $agoraToken,
+                    'role' => 'publisher'
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->sendError('Failed to start stream', $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * End a stream (Admin only)
+     */
+    public function end(Request $request, $id)
+    {
+        try {
+            $stream = Stream::find($id);
+
+            if (!$stream) {
+                return $this->sendError('Stream not found', null, 404);
+            }
+
+            // Check if user is the stream owner
+            if ($stream->user_id !== $request->user()->id) {
+                return $this->sendError('Unauthorized. You can only end your own streams.', null, 403);
+            }
+
+            if ($stream->status !== 'live') {
+                return $this->sendError('Stream is not currently live', null, 400);
+            }
+
+            $stream->end();
+
+            return $this->sendResponse('Stream ended successfully', [
+                'stream' => $this->formatStreamResponse($stream->load('user'))
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->sendError('Failed to end stream', $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Join a stream (Any authenticated user)
+     */
+    public function join(Request $request, $id)
+    {
+        try {
+            $stream = Stream::with('user')->find($id);
+            $user = $request->user();
+
+            if (!$stream) {
+                return $this->sendError('Stream not found', null, 404);
+            }
+
+            if (!$stream->canUserJoin($user)) {
+                if ($stream->status !== 'live') {
+                    return $this->sendError('Stream is not currently live', null, 400);
+                }
+                if ($stream->is_paid && !$stream->hasUserPaid($user)) {
+                    return $this->sendError('Payment required to join this stream', null, 402);
+                }
+            }
+
+            // Generate Agora token for viewer
+            $agoraUid = StreamViewer::generateAgoraUid();
+            $agoraToken = AgoraHelper::generateRtcToken($stream->channel_name, (int)$agoraUid, 3600, 'subscriber'); // 1 hour
+
+            if (!$agoraToken) {
+                return $this->sendError('Failed to generate viewing token', null, 500);
+            }
+
+            // Add user as viewer
+            $viewer = $stream->addViewer($user, $agoraUid, $agoraToken);
+
+            return $this->sendResponse('Joined stream successfully', [
+                'stream' => $this->formatStreamResponse($stream),
+                'agora_config' => [
+                    'app_id' => AgoraHelper::getAppId(),
+                    'channel_name' => $stream->channel_name,
+                    'agora_uid' => $agoraUid,
+                    'token' => $agoraToken,
+                    'role' => 'subscriber'
+                ],
+                'viewer' => [
+                    'id' => $viewer->id,
+                    'joined_at' => $viewer->joined_at
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->sendError('Failed to join stream', $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Leave a stream
+     */
+    public function leave(Request $request, $id)
+    {
+        try {
+            $stream = Stream::find($id);
+            $user = $request->user();
+
+            if (!$stream) {
+                return $this->sendError('Stream not found', null, 404);
+            }
+
+            $left = $stream->removeViewer($user);
+
+            if (!$left) {
+                return $this->sendError('You are not currently viewing this stream', null, 400);
+            }
+
+            return $this->sendResponse('Left stream successfully', [
+                'stream_id' => $stream->id
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->sendError('Failed to leave stream', $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Get stream details
+     */
+    public function show(Request $request, $id)
+    {
+        try {
+            $stream = Stream::with(['user', 'activeViewers.user'])->find($id);
+
+            if (!$stream) {
+                return $this->sendError('Stream not found', null, 404);
+            }
+
+            return $this->sendResponse('Stream details retrieved successfully', [
+                'stream' => $this->formatStreamResponse($stream)
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->sendError('Failed to retrieve stream details', $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Check stream status
+     */
+    public function status(Request $request, $id)
+    {
+        try {
+            $stream = Stream::find($id);
+
+            if (!$stream) {
+                return $this->sendError('Stream not found', null, 404);
+            }
+
+            return $this->sendResponse('Stream status retrieved successfully', [
+                'stream_id' => $stream->id,
+                'status' => $stream->status,
+                'is_live' => $stream->is_live,
+                'current_viewers' => $stream->current_viewers,
+                'started_at' => $stream->started_at,
+                'ended_at' => $stream->ended_at,
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->sendError('Failed to retrieve stream status', $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Get latest live streams
+     */
+    public function latest(Request $request)
+    {
+        try {
+            $limit = $request->get('limit', 10);
+            
+            $streams = Stream::with('user')
+                ->live()
+                ->orderBy('started_at', 'desc')
+                ->limit($limit)
+                ->get();
+
+            return $this->sendResponse('Latest live streams retrieved successfully', [
+                'streams' => $streams->map(function ($stream) {
+                    return $this->formatStreamResponse($stream);
+                })
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->sendError('Failed to retrieve latest streams', $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Get upcoming streams
+     */
+    public function upcoming(Request $request)
+    {
+        try {
+            $limit = $request->get('limit', 10);
+            
+            $streams = Stream::with('user')
+                ->upcoming()
+                ->where('scheduled_at', '>', now())
+                ->orderBy('scheduled_at', 'asc')
+                ->limit($limit)
+                ->get();
+
+            return $this->sendResponse('Upcoming streams retrieved successfully', [
+                'streams' => $streams->map(function ($stream) {
+                    return $this->formatStreamResponse($stream);
+                })
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->sendError('Failed to retrieve upcoming streams', $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Get stream viewers
+     */
+    public function viewers(Request $request, $id)
+    {
+        try {
+            $stream = Stream::find($id);
+
+            if (!$stream) {
+                return $this->sendError('Stream not found', null, 404);
+            }
+
+            $viewers = $stream->activeViewers()
+                ->with('user:id,username,first_name,last_name,profile_picture')
+                ->orderBy('joined_at', 'desc')
+                ->get();
+
+            return $this->sendResponse('Stream viewers retrieved successfully', [
+                'stream_id' => $stream->id,
+                'total_viewers' => $viewers->count(),
+                'viewers' => $viewers->map(function ($viewer) {
+                    return [
+                        'id' => $viewer->id,
+                        'user' => [
+                            'id' => $viewer->user->id,
+                            'username' => $viewer->user->username,
+                            'name' => $viewer->user->first_name . ' ' . $viewer->user->last_name,
+                            'profile_picture' => $viewer->user->profile_picture,
+                        ],
+                        'joined_at' => $viewer->joined_at,
+                    ];
+                })
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->sendError('Failed to retrieve stream viewers', $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Get stream chat messages
+     */
+    public function getChat(Request $request, $id)
+    {
+        try {
+            $stream = Stream::find($id);
+
+            if (!$stream) {
+                return $this->sendError('Stream not found', null, 404);
+            }
+
+            $limit = $request->get('limit', 50);
+            $afterId = $request->get('after_id');
+            $beforeId = $request->get('before_id');
+
+            $query = $stream->chats();
+
+            if ($afterId) {
+                $query->after($afterId);
+            } elseif ($beforeId) {
+                $query->before($beforeId);
+            }
+
+            $messages = $query->orderBy('created_at', 'desc')
+                ->limit($limit)
+                ->get()
+                ->reverse()
+                ->values();
+
+            return $this->sendResponse('Stream chat retrieved successfully', [
+                'stream_id' => $stream->id,
+                'messages' => $messages,
+                'has_more' => $messages->count() >= $limit,
+                'last_message_id' => $messages->last()?->id,
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->sendError('Failed to retrieve stream chat', $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Send chat message
+     */
+    public function sendChat(Request $request, $id)
+    {
+        try {
+            $stream = Stream::find($id);
+            $user = $request->user();
+
+            if (!$stream) {
+                return $this->sendError('Stream not found', null, 404);
+            }
+
+            if ($stream->status !== 'live') {
+                return $this->sendError('Cannot send message to non-live stream', null, 400);
+            }
+
+            // Check if user is viewing the stream or is the stream owner
+            $isViewer = $stream->activeViewers()->where('user_id', $user->id)->exists();
+            $isOwner = $stream->user_id === $user->id;
+
+            if (!$isViewer && !$isOwner) {
+                return $this->sendError('You must be viewing the stream to send messages', null, 403);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'message' => 'required|string|max:500',
+            ]);
+
+            if ($validator->fails()) {
+                return $this->sendError('Validation Error', $validator->errors(), 422);
+            }
+
+            $message = StreamChat::create([
+                'stream_id' => $stream->id,
+                'user_id' => $user->id,
+                'username' => $user->username,
+                'message' => $request->message,
+                'user_profile_url' => $user->profile_picture,
+                'is_admin' => $user->hasRole('admin'),
+            ]);
+
+            return $this->sendResponse('Message sent successfully', [
+                'message' => $message
+            ], 201);
+
+        } catch (\Exception $e) {
+            return $this->sendError('Failed to send message', $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Get user's streams (for admins)
+     */
+    public function myStreams(Request $request)
+    {
+        try {
+            if (!$request->user()->hasRole('admin')) {
+                return $this->sendError('Unauthorized. Only admins can view their streams.', null, 403);
+            }
+
+            $streams = Stream::byUser($request->user()->id)
+                ->with('user')
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            return $this->sendResponse('Your streams retrieved successfully', [
+                'streams' => $streams->map(function ($stream) {
+                    return $this->formatStreamResponse($stream);
+                })
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->sendError('Failed to retrieve your streams', $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Update stream details (Admin only)
+     */
+    public function update(Request $request, $id)
+    {
+        try {
+            $stream = Stream::find($id);
+
+            if (!$stream) {
+                return $this->sendError('Stream not found', null, 404);
+            }
+
+            // Check if user is the stream owner
+            if ($stream->user_id !== $request->user()->id) {
+                return $this->sendError('Unauthorized. You can only update your own streams.', null, 403);
+            }
+
+            // Cannot update live or ended streams
+            if ($stream->status !== 'upcoming') {
+                return $this->sendError('Cannot update stream that is not in upcoming status', null, 400);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'title' => 'string|max:255',
+                'description' => 'nullable|string|max:1000',
+                'banner_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120',
+                'scheduled_at' => 'nullable|date|after:now',
+                'is_paid' => 'boolean',
+                'price' => 'required_if:is_paid,true|numeric|min:0',
+                'currency' => 'string|in:USD,NGN|max:3',
+                'max_viewers' => 'nullable|integer|min:1',
+            ]);
+
+            if ($validator->fails()) {
+                return $this->sendError('Validation Error', $validator->errors(), 422);
+            }
+
+            $data = $validator->validated();
+
+            // Handle banner image upload
+            if ($request->hasFile('banner_image')) {
+                // Delete old banner if exists
+                if ($stream->banner_image) {
+                    Storage::disk('public')->delete($stream->banner_image);
+                }
+
+                $path = $request->file('banner_image')->store('stream-banners', 'public');
+                $data['banner_image'] = $path;
+                $data['banner_image_url'] = Storage::url($path);
+            }
+
+            $stream->update($data);
+
+            return $this->sendResponse('Stream updated successfully', [
+                'stream' => $this->formatStreamResponse($stream->load('user'))
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->sendError('Failed to update stream', $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Delete stream (Admin only)
+     */
+    public function destroy(Request $request, $id)
+    {
+        try {
+            $stream = Stream::find($id);
+
+            if (!$stream) {
+                return $this->sendError('Stream not found', null, 404);
+            }
+
+            // Check if user is the stream owner
+            if ($stream->user_id !== $request->user()->id) {
+                return $this->sendError('Unauthorized. You can only delete your own streams.', null, 403);
+            }
+
+            // Cannot delete live streams
+            if ($stream->status === 'live') {
+                return $this->sendError('Cannot delete a live stream. End the stream first.', null, 400);
+            }
+
+            // Delete banner image if exists
+            if ($stream->banner_image) {
+                Storage::disk('public')->delete($stream->banner_image);
+            }
+
+            $stream->delete();
+
+            return $this->sendResponse('Stream deleted successfully');
+
+        } catch (\Exception $e) {
+            return $this->sendError('Failed to delete stream', $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Format stream response
+     */
+    private function formatStreamResponse(Stream $stream): array
+    {
+        return [
+            'id' => $stream->id,
+            'title' => $stream->title,
+            'description' => $stream->description,
+            'banner_image_url' => $stream->banner_image_url,
+            'status' => $stream->status,
+            'is_live' => $stream->is_live,
+            'is_paid' => $stream->is_paid,
+            'price' => $stream->price,
+            'currency' => $stream->currency,
+            'max_viewers' => $stream->max_viewers,
+            'current_viewers' => $stream->current_viewers,
+            'duration' => $stream->duration,
+            'scheduled_at' => $stream->scheduled_at,
+            'started_at' => $stream->started_at,
+            'ended_at' => $stream->ended_at,
+            'created_at' => $stream->created_at,
+            'updated_at' => $stream->updated_at,
+            'streamer' => [
+                'id' => $stream->user->id,
+                'username' => $stream->user->username,
+                'name' => $stream->user->first_name . ' ' . $stream->user->last_name,
+                'profile_picture' => $stream->user->profile_picture,
+            ],
+        ];
+    }
+}

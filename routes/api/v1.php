@@ -18,6 +18,8 @@ use App\Http\Controllers\API\V1\ConversationController;
 use App\Http\Controllers\API\V1\ProfileController;
 use App\Http\Controllers\API\V1\AdController;
 use App\Http\Controllers\API\V1\AdminAdController;
+use App\Http\Controllers\API\V1\StreamController;
+use App\Http\Controllers\API\V1\StreamPaymentController;
 
 Route::middleware('auth:api')->get('/user', function (Request $request) {
     return $request->user();
@@ -273,6 +275,52 @@ Route::prefix('discover')->group(function () {
 
 
 
+
+    // Live Streaming Routes
+    Route::prefix('streams')->group(function () {
+        // Public stream routes (no auth needed for discovery)
+        Route::get('/latest', [StreamController::class, 'latest']);
+        Route::get('/upcoming', [StreamController::class, 'upcoming']);
+        Route::get('/{id}', [StreamController::class, 'show']);
+        Route::get('/{id}/status', [StreamController::class, 'status']);
+        Route::get('/{id}/viewers', [StreamController::class, 'viewers']);
+        Route::get('/{id}/chat', [StreamController::class, 'getChat']);
+
+        // Authenticated stream routes
+        Route::middleware('auth:sanctum')->group(function () {
+            // Stream management (Admin only - middleware will be checked in controller)
+            Route::post('/', [StreamController::class, 'store']);
+            Route::put('/{id}', [StreamController::class, 'update']);
+            Route::delete('/{id}', [StreamController::class, 'destroy']);
+            Route::post('/{id}/start', [StreamController::class, 'start']);
+            Route::post('/{id}/end', [StreamController::class, 'end']);
+            Route::get('/my-streams', [StreamController::class, 'myStreams']);
+
+            // Stream participation (All users)
+            Route::post('/{id}/join', [StreamController::class, 'join']);
+            Route::post('/{id}/leave', [StreamController::class, 'leave']);
+            Route::post('/{id}/chat', [StreamController::class, 'sendChat']);
+
+            // Stream payments
+            Route::prefix('{id}/payment')->group(function () {
+                Route::post('/stripe/initialize', [StreamPaymentController::class, 'initializeStripePayment']);
+                Route::post('/nomba/initialize', [StreamPaymentController::class, 'initializeNombaPayment']);
+            });
+
+            // Payment management
+            Route::prefix('payments')->group(function () {
+                Route::post('/verify', [StreamPaymentController::class, 'verifyPayment']);
+                Route::get('/{paymentId}/status', [StreamPaymentController::class, 'getPaymentStatus']);
+                Route::get('/my-payments', [StreamPaymentController::class, 'getUserPayments']);
+            });
+        });
+    });
+
+    // Stream payment webhooks (no auth needed)
+    Route::prefix('streams/webhooks')->group(function () {
+        Route::post('/stripe', [StreamPaymentController::class, 'handleStripeWebhook']);
+        Route::post('/nomba', [StreamPaymentController::class, 'handleNombaWebhook']);
+    });
 
     // User Advertising Routes
     Route::prefix('ads')->group(function () {
