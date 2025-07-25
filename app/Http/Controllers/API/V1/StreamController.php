@@ -21,9 +21,9 @@ class StreamController extends BaseController
     {
         try {
             // Check if user has admin role
-            if (!$request->user()->hasRole('admin')) {
-                return $this->sendError('Unauthorized. Only admins can create streams.', null, 403);
-            }
+            // if (!$request->user()->hasRole('admin')) {
+            //     return $this->sendError('Unauthorized. Only admins can create streams.', null, 403);
+            // }
 
             $validator = Validator::make($request->all(), [
                 'title' => 'required|string|max:255',
@@ -228,6 +228,7 @@ class StreamController extends BaseController
      */
     public function show(Request $request, $id)
     {
+
         try {
             $stream = Stream::with(['user', 'activeViewers.user'])->find($id);
 
@@ -277,7 +278,7 @@ class StreamController extends BaseController
     {
         try {
             $limit = $request->get('limit', 10);
-            
+
             $streams = Stream::with('user')
                 ->live()
                 ->orderBy('started_at', 'desc')
@@ -302,7 +303,7 @@ class StreamController extends BaseController
     {
         try {
             $limit = $request->get('limit', 10);
-            
+
             $streams = Stream::with('user')
                 ->upcoming()
                 ->where('scheduled_at', '>', now())
@@ -334,7 +335,7 @@ class StreamController extends BaseController
             }
 
             $viewers = $stream->activeViewers()
-                ->with('user:id,username,first_name,last_name,profile_picture')
+                ->with('user:id,username,name,profile_picture')
                 ->orderBy('joined_at', 'desc')
                 ->get();
 
@@ -347,7 +348,7 @@ class StreamController extends BaseController
                         'user' => [
                             'id' => $viewer->user->id,
                             'username' => $viewer->user->username,
-                            'name' => $viewer->user->first_name . ' ' . $viewer->user->last_name,
+                            'name' => $viewer->user->name,
                             'profile_picture' => $viewer->user->profile_picture,
                         ],
                         'joined_at' => $viewer->joined_at,
@@ -458,10 +459,11 @@ class StreamController extends BaseController
      */
     public function myStreams(Request $request)
     {
+
         try {
-            if (!$request->user()->hasRole('admin')) {
-                return $this->sendError('Unauthorized. Only admins can view their streams.', null, 403);
-            }
+            // if (!$request->user()->hasRole('admin')) {
+            //     return $this->sendError('Unauthorized. Only admins can view their streams.', null, 403);
+            // }
 
             $streams = Stream::byUser($request->user()->id)
                 ->with('user')
@@ -603,7 +605,7 @@ class StreamController extends BaseController
             'streamer' => [
                 'id' => $stream->user->id,
                 'username' => $stream->user->username,
-                'name' => $stream->user->first_name . ' ' . $stream->user->last_name,
+                'name' => $stream->user->name,
                 'profile_picture' => $stream->user->profile_picture,
             ],
         ];

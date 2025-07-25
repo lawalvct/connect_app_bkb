@@ -8,6 +8,21 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return view('welcome');
 });
+
+// Test route for live streaming functionality
+Route::get('/test-streaming', function () {
+    return view('test-streaming');
+});
+
+// Simple test route (no external CDNs)
+Route::get('/simple-streaming-test', function () {
+    return view('simple-streaming-test');
+});
+
+// Debug route
+Route::get('/debug-streaming', function () {
+    return view('debug-streaming');
+});
 Route::get('/test-mail', function () {
     try {
         Mail::raw('Test email from ConnectApp', function ($message) {

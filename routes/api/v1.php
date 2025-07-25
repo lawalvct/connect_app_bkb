@@ -281,7 +281,7 @@ Route::prefix('discover')->group(function () {
         // Public stream routes (no auth needed for discovery)
         Route::get('/latest', [StreamController::class, 'latest']);
         Route::get('/upcoming', [StreamController::class, 'upcoming']);
-        Route::get('/{id}', [StreamController::class, 'show']);
+        Route::get('/mystreams', [StreamController::class, 'show']);
         Route::get('/{id}/status', [StreamController::class, 'status']);
         Route::get('/{id}/viewers', [StreamController::class, 'viewers']);
         Route::get('/{id}/chat', [StreamController::class, 'getChat']);
