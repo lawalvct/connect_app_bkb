@@ -221,6 +221,10 @@ Route::prefix('discover')->group(function () {
 
             // Payment routes
             Route::post('/stripe/initialize', [SubscriptionController::class, 'initializeStripePayment']);
+
+              Route::post('/stripe/initialize', [SubscriptionController::class, 'initializeStripeWithPaymentLink']);
+
+
             Route::post('/nomba/initialize', [SubscriptionController::class, 'initializeNombaPayment']);
             Route::post('/nomba/initialize-ngn', [SubscriptionController::class, 'initializeNombaPaymentNGN']); // Direct NGN payment
             Route::post('/nomba/initialize-usd', [SubscriptionController::class, 'initializeNombaPaymentUSD']); // Direct USD payment
@@ -430,6 +434,7 @@ Route::prefix('discover')->group(function () {
 
   // Webhook routes (no auth needed)
   Route::post('/nomba/callback', [SubscriptionController::class, 'handleNombaCallback']);
+  Route::post('/stripe/subscription/webhook', [SubscriptionController::class, 'stripeWebhook']);
 
 
   //testion if everything is fine with git

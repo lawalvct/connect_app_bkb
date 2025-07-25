@@ -27,7 +27,7 @@ class SubscriptionController extends BaseController
 
     if (empty($stripeKey)) {
         \Log::error('Stripe secret key is missing or empty');
-     
+
     }
 
     Stripe::setApiKey($stripeKey);
@@ -1221,5 +1221,376 @@ public function handleNombaCallbackWeb(Request $request)
 
 
     }
+
+
+
+    public function initializeStripeWithPaymentLink(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'subscription_id' => 'required|exists:subscribes,id',
+                'success_url' => 'nullable|url',
+                'cancel_url' => 'nullable|url'
+            ]);
+
+            if ($validator->fails()) {
+                return $this->sendError('Validation Error', $validator->errors(), 422);
+            }
+
+            $user = $request->user();
+            $subscriptionPlanId = $request->subscription_id;
+
+            \Log::info('Starting Stripe checkout session initialization', [
+                'user_id' => $user->id,
+                'subscription_id' => $subscriptionPlanId
+            ]);
+
+            // Get subscription plan details
+            $subscriptionPlan = Subscribe::findOrFail($subscriptionPlanId);
+
+            \Log::info('Retrieved subscription plan', [
+                'plan_id' => $subscriptionPlan->id,
+                'plan_name' => $subscriptionPlan->name,
+                'price' => $subscriptionPlan->price
+            ]);
+
+            // Check if user already has this subscription
+            $existingSubscription = UserSubscription::where('user_id', $user->id)
+                ->where('subscription_id', $subscriptionPlanId)
+                ->where('status', 'active')
+                ->first();
+
+            if ($existingSubscription) {
+                return $this->sendError('You already have an active subscription to this plan', [], 400);
+            }
+
+            // Create or get Stripe customer
+            $stripeCustomerId = null;
+
+            if ($user->stripe_customer_id) {
+                try {
+                    $customer = \Stripe\Customer::retrieve($user->stripe_customer_id);
+                    $stripeCustomerId = $customer->id;
+                    \Log::info('Retrieved existing Stripe customer', ['customer_id' => $stripeCustomerId]);
+                } catch (\Exception $e) {
+                    \Log::warning('Failed to retrieve Stripe customer, creating new one', [
+                        'error' => $e->getMessage()
+                    ]);
+                    $user->stripe_customer_id = null;
+                }
+            }
+
+            if (!$stripeCustomerId) {
+                $customer = \Stripe\Customer::create([
+                    'email' => $user->email,
+                    'name' => $user->name,
+                    'metadata' => [
+                        'user_id' => $user->id
+                    ]
+                ]);
+
+                $stripeCustomerId = $customer->id;
+                $user->stripe_customer_id = $stripeCustomerId;
+                $user->save();
+
+                \Log::info('Created new Stripe customer', ['customer_id' => $stripeCustomerId]);
+            }
+
+            // Set URLs
+            $successUrl = $request->success_url ?? config('app.url') . '/subscription-success?session_id={CHECKOUT_SESSION_ID}';
+            $cancelUrl = $request->cancel_url ?? config('app.url') . '/subscription-cancel';
+
+            // Create pending subscription record for tracking
+            $pendingSubscription = new UserSubscription();
+            $pendingSubscription->user_id = $user->id;
+            $pendingSubscription->subscription_id = $subscriptionPlanId;
+            $pendingSubscription->status = 'pending';
+            $pendingSubscription->starts_at = now();
+            $pendingSubscription->expires_at = now()->addDays(30);
+            $pendingSubscription->save();
+
+            // Create Stripe checkout session
+            \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
+
+            $session = \Stripe\Checkout\Session::create([
+                'payment_method_types' => ['card'],
+                'customer' => $stripeCustomerId,
+                'line_items' => [[
+                    'price_data' => [
+                        'currency' => 'usd', // You can make this dynamic
+                        'product_data' => [
+                            'name' => $subscriptionPlan->name,
+                            'description' => $subscriptionPlan->description ?? 'Subscription Plan',
+                        ],
+                        'unit_amount' => $subscriptionPlan->price * 100, // Stripe expects amount in cents
+                        'recurring' => [
+                            'interval' => $subscriptionPlan->billing_period ?? 'month',
+                            'interval_count' => 1,
+                        ],
+                    ],
+                    'quantity' => 1,
+                ]],
+                'mode' => 'subscription',
+                'success_url' => $successUrl,
+                'cancel_url' => $cancelUrl,
+                'client_reference_id' => $pendingSubscription->id,
+                'metadata' => [
+                    'user_id' => $user->id,
+                    'subscription_id' => $subscriptionPlanId,
+                    'subscription_plan_name' => $subscriptionPlan->name,
+                    'type' => 'subscription_payment'
+                ]
+            ]);
+
+            // Update pending subscription with session ID
+            $pendingSubscription->stripe_session_id = $session->id;
+            $pendingSubscription->save();
+
+            \Log::info('Stripe checkout session created successfully', [
+                'session_id' => $session->id,
+                'user_id' => $user->id,
+                'subscription_id' => $subscriptionPlanId
+            ]);
+
+            return $this->sendResponse('Checkout session created successfully', [
+                'checkout_url' => $session->url,
+                'session_id' => $session->id,
+                'subscription_plan' => [
+                    'id' => $subscriptionPlan->id,
+                    'name' => $subscriptionPlan->name,
+                    'price' => $subscriptionPlan->price,
+                    'billing_period' => $subscriptionPlan->billing_period ?? 'month'
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Stripe checkout session initialization failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return $this->sendError('Payment initialization failed: ' . $e->getMessage(), []);
+        }
+    }
+
+    /**
+     * Handle Stripe webhook for subscription payments
+     */
+    public function stripeWebhook(Request $request)
+    {
+        try {
+            \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
+
+            $payload = $request->getContent();
+            $sig_header = $request->header('Stripe-Signature');
+            $endpoint_secret = config('services.stripe.webhook_secret');
+
+            try {
+                $event = \Stripe\Webhook::constructEvent(
+                    $payload, $sig_header, $endpoint_secret
+                );
+            } catch (\UnexpectedValueException $e) {
+                \Log::error('Invalid payload', ['error' => $e->getMessage()]);
+                return response('Invalid payload', 400);
+            } catch (\Stripe\Exception\SignatureVerificationException $e) {
+                \Log::error('Invalid signature', ['error' => $e->getMessage()]);
+                return response('Invalid signature', 400);
+            }
+
+            // Handle the event
+            switch ($event['type']) {
+                case 'checkout.session.completed':
+                    $session = $event['data']['object'];
+                    $this->handleStripeSubscriptionCheckoutCompleted($session);
+                    break;
+
+                case 'customer.subscription.created':
+                    $subscription = $event['data']['object'];
+                    $this->handleStripeSubscriptionCreated($subscription);
+                    break;
+
+                case 'customer.subscription.updated':
+                    $subscription = $event['data']['object'];
+                    $this->handleStripeSubscriptionUpdated($subscription);
+                    break;
+
+                case 'customer.subscription.deleted':
+                    $subscription = $event['data']['object'];
+                    $this->handleStripeSubscriptionDeleted($subscription);
+                    break;
+
+                case 'invoice.payment_succeeded':
+                    $invoice = $event['data']['object'];
+                    $this->handleStripeInvoicePaymentSucceeded($invoice);
+                    break;
+
+                case 'invoice.payment_failed':
+                    $invoice = $event['data']['object'];
+                    $this->handleStripeInvoicePaymentFailed($invoice);
+                    break;
+
+                default:
+                    \Log::info('Unhandled Stripe event type: ' . $event['type']);
+            }
+
+            return response('Success', 200);
+
+        } catch (\Exception $e) {
+            \Log::error('Stripe webhook error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response('Error', 500);
+        }
+    }
+
+    /**
+     * Handle Stripe checkout session completed for subscriptions
+     */
+    private function handleStripeSubscriptionCheckoutCompleted($session)
+    {
+        $subscriptionId = $session['client_reference_id'];
+
+        $userSubscription = UserSubscription::where('id', $subscriptionId)
+            ->where('status', 'pending')
+            ->first();
+
+        if (!$userSubscription) {
+            \Log::warning('Stripe webhook: Subscription not found', ['subscription_id' => $subscriptionId]);
+            return;
+        }
+
+        $userSubscription->update([
+            'status' => 'active',
+            'stripe_subscription_id' => $session['subscription'],
+            'stripe_session_id' => $session['id'],
+            'paid_at' => now(),
+            'gateway_response' => $session
+        ]);
+
+        \Log::info('Stripe subscription checkout completed', [
+            'subscription_id' => $userSubscription->id,
+            'user_id' => $userSubscription->user_id
+        ]);
+    }
+
+    /**
+     * Handle Stripe subscription created
+     */
+    private function handleStripeSubscriptionCreated($subscription)
+    {
+        $userSubscription = UserSubscription::where('stripe_subscription_id', $subscription['id'])->first();
+
+        if ($userSubscription) {
+            $userSubscription->update([
+                'status' => 'active',
+                'current_period_start' => \Carbon\Carbon::createFromTimestamp($subscription['current_period_start']),
+                'current_period_end' => \Carbon\Carbon::createFromTimestamp($subscription['current_period_end']),
+            ]);
+
+            \Log::info('Stripe subscription created webhook processed', [
+                'subscription_id' => $userSubscription->id
+            ]);
+        }
+    }
+
+    /**
+     * Handle Stripe subscription updated
+     */
+    private function handleStripeSubscriptionUpdated($subscription)
+    {
+        $userSubscription = UserSubscription::where('stripe_subscription_id', $subscription['id'])->first();
+
+        if ($userSubscription) {
+            $status = $subscription['status'];
+
+            // Map Stripe status to our local status
+            $localStatus = match($status) {
+                'active' => 'active',
+                'canceled' => 'cancelled',
+                'past_due' => 'past_due',
+                'unpaid' => 'unpaid',
+                'trialing' => 'trialing',
+                default => $status
+            };
+
+            $userSubscription->update([
+                'status' => $localStatus,
+                'current_period_start' => \Carbon\Carbon::createFromTimestamp($subscription['current_period_start']),
+                'current_period_end' => \Carbon\Carbon::createFromTimestamp($subscription['current_period_end']),
+            ]);
+
+            \Log::info('Stripe subscription updated webhook processed', [
+                'subscription_id' => $userSubscription->id,
+                'new_status' => $localStatus
+            ]);
+        }
+    }
+
+    /**
+     * Handle Stripe subscription deleted
+     */
+    private function handleStripeSubscriptionDeleted($subscription)
+    {
+        $userSubscription = UserSubscription::where('stripe_subscription_id', $subscription['id'])->first();
+
+        if ($userSubscription) {
+            $userSubscription->update([
+                'status' => 'cancelled',
+                'cancelled_at' => now(),
+            ]);
+
+            \Log::info('Stripe subscription deleted webhook processed', [
+                'subscription_id' => $userSubscription->id
+            ]);
+        }
+    }
+
+    /**
+     * Handle Stripe invoice payment succeeded
+     */
+    private function handleStripeInvoicePaymentSucceeded($invoice)
+    {
+        $subscriptionId = $invoice['subscription'];
+
+        if ($subscriptionId) {
+            $userSubscription = UserSubscription::where('stripe_subscription_id', $subscriptionId)->first();
+
+            if ($userSubscription) {
+                $userSubscription->update([
+                    'last_payment_at' => now(),
+                    'status' => 'active'
+                ]);
+
+                \Log::info('Stripe invoice payment succeeded', [
+                    'subscription_id' => $userSubscription->id,
+                    'invoice_id' => $invoice['id']
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Handle Stripe invoice payment failed
+     */
+    private function handleStripeInvoicePaymentFailed($invoice)
+    {
+        $subscriptionId = $invoice['subscription'];
+
+        if ($subscriptionId) {
+            $userSubscription = UserSubscription::where('stripe_subscription_id', $subscriptionId)->first();
+
+            if ($userSubscription) {
+                $userSubscription->update([
+                    'status' => 'past_due'
+                ]);
+
+                \Log::info('Stripe invoice payment failed', [
+                    'subscription_id' => $userSubscription->id,
+                    'invoice_id' => $invoice['id']
+                ]);
+            }
+        }
+    }
+
 
 }

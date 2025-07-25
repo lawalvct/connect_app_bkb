@@ -29,14 +29,28 @@ class UserSubscription extends Model
         'auto_renew',
         'created_by',
         'updated_by',
-        'deleted_flag'
+        'deleted_flag',
+        'stripe_subscription_id',
+        'stripe_session_id',
+        'paid_at',
+        'gateway_response',
+        'current_period_start',
+        'current_period_end',
+        'last_payment_at',
+        'starts_at'
     ];
 
     protected $casts = [
         'payment_details' => 'array',
+        'gateway_response' => 'array',
         'started_at' => 'datetime',
+        'starts_at' => 'datetime',
         'expires_at' => 'datetime',
         'cancelled_at' => 'datetime',
+        'paid_at' => 'datetime',
+        'current_period_start' => 'datetime',
+        'current_period_end' => 'datetime',
+        'last_payment_at' => 'datetime',
         'amount' => 'decimal:2'
     ];
 
