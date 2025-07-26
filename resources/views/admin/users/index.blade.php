@@ -26,22 +26,22 @@
 @endsection
 
 @section('content')
-    <div x-data="userManagement()" x-init="loadUsers()">
+    <div x-data="userManagement()" x-init="loadUsers(); loadSocialCircles()">
 
         <!-- Filters and Search -->
         <div class="bg-white rounded-lg shadow-md mb-6">
             <div class="p-6">
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
 
                     <!-- Search -->
-                    <div class="md:col-span-2">
+                    <div>
                         <label for="search" class="block text-sm font-medium text-gray-700 mb-1">Search Users</label>
                         <div class="relative">
                             <input type="text"
                                    id="search"
                                    x-model="filters.search"
                                    @input="debounceSearch()"
-                                   placeholder="Search by name, email, or phone..."
+                                   placeholder="Search by name or email..."
                                    class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary">
                             <div class="absolute inset-y-0 left-0 pl-3 flex items-center">
                                 <i class="fas fa-search text-gray-400"></i>
@@ -81,10 +81,28 @@
                         </select>
                     </div>
 
+                    <!-- Social Circle Filter -->
+                    <div>
+                        <label for="social_circles" class="block text-sm font-medium text-gray-700 mb-1">Social Circles</label>
+                        <select id="social_circles"
+                                x-model="filters.social_circles"
+                                @change="loadUsers()"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary">
+                            <option value="">All Users</option>
+                            <option value="has_circles">With Circles</option>
+                            <option value="no_circles">No Circles</option>
+                            <optgroup label="Specific Circles">
+                                <template x-for="circle in socialCircles" :key="circle.id">
+                                    <option :value="circle.id" x-text="circle.name"></option>
+                                </template>
+                            </optgroup>
+                        </select>
+                    </div>
+
                 </div>
 
                 <!-- Quick Stats -->
-                <div class="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="mt-6 grid grid-cols-2 md:grid-cols-5 gap-4">
                     <div class="text-center p-3 bg-blue-50 rounded-md">
                         <p class="text-sm text-blue-600">Total Users</p>
                         <p class="text-xl font-bold text-blue-900" x-text="stats.total || '0'">0</p>
@@ -101,6 +119,11 @@
                         <p class="text-sm text-red-600">Banned</p>
                         <p class="text-xl font-bold text-red-900" x-text="stats.banned || '0'">0</p>
                     </div>
+                    <div class="text-center p-3 bg-purple-50 rounded-md">
+                        <p class="text-sm text-purple-600">In Circles</p>
+                        <p class="text-xl font-bold text-purple-900" x-text="stats.with_social_circles || '0'">0</p>
+                    </div>
+
                 </div>
             </div>
         </div>
@@ -173,6 +196,9 @@
                                 Status
                             </th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Social Circles
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 Registration
                             </th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -224,6 +250,30 @@
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
                                           :class="getStatusBadge(user.status)" x-text="user.status"></span>
+                                </td>
+
+                                <!-- Social Circles -->
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900">
+                                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                            <i class="fas fa-users mr-1"></i>
+                                            <span x-text="user.social_circles_count || 0"></span>
+                                        </span>
+                                    </div>
+                                    <div class="text-xs text-gray-500 mt-1" x-show="user.social_circles_names && user.social_circles_names.length > 0">
+                                        <template x-for="(circle, index) in user.social_circles_names?.slice(0, 2)" :key="index">
+                                            <span class="inline-block bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded mr-1 mb-1"
+                                                  x-text="circle"
+                                                  :style="user.social_circles_colors && user.social_circles_colors[circle] ?
+                                                    `background-color: ${user.social_circles_colors[circle]}20; color: ${user.social_circles_colors[circle]}` : ''"></span>
+                                        </template>
+                                        <span x-show="user.social_circles_names && user.social_circles_names.length > 2"
+                                              class="text-xs text-gray-400"
+                                              x-text="`+${user.social_circles_names.length - 2} more`"></span>
+                                    </div>
+                                    <div class="text-xs text-gray-400 italic" x-show="!user.social_circles_names || user.social_circles_names.length === 0">
+                                        No circles
+                                    </div>
                                 </td>
 
                                 <!-- Registration -->
@@ -299,7 +349,7 @@
 
                         <!-- Empty State -->
                         <tr x-show="users.length === 0">
-                            <td colspan="7" class="px-6 py-12 text-center text-gray-500">
+                            <td colspan="8" class="px-6 py-12 text-center text-gray-500">
                                 <i class="fas fa-users text-4xl mb-4"></i>
                                 <p class="text-lg">No users found</p>
                                 <p class="text-sm">Try adjusting your search filters</p>
@@ -369,12 +419,14 @@
             users: [],
             stats: {},
             pagination: {},
+            socialCircles: [],
             loading: false,
             selectedUsers: [],
             filters: {
                 search: '',
                 status: '',
-                verified: ''
+                verified: '',
+                social_circles: ''
             },
             searchTimeout: null,
 
@@ -423,6 +475,28 @@
                     this.showError('Failed to load users: ' + error.message);
                 } finally {
                     this.loading = false;
+                }
+            },
+
+            async loadSocialCircles() {
+                try {
+                    const response = await fetch('/admin/api/social-circles', {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                        }
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+
+                    const data = await response.json();
+                    this.socialCircles = data.social_circles || [];
+                } catch (error) {
+                    console.error('Failed to load social circles:', error);
+                    this.socialCircles = [];
                 }
             },
 

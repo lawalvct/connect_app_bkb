@@ -111,12 +111,69 @@
                             <div class="text-sm text-green-600">Streams</div>
                         </div>
                         <div class="text-center p-4 bg-purple-50 rounded-lg">
-                            <div class="text-2xl font-bold text-purple-900">0</div>
-                            <div class="text-sm text-purple-600">Connections</div>
+                            <div class="text-2xl font-bold text-purple-900">{{ $user->socialCircles ? $user->socialCircles->count() : 0 }}</div>
+                            <div class="text-sm text-purple-600">Social Circles</div>
                         </div>
                     </div>
                 </div>
             </div>
+
+            <!-- Social Circles -->
+            @if($user->socialCircles && $user->socialCircles->count() > 0)
+            <div class="bg-white rounded-lg shadow-md mt-6">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900">Social Circles ({{ $user->socialCircles->count() }})</h3>
+                </div>
+                <div class="p-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        @foreach($user->socialCircles as $circle)
+                        <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                            <div class="flex items-center space-x-3">
+                                @if($circle->logo)
+                                <div class="flex-shrink-0">
+                                   <img src="/uploads/logo/{{ $circle->logo }}" alt="{{ $circle->name }}"
+         class="w-10 h-10 rounded-full object-cover">
+                                </div>
+                                @else
+                                <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-medium"
+                                     style="background-color: {{ $circle->color ?? '#6B7280' }}">
+                                    {{ substr($circle->name, 0, 2) }}
+                                </div>
+                                @endif
+
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-medium text-gray-900 truncate">{{ $circle->name }}</p>
+                                    @if($circle->description)
+                                    <p class="text-xs text-gray-500 truncate">{{ Str::limit($circle->description, 50) }}</p>
+                                    @endif
+                                </div>
+                            </div>
+
+                            @if($circle->color)
+                            <div class="mt-3">
+                                <div class="w-full h-2 rounded-full" style="background-color: {{ $circle->color }}20;">
+                                    <div class="h-2 rounded-full" style="background-color: {{ $circle->color }}; width: 100%;"></div>
+                                </div>
+                            </div>
+                            @endif
+                        </div>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+            @else
+            <div class="bg-white rounded-lg shadow-md mt-6">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900">Social Circles</h3>
+                </div>
+                <div class="p-6">
+                    <div class="text-center py-8">
+                        <i class="fas fa-users text-4xl text-gray-300 mb-4"></i>
+                        <p class="text-gray-500">This user is not a member of any social circles yet.</p>
+                    </div>
+                </div>
+            </div>
+            @endif
 
             <!-- Recent Posts -->
             @if($user->posts && $user->posts->count() > 0)

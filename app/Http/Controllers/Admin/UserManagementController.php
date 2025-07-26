@@ -25,8 +25,8 @@ class UserManagementController extends Controller
      */
     public function show(User $user)
     {
-        // Only load relationships that exist
-        $user->load(['posts']);
+        // Load relationships that exist, including social circles
+        $user->load(['posts', 'socialCircles:id,name,description,color,logo']);
         return view('admin.users.show', compact('user'));
     }
 
@@ -170,8 +170,24 @@ class UserManagementController extends Controller
                 }
             }
 
-            // Get paginated results - start simple without relationships
+            if ($request->filled('social_circles')) {
+                $socialCircleFilter = $request->get('social_circles');
+                if ($socialCircleFilter === 'has_circles') {
+                    $query->whereHas('socialCircles');
+                } elseif ($socialCircleFilter === 'no_circles') {
+                    $query->whereDoesntHave('socialCircles');
+                } elseif (is_numeric($socialCircleFilter)) {
+                    // Filter by specific social circle ID
+                    $query->whereHas('socialCircles', function($q) use ($socialCircleFilter) {
+                        $q->where('social_circles.id', $socialCircleFilter);
+                    });
+                }
+            }
+
+            // Get paginated results - include social circles relationship
             $users = $query->select(['id', 'name', 'email', 'is_active', 'is_banned', 'banned_until', 'created_at', 'email_verified_at'])
+                ->with(['socialCircles:id,name,color']) // Load social circles with only needed fields
+                ->withCount('socialCircles') // Count social circles
                 ->orderBy('created_at', 'desc')
                 ->paginate(20);
 
@@ -195,6 +211,11 @@ class UserManagementController extends Controller
                     $user->status = 'active';
                 }
 
+                // Format social circles data
+                $user->social_circles_count = $user->social_circles_count ?? 0;
+                $user->social_circles_names = $user->socialCircles ? $user->socialCircles->pluck('name')->toArray() : [];
+                $user->social_circles_colors = $user->socialCircles ? $user->socialCircles->pluck('color', 'name')->toArray() : [];
+
                 return $user;
             });
 
@@ -203,7 +224,9 @@ class UserManagementController extends Controller
                 'total' => User::count(),
                 'active' => User::where('is_active', true)->where('is_banned', false)->count(),
                 'suspended' => User::where('is_active', false)->count(),
-                'banned' => User::where('is_banned', true)->count()
+                'banned' => User::where('is_banned', true)->count(),
+                'with_social_circles' => User::whereHas('socialCircles')->count(),
+                'avg_social_circles' => round(User::withCount('socialCircles')->get()->avg('social_circles_count') ?? 0, 1)
             ];
 
             Log::info('UserManagement getUsers success - returning ' . $users->count() . ' users');
@@ -222,6 +245,31 @@ class UserManagementController extends Controller
                 'users' => (object)['data' => [], 'current_page' => 1, 'last_page' => 1, 'from' => 0, 'to' => 0, 'total' => 0],
                 'stats' => ['total' => 0, 'active' => 0, 'suspended' => 0, 'banned' => 0]
             ], 200); // Return 200 instead of 500 for better debugging
+        }
+    }
+
+    /**
+     * Get social circles for filter dropdown
+     */
+    public function getSocialCircles()
+    {
+        try {
+            $socialCircles = \App\Models\SocialCircle::withoutGlobalScope('active')
+                ->where('is_active', true)
+                ->where('deleted_flag', 'N')
+                ->orderBy('order_by', 'asc')
+                ->get(['id', 'name', 'color']);
+
+            return response()->json([
+                'social_circles' => $socialCircles
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error fetching social circles: ' . $e->getMessage());
+            return response()->json([
+                'error' => 'Failed to load social circles',
+                'social_circles' => []
+            ], 200);
         }
     }
 

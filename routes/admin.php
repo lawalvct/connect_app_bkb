@@ -32,6 +32,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('/dashboard-data', [DashboardController::class, 'getDashboardData']);
             Route::get('/dashboard-charts', [DashboardController::class, 'getChartData']);
             Route::get('/users', [UserManagementController::class, 'getUsers']);
+            Route::get('/social-circles', [UserManagementController::class, 'getSocialCircles']);
             Route::patch('/users/{user}/status', [UserManagementController::class, 'updateStatus']);
             Route::patch('/users/bulk-status', [UserManagementController::class, 'bulkUpdateStatus']);
             Route::post('/users/{user}/reset-password', [UserManagementController::class, 'resetPassword']);
