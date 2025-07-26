@@ -115,162 +115,145 @@
                                     <option value="EUR" {{ old('currency', $plan->currency) === 'EUR' ? 'selected' : '' }}>EUR</option>
                                     <option value="GBP" {{ old('currency', $plan->currency) === 'GBP' ? 'selected' : '' }}>GBP</option>
                                     <option value="NGN" {{ old('currency', $plan->currency) === 'NGN' ? 'selected' : '' }}>NGN</option>
-                                    </select>
-                                    @error('currency')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
-                                </div>
+                                </select>
+                                @error('currency')
+                                    <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
+                                @enderror
                             </div>
-                            <div class="col-md-4">
-                                <div class="form-group">
-                                    <label for="duration_days" class="form-label required">Duration (Days)</label>
-                                    <input type="number"
-                                           class="form-control @error('duration_days') is-invalid @enderror"
-                                           id="duration_days"
-                                           name="duration_days"
-                                           value="{{ old('duration_days', $plan->duration_days) }}"
-                                           min="1"
-                                           required>
-                                    @error('duration_days')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
-                                </div>
+                            <div>
+                                <label for="duration_days" class="block text-sm font-medium text-gray-700 mb-2 required">Duration (Days)</label>
+                                <input type="number"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary @error('duration_days') border-red-500 @enderror"
+                                       id="duration_days"
+                                       name="duration_days"
+                                       value="{{ old('duration_days', $plan->duration_days) }}"
+                                       min="1"
+                                       required>
+                                @error('duration_days')
+                                    <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
+                                @enderror
                             </div>
                         </div>
 
-                        <div class="form-group">
-                            <label class="form-label">Features</label>
+                        <div class="mt-6">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Features</label>
                             <div x-data="{ features: {{ json_encode(old('features', $plan->features ?? [''])) }} }">
                                 <template x-for="(feature, index) in features" :key="index">
-                                    <div class="input-group mb-2">
+                                    <div class="flex mb-2">
                                         <input type="text"
-                                               class="form-control"
+                                               class="flex-1 px-3 py-2 border border-gray-300 rounded-l-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                                                :name="'features[' + index + ']'"
                                                x-model="features[index]"
                                                placeholder="Enter feature description">
-                                        <div class="input-group-append">
-                                            <button type="button"
-                                                    class="btn btn-outline-danger"
-                                                    @click="features.splice(index, 1)"
-                                                    x-show="features.length > 1">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
-                                        </div>
+                                        <button type="button"
+                                                class="px-3 py-2 bg-red-600 text-white rounded-r-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+                                                @click="features.splice(index, 1)"
+                                                x-show="features.length > 1">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
                                     </div>
                                 </template>
                                 <button type="button"
-                                        class="btn btn-outline-primary btn-sm"
+                                        class="mt-2 px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                         @click="features.push('')">
                                     <i class="fas fa-plus mr-1"></i>Add Feature
                                 </button>
                             </div>
                         </div>
 
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label for="stripe_price_id" class="form-label">Stripe Price ID</label>
-                                    <input type="text"
-                                           class="form-control @error('stripe_price_id') is-invalid @enderror"
-                                           id="stripe_price_id"
-                                           name="stripe_price_id"
-                                           value="{{ old('stripe_price_id', $plan->stripe_price_id) }}"
-                                           placeholder="price_xxxxxxxxxxxxx">
-                                    @error('stripe_price_id')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
-                                </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                            <div>
+                                <label for="stripe_price_id" class="block text-sm font-medium text-gray-700 mb-2">Stripe Price ID</label>
+                                <input type="text"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary @error('stripe_price_id') border-red-500 @enderror"
+                                       id="stripe_price_id"
+                                       name="stripe_price_id"
+                                       value="{{ old('stripe_price_id', $plan->stripe_price_id) }}"
+                                       placeholder="price_xxxxxxxxxxxxx">
+                                @error('stripe_price_id')
+                                    <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
+                                @enderror
                             </div>
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label for="nomba_plan_id" class="form-label">Nomba Plan ID</label>
-                                    <input type="text"
-                                           class="form-control @error('nomba_plan_id') is-invalid @enderror"
-                                           id="nomba_plan_id"
-                                           name="nomba_plan_id"
-                                           value="{{ old('nomba_plan_id', $plan->nomba_plan_id) }}"
-                                           placeholder="nomba_plan_xxxxxxxxxxxxx">
-                                    @error('nomba_plan_id')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
-                                </div>
+                            <div>
+                                <label for="nomba_plan_id" class="block text-sm font-medium text-gray-700 mb-2">Nomba Plan ID</label>
+                                <input type="text"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary @error('nomba_plan_id') border-red-500 @enderror"
+                                       id="nomba_plan_id"
+                                       name="nomba_plan_id"
+                                       value="{{ old('nomba_plan_id', $plan->nomba_plan_id) }}"
+                                       placeholder="nomba_plan_xxxxxxxxxxxxx">
+                                @error('nomba_plan_id')
+                                    <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
+                                @enderror
                             </div>
                         </div>
 
-                        <div class="row">
-                            <div class="col-md-4">
-                                <div class="form-group">
-                                    <label for="sort_order" class="form-label">Sort Order</label>
-                                    <input type="number"
-                                           class="form-control @error('sort_order') is-invalid @enderror"
-                                           id="sort_order"
-                                           name="sort_order"
-                                           value="{{ old('sort_order', $plan->sort_order ?? 0) }}"
-                                           min="0">
-                                    @error('sort_order')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
-                                </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+                            <div>
+                                <label for="sort_order" class="block text-sm font-medium text-gray-700 mb-2">Sort Order</label>
+                                <input type="number"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary @error('sort_order') border-red-500 @enderror"
+                                       id="sort_order"
+                                       name="sort_order"
+                                       value="{{ old('sort_order', $plan->sort_order ?? 0) }}"
+                                       min="0">
+                                @error('sort_order')
+                                    <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
+                                @enderror
                             </div>
-                            <div class="col-md-4">
-                                <div class="form-group">
-                                    <label for="badge_color" class="form-label">Badge Color</label>
-                                    <input type="color"
-                                           class="form-control @error('badge_color') is-invalid @enderror"
-                                           id="badge_color"
-                                           name="badge_color"
-                                           value="{{ old('badge_color', $plan->badge_color ?? '#007bff') }}">
-                                    @error('badge_color')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
-                                </div>
+                            <div>
+                                <label for="badge_color" class="block text-sm font-medium text-gray-700 mb-2">Badge Color</label>
+                                <input type="color"
+                                       class="w-full h-10 px-1 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary @error('badge_color') border-red-500 @enderror"
+                                       id="badge_color"
+                                       name="badge_color"
+                                       value="{{ old('badge_color', $plan->badge_color ?? '#007bff') }}">
+                                @error('badge_color')
+                                    <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
+                                @enderror
                             </div>
-                            <div class="col-md-4">
-                                <div class="form-group">
-                                    <label for="icon" class="form-label">Icon Class</label>
-                                    <input type="text"
-                                           class="form-control @error('icon') is-invalid @enderror"
-                                           id="icon"
-                                           name="icon"
-                                           value="{{ old('icon', $plan->icon) }}"
-                                           placeholder="fas fa-star">
-                                    @error('icon')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
-                                </div>
+                            <div>
+                                <label for="icon" class="block text-sm font-medium text-gray-700 mb-2">Icon Class</label>
+                                <input type="text"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary @error('icon') border-red-500 @enderror"
+                                       id="icon"
+                                       name="icon"
+                                       value="{{ old('icon', $plan->icon) }}"
+                                       placeholder="fas fa-star">
+                                @error('icon')
+                                    <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
+                                @enderror
                             </div>
                         </div>
 
-                        <div class="form-group">
-                            <div class="custom-control custom-switch">
+                        <div class="mt-6">
+                            <div class="flex items-center">
                                 <input type="checkbox"
-                                       class="custom-control-input"
+                                       class="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
                                        id="is_active"
                                        name="is_active"
                                        value="1"
                                        {{ old('is_active', $plan->is_active) ? 'checked' : '' }}>
-                                <label class="custom-control-label" for="is_active">
+                                <label for="is_active" class="ml-2 block text-sm text-gray-900">
                                     Active Plan
                                 </label>
                             </div>
-                            <small class="form-text text-muted">Only active plans will be available for new subscriptions</small>
+                            <p class="text-gray-500 text-sm mt-1">Only active plans will be available for new subscriptions</p>
                         </div>
 
-                        <hr>
-
-                        <div class="d-flex justify-content-between">
-                            <div>
-                                <a href="{{ route('admin.subscriptions.plans.index') }}" class="btn btn-secondary">
+                        <div class="flex justify-between items-center pt-6 border-t border-gray-200 mt-8">
+                            <div class="flex space-x-2">
+                                <a href="{{ route('admin.subscriptions.plans.index') }}" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500">
                                     <i class="fas fa-times mr-2"></i>Cancel
                                 </a>
                                 <button type="button"
-                                        class="btn btn-danger ml-2"
+                                        class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
                                         onclick="confirmDelete()"
                                         @if($plan->activeUserSubscriptions()->count() > 0) disabled title="Cannot delete plan with active subscriptions" @endif>
                                     <i class="fas fa-trash mr-2"></i>Delete Plan
                                 </button>
                             </div>
-                            <button type="submit" class="btn btn-primary">
+                            <button type="submit" class="px-6 py-2 bg-primary text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-primary">
                                 <i class="fas fa-save mr-2"></i>Update Plan
                             </button>
                         </div>
@@ -285,59 +268,64 @@
             </div>
         </div>
 
-        <div class="col-lg-4">
-            <div class="card shadow">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">Plan Statistics</h6>
+        <div class="lg:col-span-1">
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-primary">Plan Statistics</h3>
                 </div>
-                <div class="card-body">
-                    <div class="row text-center">
-                        <div class="col-6">
-                            <div class="h4 text-primary">{{ $plan->userSubscriptions()->count() }}</div>
-                            <small class="text-muted">Total Subscribers</small>
+                <div class="p-6">
+                    <div class="grid grid-cols-2 gap-4 text-center">
+                        <div>
+                            <div class="text-2xl font-bold text-primary">{{ $plan->userSubscriptions()->count() }}</div>
+                            <p class="text-sm text-gray-500">Total Subscribers</p>
                         </div>
-                        <div class="col-6">
-                            <div class="h4 text-success">{{ $plan->activeUserSubscriptions()->count() }}</div>
-                            <small class="text-muted">Active Subscribers</small>
+                        <div>
+                            <div class="text-2xl font-bold text-green-600">{{ $plan->activeUserSubscriptions()->count() }}</div>
+                            <p class="text-sm text-gray-500">Active Subscribers</p>
                         </div>
                     </div>
-                    <hr>
-                    <div class="text-center">
-                        <div class="h5">
-                            {{ $plan->currency }} {{ number_format($plan->price * $plan->activeUserSubscriptions()->count(), 2) }}
+                    <div class="border-t border-gray-200 mt-4 pt-4">
+                        <div class="text-center">
+                            <div class="text-xl font-semibold text-gray-900">
+                                {{ $plan->currency }} {{ number_format($plan->price * $plan->activeUserSubscriptions()->count(), 2) }}
+                            </div>
+                            <p class="text-sm text-gray-500">Current Monthly Revenue</p>
                         </div>
-                        <small class="text-muted">Current Monthly Revenue</small>
                     </div>
                 </div>
             </div>
 
-            <div class="card shadow mt-4">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">Plan Preview</h6>
+            <div class="bg-white shadow rounded-lg mt-6">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-primary">Plan Preview</h3>
                 </div>
-                <div class="card-body">
+                <div class="p-6">
                     <div class="text-center">
-                        <h5>{{ $plan->name }}</h5>
-                        <div class="h3 text-primary">
+                        <h5 class="text-xl font-bold text-gray-900 mb-2">{{ $plan->name }}</h5>
+                        <div class="text-3xl font-bold text-primary mb-2">
                             {{ $plan->currency }} {{ number_format($plan->price, 2) }}
                         </div>
-                        <p class="text-muted">
+                        <p class="text-gray-500 mb-4">
                             for {{ $plan->duration_days }} days
                         </p>
                         @if($plan->is_active)
-                            <span class="badge badge-success">Active</span>
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Active</span>
                         @else
-                            <span class="badge badge-secondary">Inactive</span>
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Inactive</span>
                         @endif
                     </div>
 
                     @if($plan->features && count($plan->features) > 0)
-                        <hr>
-                        <ul class="list-unstyled">
-                            @foreach($plan->features as $feature)
-                                <li><i class="fas fa-check text-success mr-2"></i>{{ $feature }}</li>
-                            @endforeach
-                        </ul>
+                        <div class="border-t border-gray-200 mt-4 pt-4">
+                            <ul class="space-y-2">
+                                @foreach($plan->features as $feature)
+                                    <li class="flex items-center">
+                                        <i class="fas fa-check text-green-500 mr-2"></i>
+                                        <span class="text-sm text-gray-700">{{ $feature }}</span>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
                     @endif
                 </div>
             </div>
@@ -373,7 +361,7 @@ function confirmDelete() {
 <style>
 .required::after {
     content: " *";
-    color: red;
+    color: #e53e3e;
 }
 </style>
 @endsection
