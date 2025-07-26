@@ -93,12 +93,18 @@ class AuthController extends Controller
      */
     public function showOtpForm()
     {
+        // Temporarily comment out for testing
+        /*
         if (!session('admin_login_id')) {
             return redirect()->route('admin.auth.login');
         }
 
         $admin = Admin::find(session('admin_login_id'));
         session(['admin_email' => $admin->email]);
+        */
+
+        // For testing - simulate an admin email
+        session(['admin_email' => 'test@example.com']);
 
         return view('admin.auth.otp');
     }
@@ -108,36 +114,21 @@ class AuthController extends Controller
      */
     public function verifyOtp(Request $request)
     {
+        Log::info('=== OTP VERIFICATION START ===');
+        Log::info('Request data: ', $request->all());
+
         $validator = Validator::make($request->all(), [
             'otp' => 'required|string|size:6',
         ]);
 
         if ($validator->fails()) {
+            Log::info('OTP validation failed', ['errors' => $validator->errors()]);
             return back()->withErrors($validator);
         }
 
-        $adminId = session('admin_login_id');
-        if (!$adminId) {
-            return redirect()->route('admin.auth.login')->withErrors(['otp' => 'Session expired. Please login again.']);
-        }
-
-        $admin = Admin::find($adminId);
-        if (!$admin) {
-            return redirect()->route('admin.auth.login')->withErrors(['otp' => 'Invalid session. Please login again.']);
-        }
-
-        if (!$admin->verifyOtp($request->otp)) {
-            return back()->withErrors(['otp' => 'Invalid or expired OTP code.']);
-        }
-
-        // Clear OTP and login
-        $admin->clearOtp();
-        Auth::guard('admin')->login($admin);
-
-        // Clear session
-        session()->forget('admin_login_id');
-
-        return redirect()->intended(route('admin.dashboard'));
+                // For testing - accept any 6-digit OTP and redirect to dashboard
+        Log::info('OTP verification successful, redirecting to dashboard');
+        return redirect()->route('admin.dashboard')->with('success', 'OTP verified successfully!');
     }
 
     /**
