@@ -36,6 +36,11 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::patch('/users/{user}/status', [UserManagementController::class, 'updateStatus']);
             Route::patch('/users/bulk-status', [UserManagementController::class, 'bulkUpdateStatus']);
             Route::post('/users/{user}/reset-password', [UserManagementController::class, 'resetPassword']);
+
+            // Post Management API
+            Route::get('/posts', [\App\Http\Controllers\Admin\PostManagementController::class, 'getPosts']);
+            Route::patch('/posts/{post}/status', [\App\Http\Controllers\Admin\PostManagementController::class, 'updateStatus']);
+            Route::patch('/posts/bulk-status', [\App\Http\Controllers\Admin\PostManagementController::class, 'bulkUpdateStatus']);
         });
 
         // User Management
@@ -48,6 +53,14 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::patch('/{user}/suspend', [UserManagementController::class, 'suspend'])->name('suspend');
             Route::patch('/{user}/activate', [UserManagementController::class, 'activate'])->name('activate');
             Route::delete('/{user}', [UserManagementController::class, 'destroy'])->name('destroy');
+        });
+
+        // Post Management
+        Route::prefix('posts')->name('posts.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Admin\PostManagementController::class, 'index'])->name('index');
+            Route::get('/export', [\App\Http\Controllers\Admin\PostManagementController::class, 'export'])->name('export');
+            Route::get('/{post}', [\App\Http\Controllers\Admin\PostManagementController::class, 'show'])->name('show');
+            Route::delete('/{post}', [\App\Http\Controllers\Admin\PostManagementController::class, 'destroy'])->name('destroy');
         });
 
         // Logout

@@ -71,7 +71,8 @@
                         <i class="fas fa-chevron-down transform transition-transform duration-200" :class="open ? 'rotate-180' : ''"></i>
                     </button>
                     <div x-show="open" x-collapse class="ml-6 mt-2 space-y-2">
-                        <a href="#" class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary">
+                        <a href="{{ route('admin.posts.index') }}"
+                           class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.posts*') ? 'bg-primary-light text-primary' : '' }}">
                             <span>Posts</span>
                         </a>
                         <a href="#" class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary">

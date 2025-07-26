@@ -129,10 +129,13 @@
                         @foreach($user->socialCircles as $circle)
                         <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                             <div class="flex items-center space-x-3">
-                                @if($circle->logo)
+                                @if($circle->logo_url || $circle->logo)
                                 <div class="flex-shrink-0">
-                                   <img src="/uploads/logo/{{ $circle->logo }}" alt="{{ $circle->name }}"
-         class="w-10 h-10 rounded-full object-cover">
+                                    <img src="{{ $circle->logo_url && $circle->logo ? $circle->logo_url . $circle->logo :
+                                                 ($circle->logo_url ? asset($circle->logo_url) :
+                                                  ($circle->logo ? asset('uploads/logo/' . $circle->logo) : asset('images/default-circle.png'))) }}"
+                                         alt="{{ $circle->name }}"
+                                         class="w-10 h-10 rounded-full object-cover">
                                 </div>
                                 @else
                                 <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-medium"
