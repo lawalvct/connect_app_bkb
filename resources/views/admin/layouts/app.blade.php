@@ -75,7 +75,8 @@
                            class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.posts*') ? 'bg-primary-light text-primary' : '' }}">
                             <span>Posts</span>
                         </a>
-                        <a href="#" class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary">
+                        <a href="{{ route('admin.stories.index') }}"
+                           class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.stories*') ? 'bg-primary-light text-primary' : '' }}">
                             <span>Stories</span>
                         </a>
                     </div>

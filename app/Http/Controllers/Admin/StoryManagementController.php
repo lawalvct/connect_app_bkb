@@ -140,7 +140,7 @@ class StoryManagementController extends Controller
         // Sorting
         $sortBy = $request->get('sort_by', 'created_at');
         $sortDirection = $request->get('sort_direction', 'desc');
-        
+
         if (in_array($sortBy, ['created_at', 'views_count', 'expires_at'])) {
             $query->orderBy($sortBy, $sortDirection);
         } else {
@@ -232,7 +232,7 @@ class StoryManagementController extends Controller
 
         $callback = function() use ($stories) {
             $file = fopen('php://output', 'w');
-            
+
             // CSV Headers
             fputcsv($file, [
                 'ID', 'User', 'Username', 'Email', 'Type', 'Caption', 'Content',
@@ -272,7 +272,7 @@ class StoryManagementController extends Controller
 
         try {
             $stories = Story::whereIn('id', $request->story_ids)->get();
-            
+
             foreach ($stories as $story) {
                 // Delete associated files
                 if ($story->file_url) {
@@ -301,7 +301,7 @@ class StoryManagementController extends Controller
     {
         try {
             $expiredStories = Story::expired()->get();
-            
+
             foreach ($expiredStories as $story) {
                 // Delete associated files
                 if ($story->file_url) {

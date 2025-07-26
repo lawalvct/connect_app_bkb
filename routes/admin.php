@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\UserManagementController;
+use App\Http\Controllers\Admin\StoryManagementController;
 
 // Admin Authentication Routes
 Route::prefix('admin')->name('admin.')->group(function () {
@@ -41,6 +42,12 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('/posts', [\App\Http\Controllers\Admin\PostManagementController::class, 'getPosts']);
             Route::patch('/posts/{post}/status', [\App\Http\Controllers\Admin\PostManagementController::class, 'updateStatus']);
             Route::patch('/posts/bulk-status', [\App\Http\Controllers\Admin\PostManagementController::class, 'bulkUpdateStatus']);
+
+            // Story Management API
+            Route::get('/stories', [StoryManagementController::class, 'getStories']);
+            Route::get('/stories/stats', [StoryManagementController::class, 'getStats']);
+            Route::post('/stories/bulk-delete', [StoryManagementController::class, 'bulkDelete']);
+            Route::post('/stories/cleanup-expired', [StoryManagementController::class, 'cleanupExpired']);
         });
 
         // User Management
@@ -61,6 +68,14 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('/export', [\App\Http\Controllers\Admin\PostManagementController::class, 'export'])->name('export');
             Route::get('/{post}', [\App\Http\Controllers\Admin\PostManagementController::class, 'show'])->name('show');
             Route::delete('/{post}', [\App\Http\Controllers\Admin\PostManagementController::class, 'destroy'])->name('destroy');
+        });
+
+        // Story Management
+        Route::prefix('stories')->name('stories.')->group(function () {
+            Route::get('/', [StoryManagementController::class, 'index'])->name('index');
+            Route::get('/export', [StoryManagementController::class, 'export'])->name('export');
+            Route::get('/{story}', [StoryManagementController::class, 'show'])->name('show');
+            Route::delete('/{story}', [StoryManagementController::class, 'destroy'])->name('destroy');
         });
 
         // Logout
