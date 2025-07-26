@@ -31,17 +31,67 @@ class UserManagementController extends Controller
     }
 
     /**
-     * Suspend user
+     * Show edit user form
      */
-    public function suspend(User $user)
+    public function edit(User $user)
     {
+        return view('admin.users.edit', compact('user'));
+    }
+
+    /**
+     * Update user
+     */
+    public function update(Request $request, User $user)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email,' . $user->id,
+            'phone' => 'nullable|string|max:20',
+            'is_active' => 'boolean',
+            'is_banned' => 'boolean',
+        ]);
+
         try {
-            $user->update(['status' => 'suspended']);
-            return redirect()->back()
-                ->with('success', 'User suspended successfully');
+            $user->update($request->only([
+                'name', 'email', 'phone', 'is_active', 'is_banned'
+            ]));
+
+            return redirect()->route('admin.users.show', $user)
+                ->with('success', 'User updated successfully');
         } catch (\Exception $e) {
             return redirect()->back()
-                ->with('error', 'Failed to suspend user: ' . $e->getMessage());
+                ->with('error', 'Failed to update user: ' . $e->getMessage())
+                ->withInput();
+        }
+    }
+
+    /**
+     * Suspend user
+     */
+    public function suspend(User $user, Request $request)
+    {
+        try {
+            // Check if this is a ban action
+            if ($request->filled('ban')) {
+                $user->update([
+                    'is_active' => false,
+                    'is_banned' => true,
+                    'banned_until' => null
+                ]);
+                $message = 'User banned successfully';
+            } else {
+                $user->update([
+                    'is_active' => false,
+                    'is_banned' => false,
+                    'banned_until' => null
+                ]);
+                $message = 'User suspended successfully';
+            }
+
+            return redirect()->back()->with('success', $message);
+        } catch (\Exception $e) {
+            return redirect()->back()
+                ->with('error', 'Failed to update user: ' . $e->getMessage());
         }
     }
 
@@ -51,7 +101,11 @@ class UserManagementController extends Controller
     public function activate(User $user)
     {
         try {
-            $user->update(['status' => 'active']);
+            $user->update([
+                'is_active' => true,
+                'is_banned' => false,
+                'banned_until' => null
+            ]);
             return redirect()->back()
                 ->with('success', 'User activated successfully');
         } catch (\Exception $e) {
@@ -319,6 +373,98 @@ class UserManagementController extends Controller
                 'success' => false,
                 'message' => 'Failed to generate login link'
             ], 500);
+        }
+    }
+
+    /**
+     * Export users to CSV
+     */
+    public function export(Request $request)
+    {
+        try {
+            $query = User::query();
+
+            // Apply same filters as getUsers
+            if ($request->filled('search')) {
+                $search = $request->get('search');
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('email', 'like', "%{$search}%");
+                });
+            }
+
+            if ($request->filled('status')) {
+                $status = $request->get('status');
+                if ($status === 'active') {
+                    $query->where('is_active', true)->where('is_banned', false);
+                } elseif ($status === 'suspended') {
+                    $query->where('is_active', false);
+                } elseif ($status === 'banned') {
+                    $query->where('is_banned', true);
+                }
+            }
+
+            if ($request->filled('verified')) {
+                if ($request->get('verified') == '1') {
+                    $query->whereNotNull('email_verified_at');
+                } else {
+                    $query->whereNull('email_verified_at');
+                }
+            }
+
+            $users = $query->get(['id', 'name', 'email', 'phone', 'is_active', 'is_banned', 'created_at', 'email_verified_at']);
+
+            $filename = 'users_export_' . now()->format('Y-m-d_H-i-s') . '.csv';
+
+            $headers = [
+                'Content-Type' => 'text/csv',
+                'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            ];
+
+            $callback = function() use ($users) {
+                $file = fopen('php://output', 'w');
+
+                // Add CSV headers
+                fputcsv($file, [
+                    'ID',
+                    'Name',
+                    'Email',
+                    'Phone',
+                    'Status',
+                    'Email Verified',
+                    'Registration Date',
+                    'Posts Count'
+                ]);
+
+                // Add data rows
+                foreach ($users as $user) {
+                    $status = 'Active';
+                    if ($user->is_banned) {
+                        $status = 'Banned';
+                    } elseif (!$user->is_active) {
+                        $status = 'Suspended';
+                    }
+
+                    fputcsv($file, [
+                        $user->id,
+                        $user->name,
+                        $user->email,
+                        $user->phone ?? 'N/A',
+                        $status,
+                        $user->email_verified_at ? 'Yes' : 'No',
+                        $user->created_at->format('Y-m-d H:i:s'),
+                        $user->posts_count ?? 0
+                    ]);
+                }
+
+                fclose($file);
+            };
+
+            return response()->stream($callback, 200, $headers);
+
+        } catch (\Exception $e) {
+            Log::error('Error exporting users: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Failed to export users');
         }
     }
 }

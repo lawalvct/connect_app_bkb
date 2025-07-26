@@ -637,7 +637,16 @@
     }
 
     function exportUsers() {
-        window.location.href = '/admin/users/export';
+        // Get current filters
+        const params = new URLSearchParams();
+        const filters = document.querySelector('[x-data]').__x.$data.filters;
+
+        if (filters.search) params.append('search', filters.search);
+        if (filters.status) params.append('status', filters.status);
+        if (filters.verified) params.append('verified', filters.verified);
+
+        const exportUrl = `/admin/users/export?${params.toString()}`;
+        window.location.href = exportUrl;
     }
 
     function bulkAction() {

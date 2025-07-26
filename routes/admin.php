@@ -19,7 +19,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('/verify-otp', [AuthController::class, 'showOtpForm'])->name('auth.verify-otp');
         Route::post('/verify-otp', [AuthController::class, 'verifyOtp'])->name('auth.verify-otp.post');
         Route::post('/resend-otp', [AuthController::class, 'resendOtp'])->name('auth.resend-otp');
- 
+
 
     // Authenticated admin routes
     Route::middleware('auth:admin')->group(function () {
@@ -41,7 +41,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
         // User Management
         Route::prefix('users')->name('users.')->group(function () {
             Route::get('/', [UserManagementController::class, 'index'])->name('index');
+            Route::get('/export', [UserManagementController::class, 'export'])->name('export');
             Route::get('/{user}', [UserManagementController::class, 'show'])->name('show');
+            Route::get('/{user}/edit', [UserManagementController::class, 'edit'])->name('edit');
+            Route::patch('/{user}', [UserManagementController::class, 'update'])->name('update');
             Route::patch('/{user}/suspend', [UserManagementController::class, 'suspend'])->name('suspend');
             Route::patch('/{user}/activate', [UserManagementController::class, 'activate'])->name('activate');
             Route::delete('/{user}', [UserManagementController::class, 'destroy'])->name('destroy');
