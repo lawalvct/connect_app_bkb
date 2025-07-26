@@ -107,6 +107,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
         // Subscription Management
         Route::prefix('subscriptions')->name('subscriptions.')->group(function () {
+             Route::get('/plans', [SubscriptionManagementController::class, 'plansIndex'])->name('plans.index');
             Route::get('/', [SubscriptionManagementController::class, 'index'])->name('index');
             Route::get('/get', [SubscriptionManagementController::class, 'getSubscriptions'])->name('get');
             Route::get('/stats', [SubscriptionManagementController::class, 'getStats'])->name('stats');
@@ -117,12 +118,13 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
             // Subscription Plans
             Route::prefix('plans')->name('plans.')->group(function () {
-                Route::get('/', [SubscriptionManagementController::class, 'plansIndex'])->name('index');
+
                 Route::get('/get', [SubscriptionManagementController::class, 'getPlans'])->name('get');
                 Route::get('/stats', [SubscriptionManagementController::class, 'getPlanStats'])->name('stats');
                 Route::get('/export', [SubscriptionManagementController::class, 'exportPlans'])->name('export');
                 Route::get('/{plan}', [SubscriptionManagementController::class, 'showPlan'])->name('show');
                 Route::put('/{plan}/status', [SubscriptionManagementController::class, 'updatePlanStatus'])->name('update-status');
+
             });
         });
 
