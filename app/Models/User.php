@@ -238,6 +238,14 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
+     * Get the ads that belong to the user.
+     */
+    public function ads()
+    {
+        return $this->hasMany(\App\Models\Ad::class);
+    }
+
+    /**
      * Get active social circles for the user (with proper scoping).
      */
     public function activeSocialCircles()

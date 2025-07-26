@@ -83,8 +83,8 @@
                 </div>
 
                 <!-- Ads Management -->
-                <a href="#"
-                   class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-primary-light hover:text-primary transition-colors duration-200">
+                <a href="{{ route('admin.ads.index') }}"
+                   class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-primary-light hover:text-primary transition-colors duration-200 {{ request()->routeIs('admin.ads*') ? 'bg-primary-light text-primary' : '' }}">
                     <i class="fas fa-ad w-6"></i>
                     <span class="ml-3">Advertisements</span>
                 </a>

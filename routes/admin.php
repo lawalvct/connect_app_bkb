@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\Admin\StoryManagementController;
+use App\Http\Controllers\Admin\AdManagementController;
 
 // Admin Authentication Routes
 Route::prefix('admin')->name('admin.')->group(function () {
@@ -48,6 +49,12 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('/stories/stats', [StoryManagementController::class, 'getStats']);
             Route::post('/stories/bulk-delete', [StoryManagementController::class, 'bulkDelete']);
             Route::post('/stories/cleanup-expired', [StoryManagementController::class, 'cleanupExpired']);
+
+            // Ad Management API
+            Route::get('/ads', [AdManagementController::class, 'getAds']);
+            Route::get('/ads/stats', [AdManagementController::class, 'getStats']);
+            Route::post('/ads/bulk-approve', [AdManagementController::class, 'bulkApprove']);
+            Route::post('/ads/bulk-reject', [AdManagementController::class, 'bulkReject']);
         });
 
         // User Management
@@ -76,6 +83,19 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('/export', [StoryManagementController::class, 'export'])->name('export');
             Route::get('/{story}', [StoryManagementController::class, 'show'])->name('show');
             Route::delete('/{story}', [StoryManagementController::class, 'destroy'])->name('destroy');
+        });
+
+        // Ad Management
+        Route::prefix('ads')->name('ads.')->group(function () {
+            Route::get('/', [AdManagementController::class, 'index'])->name('index');
+            Route::get('/export', [AdManagementController::class, 'export'])->name('export');
+            Route::get('/{ad}', [AdManagementController::class, 'show'])->name('show');
+            Route::post('/{ad}/approve', [AdManagementController::class, 'approve'])->name('approve');
+            Route::post('/{ad}/reject', [AdManagementController::class, 'reject'])->name('reject');
+            Route::post('/{ad}/pause', [AdManagementController::class, 'pauseAd'])->name('pause');
+            Route::post('/{ad}/resume', [AdManagementController::class, 'resumeAd'])->name('resume');
+            Route::post('/{ad}/stop', [AdManagementController::class, 'stopAd'])->name('stop');
+            Route::delete('/{ad}', [AdManagementController::class, 'destroy'])->name('destroy');
         });
 
         // Logout
