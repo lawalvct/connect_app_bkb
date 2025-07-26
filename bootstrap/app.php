@@ -21,6 +21,10 @@ return Application::configure(basePath: dirname(__DIR__))
             Route::middleware('api')
                 ->prefix('api/v2')
                 ->group(base_path('routes/api/v2.php'));
+
+            // Load admin routes
+            Route::middleware('web')
+                ->group(base_path('routes/admin.php'));
         },
     )
     ->withMiddleware(function (Middleware $middleware) {
@@ -38,6 +42,14 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/*',
         ]);
         $middleware->append(\App\Http\Middleware\HandleCors::class);
+
+        // Configure authentication redirects
+        $middleware->redirectGuestsTo(function ($request) {
+            if ($request->is('admin/*')) {
+                return route('admin.auth.login');
+            }
+            return route('login');
+        });
     })
 
     ->withCommands([

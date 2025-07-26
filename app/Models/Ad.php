@@ -174,7 +174,7 @@ class Ad extends Model
 
     public function getDaysRemainingAttribute()
     {
-        if ($this->end_date->isPast()) {
+        if (!$this->end_date || $this->end_date->isPast()) {
             return 0;
         }
         return now()->diffInDays($this->end_date);
@@ -271,8 +271,8 @@ class Ad extends Model
         return $this->status === 'active'
             && $this->admin_status === 'approved'
             && in_array($socialCircleId, $this->target_social_circles ?? [])
-            && $this->start_date <= now()
-            && $this->end_date >= now();
+            && $this->start_date && $this->start_date <= now()
+            && $this->end_date && $this->end_date >= now();
     }
 
     /**
@@ -289,6 +289,8 @@ class Ad extends Model
         return self::where('status', 'active')
             ->where('admin_status', 'approved')
             ->where('deleted_flag', 'N')
+            ->whereNotNull('start_date')
+            ->whereNotNull('end_date')
             ->where('start_date', '<=', now())
             ->where('end_date', '>=', now())
             ->where(function($query) use ($userSocialCircles, $user) {
@@ -388,7 +390,8 @@ class Ad extends Model
         $startOfMonth = Carbon::create($year, $month, 1)->startOfMonth();
         $endOfMonth = Carbon::create($year, $month, 1)->endOfMonth();
 
-        return $this->start_date <= $endOfMonth && $this->end_date >= $startOfMonth;
+        return $this->start_date && $this->end_date &&
+               $this->start_date <= $endOfMonth && $this->end_date >= $startOfMonth;
     }
 
     /**

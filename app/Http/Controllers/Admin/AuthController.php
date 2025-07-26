@@ -126,7 +126,43 @@ class AuthController extends Controller
             return back()->withErrors($validator);
         }
 
-                // For testing - accept any 6-digit OTP and redirect to dashboard
+        // For testing - only accept "123456" as the correct OTP
+        $enteredOtp = $request->input('otp');
+        $correctOtp = '123456'; // Default test OTP
+
+        if ($enteredOtp !== $correctOtp) {
+            Log::info('Invalid OTP entered', ['entered' => $enteredOtp, 'expected' => $correctOtp]);
+            return back()->withErrors(['otp' => 'Invalid verification code. Please try again.']);
+        }
+
+        // For testing - create a test admin or get the admin from session
+        $adminId = session('admin_login_id');
+        if ($adminId) {
+            $admin = Admin::find($adminId);
+        } else {
+            // For testing - get first admin or create one
+            $admin = Admin::first();
+            if (!$admin) {
+                // Create a test admin for demonstration
+                $admin = Admin::create([
+                    'name' => 'Test Admin',
+                    'email' => 'admin@test.com',
+                    'password' => bcrypt('admin123'),
+                    'status' => 'active'
+                ]);
+            }
+        }
+
+        if ($admin) {
+            // Log the admin in
+            Auth::guard('admin')->login($admin);
+
+            // Clear OTP session data
+            session()->forget(['admin_login_id', 'admin_email']);
+
+            Log::info('Admin logged in successfully', ['admin_id' => $admin->id]);
+        }
+
         Log::info('OTP verification successful, redirecting to dashboard');
         return redirect()->route('admin.dashboard')->with('success', 'OTP verified successfully!');
     }

@@ -9,6 +9,11 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+// Fallback login route (redirects to admin login)
+Route::get('/login', function () {
+    return redirect()->route('admin.auth.login');
+})->name('login');
+
 // Test route for live streaming functionality
 Route::get('/test-streaming', function () {
     return view('test-streaming');
