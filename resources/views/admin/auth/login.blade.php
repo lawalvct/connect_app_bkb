@@ -22,6 +22,7 @@
             align-items: center;
             justify-content: center;
             padding: 20px;
+            position: relative;
         }
 
         .login-card {
@@ -35,13 +36,29 @@
         }
 
         .logo-container {
-            text-align: center;
-            margin-bottom: 32px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            margin-bottom: 0;
+        }
+
+        .logo-top-center {
+            position: absolute;
+            top: 48px;
+            left: 0;
+            right: 0;
+            z-index: 2;
+            pointer-events: none;
         }
 
         .logo {
             max-width: 80px;
             height: auto;
+            margin-top: -20px;
+            background: #fff;
+            border-radius: 50%;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
         }
 
         .page-title {
@@ -49,20 +66,19 @@
             font-size: 24px;
             font-weight: 600;
             margin-bottom: 8px;
-            text-align: left;
-        }
 
+        }
         .page-subtitle {
             color: #666666;
             font-size: 14px;
             margin-bottom: 32px;
-            text-align: left;
+            text-align: center;
             line-height: 1.4;
         }
 
         .form-group {
             margin-bottom: 20px;
-            text-align: left;
+            text-align: center;
         }
 
         .form-label {
@@ -71,6 +87,7 @@
             font-weight: 500;
             color: #333333;
             font-size: 14px;
+            text-align: left;
         }
 
         .form-input {
@@ -113,7 +130,7 @@
         }
 
         .forgot-password {
-            text-align: left;
+            text-align: center;
             margin-bottom: 24px;
         }
 
@@ -178,7 +195,7 @@
             border-radius: 8px;
             margin-bottom: 24px;
             font-size: 14px;
-            text-align: left;
+            text-align: center;
         }
 
         /* Focus states for accessibility */
@@ -195,13 +212,15 @@
 </head>
 <body>
     <div class="login-container">
+        <div class="logo-container logo-top-center">
+            <img src="{{ asset('images/connect_logo.png') }}" alt="Connect App Logo" class="logo">
+        </div>
         <div class="login-card">
-            <div class="logo-container">
-                <img src="{{ asset('images/connect_logo.png') }}" alt="Connect App Logo" class="logo">
-            </div>
-
-            <h1 class="page-title">Login</h1>
-            <p class="page-subtitle">Enter your details to login to your CONNECT APP account</p>
+            <h1 class="page-title">Admin Login</h1>
+            <p class="page-subtitle">
+          
+                You will receive an OTP in your email after logging in.
+            </p>
 
             @if(session('error'))
                 <div class="error-message">
@@ -270,22 +289,12 @@
             const spinner = document.getElementById('spinner');
             const btnText = document.getElementById('btnText');
 
-            console.log('Login form script loaded');
-
             form.addEventListener('submit', function(e) {
-                console.log('Form submission triggered');
-
-                // Show loading state
                 btn.disabled = true;
                 spinner.style.display = 'inline-block';
                 btnText.textContent = 'Logging in...';
-
-                // Let the form submit naturally - don't prevent default
-                console.log('Form will submit to:', form.action);
-                console.log('Form method:', form.method);
             });
 
-            // Reset button state if form submission fails
             window.addEventListener('pageshow', function() {
                 btn.disabled = false;
                 spinner.style.display = 'none';
@@ -293,11 +302,9 @@
             });
         });
 
-        // Password toggle functionality
         function togglePassword() {
             const passwordInput = document.getElementById('password');
             const toggleIcon = document.getElementById('toggleIcon');
-
             if (passwordInput.type === 'password') {
                 passwordInput.type = 'text';
                 toggleIcon.textContent = '🙈';
