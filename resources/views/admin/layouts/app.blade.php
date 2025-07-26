@@ -90,11 +90,26 @@
                 </a>
 
                 <!-- Subscriptions -->
-                <a href="#"
-                   class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-primary-light hover:text-primary transition-colors duration-200">
-                    <i class="fas fa-crown w-6"></i>
-                    <span class="ml-3">Subscriptions</span>
-                </a>
+                <div x-data="{ open: {{ request()->routeIs('admin.subscriptions*') ? 'true' : 'false' }} }">
+                    <button @click="open = !open"
+                            class="w-full flex items-center justify-between px-4 py-3 text-gray-700 rounded-lg hover:bg-primary-light hover:text-primary transition-colors duration-200">
+                        <div class="flex items-center">
+                            <i class="fas fa-crown w-6"></i>
+                            <span class="ml-3">Subscriptions</span>
+                        </div>
+                        <i class="fas fa-chevron-down transform transition-transform duration-200" :class="open ? 'rotate-180' : ''"></i>
+                    </button>
+                    <div x-show="open" x-collapse class="ml-6 mt-2 space-y-2">
+                        <a href="{{ route('admin.subscriptions.index') }}"
+                           class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.subscriptions.index') || request()->routeIs('admin.subscriptions.show') ? 'bg-primary-light text-primary' : '' }}">
+                            <span>User Subscriptions</span>
+                        </a>
+                        <a href="{{ route('admin.subscriptions.plans.index') }}"
+                           class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.subscriptions.plans*') ? 'bg-primary-light text-primary' : '' }}">
+                            <span>Subscription Plans</span>
+                        </a>
+                    </div>
+                </div>
 
                 <!-- Streams -->
                 <a href="#"
@@ -200,6 +215,13 @@
 
         <!-- Page Content -->
         <main class="p-6">
+            <!-- Page Header -->
+            @hasSection('header')
+                <div class="mb-6">
+                    @yield('header')
+                </div>
+            @endif
+
             <!-- Flash Messages -->
             @if(session('success'))
                 <div class="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded-lg">

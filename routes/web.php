@@ -55,6 +55,3 @@ Route::get('/payment/callback', [SubscriptionController::class, 'handleNombaCall
         ->name('ads.payment.success');
     Route::get('/payment/{payment}/cancel', [AdController::class, 'paymentCancel'])
         ->name('ads.payment.cancel');
-
-// Include admin routes
-require __DIR__.'/admin.php';

@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\Admin\StoryManagementController;
 use App\Http\Controllers\Admin\AdManagementController;
+use App\Http\Controllers\Admin\SubscriptionManagementController;
 
 // Admin Authentication Routes
 Route::prefix('admin')->name('admin.')->group(function () {
@@ -55,6 +56,12 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('/ads/stats', [AdManagementController::class, 'getStats']);
             Route::post('/ads/bulk-approve', [AdManagementController::class, 'bulkApprove']);
             Route::post('/ads/bulk-reject', [AdManagementController::class, 'bulkReject']);
+
+            // Subscription Management API
+            Route::get('/subscriptions', [SubscriptionManagementController::class, 'getSubscriptions']);
+            Route::get('/subscriptions/stats', [SubscriptionManagementController::class, 'getStats']);
+            Route::get('/subscription-plans', [SubscriptionManagementController::class, 'getPlans']);
+            Route::get('/subscription-plans/stats', [SubscriptionManagementController::class, 'getPlanStats']);
         });
 
         // User Management
@@ -96,6 +103,27 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::post('/{ad}/resume', [AdManagementController::class, 'resumeAd'])->name('resume');
             Route::post('/{ad}/stop', [AdManagementController::class, 'stopAd'])->name('stop');
             Route::delete('/{ad}', [AdManagementController::class, 'destroy'])->name('destroy');
+        });
+
+        // Subscription Management
+        Route::prefix('subscriptions')->name('subscriptions.')->group(function () {
+            Route::get('/', [SubscriptionManagementController::class, 'index'])->name('index');
+            Route::get('/get', [SubscriptionManagementController::class, 'getSubscriptions'])->name('get');
+            Route::get('/stats', [SubscriptionManagementController::class, 'getStats'])->name('stats');
+            Route::get('/export', [SubscriptionManagementController::class, 'export'])->name('export');
+            Route::get('/{subscription}', [SubscriptionManagementController::class, 'show'])->name('show');
+            Route::put('/{subscription}/status', [SubscriptionManagementController::class, 'updateSubscriptionStatus'])->name('update-status');
+            Route::put('/{subscription}/extend', [SubscriptionManagementController::class, 'extendSubscription'])->name('extend');
+
+            // Subscription Plans
+            Route::prefix('plans')->name('plans.')->group(function () {
+                Route::get('/', [SubscriptionManagementController::class, 'plansIndex'])->name('index');
+                Route::get('/get', [SubscriptionManagementController::class, 'getPlans'])->name('get');
+                Route::get('/stats', [SubscriptionManagementController::class, 'getPlanStats'])->name('stats');
+                Route::get('/export', [SubscriptionManagementController::class, 'exportPlans'])->name('export');
+                Route::get('/{plan}', [SubscriptionManagementController::class, 'showPlan'])->name('show');
+                Route::put('/{plan}/status', [SubscriptionManagementController::class, 'updatePlanStatus'])->name('update-status');
+            });
         });
 
         // Logout

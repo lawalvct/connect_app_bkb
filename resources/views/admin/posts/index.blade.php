@@ -15,12 +15,12 @@
                 <i class="fas fa-download mr-2"></i>
                 Export
             </button>
-            <button type="button"
+            {{-- <button type="button"
                     onclick="bulkAction()"
                     class="bg-primary hover:bg-primary text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
                 <i class="fas fa-tasks mr-2"></i>
                 Bulk Actions
-            </button>
+            </button> --}}
         </div>
     </div>
 @endsection
