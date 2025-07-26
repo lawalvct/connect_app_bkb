@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Login Form Test</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                padding: 20px;
+            }
+            .form-group {
+                margin-bottom: 15px;
+            }
+            label {
+                display: block;
+                margin-bottom: 5px;
+            }
+            input {
+                padding: 10px;
+                width: 300px;
+                border: 1px solid #ccc;
+            }
+            button {
+                padding: 10px 20px;
+                background: #007cba;
+                color: white;
+                border: none;
+                cursor: pointer;
+            }
+            .status {
+                margin-top: 10px;
+                padding: 10px;
+                background: #f0f0f0;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Admin Login Form Test</h1>
+
+        <form
+            id="loginForm"
+            action="http://127.0.0.1:8000/admin/login-debug"
+            method="POST"
+        >
+            <input type="hidden" name="_token" value="{{ csrf_token() }}" />
+
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    value="admin@connectapp.com"
+                    required
+                />
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password:</label>
+                <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    value="admin123"
+                    required
+                />
+            </div>
+
+            <button type="submit" id="submitBtn">Test Login Submit</button>
+        </form>
+
+        <div id="status" class="status">Ready to test...</div>
+
+        <script>
+            document
+                .getElementById("loginForm")
+                .addEventListener("submit", function (e) {
+                    document.getElementById("status").innerHTML =
+                        "Form submitting...";
+                    console.log("Form submitted to:", this.action);
+                    console.log("Method:", this.method);
+                });
+        </script>
+    </body>
+</html>
