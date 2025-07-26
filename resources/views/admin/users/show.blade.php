@@ -209,12 +209,6 @@
                         Reset Password
                     </button>
 
-                    <button onclick="loginAsUser({{ $user->id }})"
-                            class="w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
-                        <i class="fas fa-sign-in-alt mr-2"></i>
-                        Login as User
-                    </button>
-
                     <hr class="my-4">
 
                     <form action="{{ route('admin.users.destroy', $user) }}" method="POST"
@@ -299,29 +293,6 @@
                 }
             } catch (error) {
                 showToast('Failed to send password reset email', 'error');
-            }
-        }
-    }
-
-    async function loginAsUser(userId) {
-        if (confirm('Login as this user? This will open a new tab.')) {
-            try {
-                const response = await fetch(`/admin/api/users/${userId}/login-as`, {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                        'Content-Type': 'application/json'
-                    }
-                });
-
-                const data = await response.json();
-                if (response.ok && data.login_url) {
-                    window.open(data.login_url, '_blank');
-                } else {
-                    showToast('Failed to generate login link', 'error');
-                }
-            } catch (error) {
-                showToast('Failed to login as user', 'error');
             }
         }
     }

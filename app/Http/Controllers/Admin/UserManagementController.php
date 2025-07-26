@@ -347,36 +347,6 @@ class UserManagementController extends Controller
     }
 
     /**
-     * Login as user (impersonation)
-     */
-    public function loginAsUser(User $user)
-    {
-        try {
-            // Generate a secure token for impersonation
-            $token = Str::random(64);
-
-            // Store the token temporarily (you might want to use cache or database)
-            cache()->put("admin_impersonate_{$token}", [
-                'admin_id' => auth('admin')->id(),
-                'user_id' => $user->id,
-                'expires_at' => now()->addMinutes(5)
-            ], 300); // 5 minutes
-
-            $loginUrl = url("/admin/impersonate/{$token}");
-
-            return response()->json([
-                'success' => true,
-                'login_url' => $loginUrl
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to generate login link'
-            ], 500);
-        }
-    }
-
-    /**
      * Export users to CSV
      */
     public function export(Request $request)

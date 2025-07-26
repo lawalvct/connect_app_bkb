@@ -35,7 +35,6 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::patch('/users/{user}/status', [UserManagementController::class, 'updateStatus']);
             Route::patch('/users/bulk-status', [UserManagementController::class, 'bulkUpdateStatus']);
             Route::post('/users/{user}/reset-password', [UserManagementController::class, 'resetPassword']);
-            Route::post('/users/{user}/login-as', [UserManagementController::class, 'loginAsUser']);
         });
 
         // User Management

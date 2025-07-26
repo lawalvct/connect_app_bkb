@@ -289,11 +289,6 @@
                                                         <i class="fas fa-key mr-2"></i>
                                                         Reset Password
                                                     </button>
-                                                    <button @click="loginAsUser(user); open = false"
-                                                            class="block w-full text-left px-4 py-2 text-sm text-purple-700 hover:bg-purple-50">
-                                                        <i class="fas fa-sign-in-alt mr-2"></i>
-                                                        Login as User
-                                                    </button>
                                                 </div>
                                             </div>
                                         </div>
@@ -592,28 +587,6 @@
                         }
                     } catch (error) {
                         this.showError('Failed to send password reset email');
-                    }
-                }
-            },
-
-            async loginAsUser(user) {
-                if (confirm(`Login as ${user.name}? This will open a new tab.`)) {
-                    try {
-                        const response = await fetch(`/admin/api/users/${user.id}/login-as`, {
-                            method: 'POST',
-                            headers: {
-                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                            }
-                        });
-
-                        const data = await response.json();
-                        if (response.ok && data.login_url) {
-                            window.open(data.login_url, '_blank');
-                        } else {
-                            throw new Error('Failed to generate login link');
-                        }
-                    } catch (error) {
-                        this.showError('Failed to login as user');
                     }
                 }
             },
