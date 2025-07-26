@@ -14,6 +14,11 @@
                 <i class="fas fa-arrow-left mr-2"></i>
                 Back to Subscriptions
             </a>
+            <a href="{{ route('admin.subscriptions.plans.create') }}"
+               class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                <i class="fas fa-plus mr-2"></i>
+                Create New Plan
+            </a>
             <button type="button"
                     onclick="exportPlans()"
                     class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
@@ -235,8 +240,15 @@
                                 View Details
                             </button>
                             <button @click="editPlan(plan)"
-                                    class="bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-2 rounded text-sm font-medium transition-colors">
+                                    class="bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-2 rounded text-sm font-medium transition-colors"
+                                    title="Edit Plan">
                                 <i class="fas fa-edit"></i>
+                            </button>
+                            <button @click="deletePlan(plan)"
+                                    class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded text-sm font-medium transition-colors"
+                                    title="Delete Plan"
+                                    :disabled="plan.active_user_subscriptions_count > 0">
+                                <i class="fas fa-trash"></i>
                             </button>
                         </div>
                     </div>
@@ -386,8 +398,38 @@
                 },
 
                 editPlan(plan) {
-                    // This would redirect to an edit form in a real implementation
-                    alert('Edit functionality would be implemented here');
+                    window.location.href = `{{ route('admin.subscriptions.plans.edit', ':id') }}`.replace(':id', plan.id);
+                },
+
+                deletePlan(plan) {
+                    if (plan.active_user_subscriptions_count > 0) {
+                        alert('Cannot delete plan with active subscriptions. Please wait for subscriptions to expire or transfer users to another plan.');
+                        return;
+                    }
+
+                    if (confirm(`Are you sure you want to delete the plan "${plan.name}"? This action cannot be undone.`)) {
+                        fetch(`{{ route('admin.subscriptions.plans.destroy', ':id') }}`.replace(':id', plan.id), {
+                            method: 'DELETE',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                            }
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                alert('Plan deleted successfully!');
+                                this.loadPlans();
+                                this.loadStats();
+                            } else {
+                                alert('Error: ' + (data.message || 'Failed to delete plan'));
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            alert('An error occurred while deleting the plan');
+                        });
+                    }
                 },
 
                 togglePlanStatus(plan) {

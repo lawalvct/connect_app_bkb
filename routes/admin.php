@@ -118,13 +118,16 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
             // Subscription Plans
             Route::prefix('plans')->name('plans.')->group(function () {
-
+                Route::get('/create', [SubscriptionManagementController::class, 'createPlan'])->name('create');
+                Route::post('/', [SubscriptionManagementController::class, 'storePlan'])->name('store');
                 Route::get('/get', [SubscriptionManagementController::class, 'getPlans'])->name('get');
                 Route::get('/stats', [SubscriptionManagementController::class, 'getPlanStats'])->name('stats');
                 Route::get('/export', [SubscriptionManagementController::class, 'exportPlans'])->name('export');
                 Route::get('/{plan}', [SubscriptionManagementController::class, 'showPlan'])->name('show');
+                Route::get('/{plan}/edit', [SubscriptionManagementController::class, 'editPlan'])->name('edit');
+                Route::put('/{plan}', [SubscriptionManagementController::class, 'updatePlan'])->name('update');
                 Route::put('/{plan}/status', [SubscriptionManagementController::class, 'updatePlanStatus'])->name('update-status');
-
+                Route::delete('/{plan}', [SubscriptionManagementController::class, 'destroyPlan'])->name('destroy');
             });
         });
 

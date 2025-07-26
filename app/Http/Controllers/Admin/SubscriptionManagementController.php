@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Carbon\Carbon;
 
 class SubscriptionManagementController extends Controller
@@ -26,7 +27,6 @@ class SubscriptionManagementController extends Controller
 
     public function show(UserSubscription $subscription)
     {
-        dd(5);
         $subscription->load(['user', 'subscription']);
         return view('admin.subscriptions.show', compact('subscription'));
     }
@@ -35,6 +35,185 @@ class SubscriptionManagementController extends Controller
     {
         $plan->load(['userSubscriptions.user', 'activeUserSubscriptions']);
         return view('admin.subscriptions.plans.show', compact('plan'));
+    }
+
+    public function createPlan()
+    {
+        return view('admin.subscriptions.plans.create');
+    }
+
+    public function storePlan(Request $request)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255|unique:subscribes,name',
+            'slug' => 'nullable|string|max:255|unique:subscribes,slug',
+            'description' => 'required|string|max:1000',
+            'price' => 'required|numeric|min:0',
+            'currency' => 'required|string|max:3',
+            'duration_days' => 'required|integer|min:1',
+            'features' => 'nullable|array',
+            'features.*' => 'string|max:255',
+            'stripe_price_id' => 'nullable|string|max:255',
+            'nomba_plan_id' => 'nullable|string|max:255',
+            'is_active' => 'boolean',
+            'sort_order' => 'nullable|integer|min:0',
+            'badge_color' => 'nullable|string|max:7',
+            'icon' => 'nullable|string|max:255'
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            // Generate slug if not provided
+            $slug = $request->slug ?: Str::slug($request->name);
+
+            // Ensure unique slug
+            $originalSlug = $slug;
+            $counter = 1;
+            while (Subscribe::where('slug', $slug)->exists()) {
+                $slug = $originalSlug . '-' . $counter;
+                $counter++;
+            }
+
+            $planData = $request->all();
+            $planData['slug'] = $slug;
+
+            // Handle features array
+            if ($request->has('features')) {
+                $planData['features'] = array_filter($request->features, function($feature) {
+                    return !empty(trim($feature));
+                });
+            }
+
+            $plan = Subscribe::create($planData);
+
+            Log::info('Subscription plan created', [
+                'plan_id' => $plan->id,
+                'plan_name' => $plan->name,
+                'admin_id' => Auth::id()
+            ]);
+
+            DB::commit();
+
+            return redirect()->route('admin.subscriptions.plans.index')
+                ->with('success', 'Subscription plan created successfully!');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error creating subscription plan: ' . $e->getMessage());
+
+            return redirect()->back()
+                ->withInput()
+                ->with('error', 'Failed to create subscription plan. Please try again.');
+        }
+    }
+
+    public function editPlan(Subscribe $plan)
+    {
+        return view('admin.subscriptions.plans.edit', compact('plan'));
+    }
+
+    public function updatePlan(Request $request, Subscribe $plan)
+    {
+        $request->validate([
+            'name' => 'required|string|max:255|unique:subscribes,name,' . $plan->id,
+            'slug' => 'nullable|string|max:255|unique:subscribes,slug,' . $plan->id,
+            'description' => 'required|string|max:1000',
+            'price' => 'required|numeric|min:0',
+            'currency' => 'required|string|max:3',
+            'duration_days' => 'required|integer|min:1',
+            'features' => 'nullable|array',
+            'features.*' => 'string|max:255',
+            'stripe_price_id' => 'nullable|string|max:255',
+            'nomba_plan_id' => 'nullable|string|max:255',
+            'is_active' => 'boolean',
+            'sort_order' => 'nullable|integer|min:0',
+            'badge_color' => 'nullable|string|max:7',
+            'icon' => 'nullable|string|max:255'
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            $planData = $request->all();
+
+            // Generate slug if not provided or changed
+            if (!$request->slug || $request->slug !== $plan->slug) {
+                $slug = $request->slug ?: Str::slug($request->name);
+
+                // Ensure unique slug (excluding current plan)
+                $originalSlug = $slug;
+                $counter = 1;
+                while (Subscribe::where('slug', $slug)->where('id', '!=', $plan->id)->exists()) {
+                    $slug = $originalSlug . '-' . $counter;
+                    $counter++;
+                }
+                $planData['slug'] = $slug;
+            }
+
+            // Handle features array
+            if ($request->has('features')) {
+                $planData['features'] = array_filter($request->features, function($feature) {
+                    return !empty(trim($feature));
+                });
+            }
+
+            $plan->update($planData);
+
+            Log::info('Subscription plan updated', [
+                'plan_id' => $plan->id,
+                'plan_name' => $plan->name,
+                'admin_id' => Auth::id()
+            ]);
+
+            DB::commit();
+
+            return redirect()->route('admin.subscriptions.plans.index')
+                ->with('success', 'Subscription plan updated successfully!');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error updating subscription plan: ' . $e->getMessage());
+
+            return redirect()->back()
+                ->withInput()
+                ->with('error', 'Failed to update subscription plan. Please try again.');
+        }
+    }
+
+    public function destroyPlan(Subscribe $plan)
+    {
+        try {
+            // Check if plan has active subscriptions
+            $activeSubscriptions = $plan->activeUserSubscriptions()->count();
+
+            if ($activeSubscriptions > 0) {
+                return redirect()->back()
+                    ->with('error', 'Cannot delete plan with active subscriptions. Please wait for subscriptions to expire or transfer users to another plan.');
+            }
+
+            DB::beginTransaction();
+
+            $planName = $plan->name;
+            $plan->delete();
+
+            Log::info('Subscription plan deleted', [
+                'plan_name' => $planName,
+                'admin_id' => Auth::id()
+            ]);
+
+            DB::commit();
+
+            return redirect()->route('admin.subscriptions.plans.index')
+                ->with('success', 'Subscription plan deleted successfully!');
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Error deleting subscription plan: ' . $e->getMessage());
+
+            return redirect()->back()
+                ->with('error', 'Failed to delete subscription plan. Please try again.');
+        }
     }
 
     public function getSubscriptions(Request $request)
