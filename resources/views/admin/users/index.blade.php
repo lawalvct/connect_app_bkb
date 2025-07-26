@@ -391,22 +391,41 @@
                         ...this.filters
                     });
 
-                    const response = await fetch(`/admin/api/users?${params}`);
+                    const response = await fetch(`/admin/api/users?${params}`, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                        }
+                    });
+
+                    if (!response.ok) {
+                        if (response.status === 401) {
+                            window.location.href = '/admin/login';
+                            return;
+                        }
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+
                     const data = await response.json();
 
-                    this.users = data.users.data;
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+
+                    this.users = data.users.data || [];
                     this.pagination = {
-                        current_page: data.users.current_page,
-                        last_page: data.users.last_page,
-                        from: data.users.from,
-                        to: data.users.to,
-                        total: data.users.total
+                        current_page: data.users.current_page || 1,
+                        last_page: data.users.last_page || 1,
+                        from: data.users.from || 0,
+                        to: data.users.to || 0,
+                        total: data.users.total || 0
                     };
-                    this.stats = data.stats;
+                    this.stats = data.stats || { total: 0, active: 0, suspended: 0, banned: 0 };
                     this.selectedUsers = [];
                 } catch (error) {
                     console.error('Failed to load users:', error);
-                    this.showError('Failed to load users');
+                    this.showError('Failed to load users: ' + error.message);
                 } finally {
                     this.loading = false;
                 }
