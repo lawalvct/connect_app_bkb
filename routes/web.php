@@ -63,7 +63,7 @@ Route::post('/api/streams/viewer-token', function () {
     try {
         $channelName = request('channel_name');
         $uid = request('uid', null);
-        
+
         if (!$channelName) {
             return response()->json([
                 'success' => false,
