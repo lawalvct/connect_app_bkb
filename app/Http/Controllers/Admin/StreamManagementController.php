@@ -11,6 +11,7 @@ use App\Helpers\AgoraHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 
@@ -488,11 +489,24 @@ class StreamManagementController extends Controller
     public function getStreamToken($id)
     {
         try {
+            Log::info('Token request received for stream: ' . $id);
+
             $stream = Stream::findOrFail($id);
             $admin = auth('admin')->user();
 
+            if (!$admin) {
+                Log::error('Admin not authenticated for token request');
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Admin authentication required'
+                ], 401);
+            }
+
+            Log::info('Admin authenticated: ' . $admin->id);
+
             // Generate unique UID for admin broadcaster
             $agoraUid = StreamViewer::generateAgoraUid();
+            Log::info('Generated Agora UID: ' . $agoraUid);
 
             // Generate token using AgoraHelper
             $token = AgoraHelper::generateRtcToken(
@@ -503,19 +517,31 @@ class StreamManagementController extends Controller
             );
 
             if (!$token) {
+                Log::error('Failed to generate Agora token');
                 throw new \Exception('Failed to generate Agora token');
             }
 
-            return response()->json([
+            Log::info('Token generated successfully');
+
+            $response = [
                 'success' => true,
                 'token' => $token,
                 'uid' => $agoraUid,
                 'channel_name' => $stream->channel_name,
                 'app_id' => AgoraHelper::getAppId(),
                 'expires_at' => now()->addHour()->toISOString()
-            ]);
+            ];
+
+            Log::info('Returning token response', ['has_token' => !empty($token), 'app_id' => $response['app_id']]);
+
+            return response()->json($response);
 
         } catch (\Exception $e) {
+            Log::error('Error generating token: ' . $e->getMessage(), [
+                'stream_id' => $id,
+                'trace' => $e->getTraceAsString()
+            ]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to generate token: ' . $e->getMessage()

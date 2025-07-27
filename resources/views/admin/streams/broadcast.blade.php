@@ -229,7 +229,7 @@ function liveBroadcast() {
         // Stream info
         streamId: {{ $stream->id }},
         channelName: '{{ $stream->channel_name }}',
-        appId: '{{ config('services.agora.app_id') }}',
+        appId: '{{ env('AGORA_APP_ID') }}',
         token: null,
         uid: null,
 
@@ -289,13 +289,31 @@ function liveBroadcast() {
 
         async getStreamToken() {
             try {
-                const response = await fetch(`/admin/api/streams/${this.streamId}/token`, {
+                console.log('Requesting token for stream:', this.streamId);
+                const url = `/admin/api/streams/${this.streamId}/token`;
+                console.log('Token URL:', url);
+
+                const response = await fetch(url, {
+                    method: 'GET',
                     headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                        'Accept': 'application/json'
                     }
                 });
 
+                console.log('Response status:', response.status);
+                console.log('Response headers:', response.headers);
+
+                if (!response.ok) {
+                    const text = await response.text();
+                    console.log('Error response:', text);
+                    throw new Error(`HTTP ${response.status}: ${text}`);
+                }
+
                 const data = await response.json();
+                console.log('Token response:', data);
+
                 if (data.success) {
                     this.token = data.token;
                     this.uid = data.uid;

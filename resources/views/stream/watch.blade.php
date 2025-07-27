@@ -221,7 +221,7 @@
             // Stream info
             streamId: {{ $stream->id }},
             channelName: '{{ $stream->channel_name }}',
-            appId: '{{ config('services.agora.app_id') }}',
+            appId: '{{ env('AGORA_APP_ID') }}',
             token: null,
             uid: null,
             isLive: {{ $stream->status === 'live' ? 'true' : 'false' }},

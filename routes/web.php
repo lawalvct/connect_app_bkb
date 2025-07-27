@@ -28,6 +28,26 @@ Route::get('/simple-streaming-test', function () {
 Route::get('/debug-streaming', function () {
     return view('debug-streaming');
 });
+
+// Watch live stream by user ID
+Route::get('/watch/{userId}', function ($userId) {
+    return view('watch-stream', compact('userId'));
+});
+
+// Public API endpoint for stream data (bypasses API middleware)
+Route::get('/api/streams/latest', function () {
+    try {
+        $controller = new \App\Http\Controllers\API\V1\StreamController();
+        $request = request();
+        return $controller->latest($request);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Error fetching streams: ' . $e->getMessage()
+        ], 500);
+    }
+});
+
 Route::get('/test-mail', function () {
     try {
         Mail::raw('Test email from ConnectApp', function ($message) {

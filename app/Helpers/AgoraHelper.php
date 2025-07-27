@@ -5,16 +5,21 @@ namespace App\Helpers;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 use App\Models\CallParticipant;
+use BoogieFromZk\AgoraToken\RtcTokenBuilder;
 
 class AgoraHelper
 {
-    private static string $appId;
-    private static string $appCertificate;
+    private static ?string $appId = null;
+    private static ?string $appCertificate = null;
 
     public static function init(): void
     {
-        self::$appId = config('services.agora.app_id');
-        self::$appCertificate = config('services.agora.app_certificate');
+        self::$appId = env('AGORA_APP_ID') ?: $_ENV['AGORA_APP_ID'] ?? null;
+        self::$appCertificate = env('AGORA_APP_CERTIFICATE') ?: $_ENV['AGORA_APP_CERTIFICATE'] ?? null;
+
+        if (!self::$appId || !self::$appCertificate) {
+            throw new \Exception('Agora credentials not configured properly. Check AGORA_APP_ID and AGORA_APP_CERTIFICATE in .env file.');
+        }
     }
 
     /**
@@ -36,91 +41,35 @@ class AgoraHelper
 
             $currentTimestamp = now()->timestamp;
             $privilegeExpiredTs = $currentTimestamp + $expireTimeInSeconds;
-            $roleValue = $role === 'publisher' ? 1 : 2;
 
-            // Try different possible class names (without namespace first)
-            $possibleClasses = [
-                'RtcTokenBuilder',
-                'RtcTokenBuilder2',
-                '\RtcTokenBuilder',
-                '\RtcTokenBuilder2',
-            ];
+            // Use BoogieFromZk package constants
+            $roleValue = $role === 'publisher' ? RtcTokenBuilder::RolePublisher : RtcTokenBuilder::RoleSubscriber;
 
-            $token = null;
-            $usedClass = null;
+            Log::info('Generating token with BoogieFromZk package', [
+                'channel' => $channelName,
+                'uid' => $uid,
+                'role' => $role,
+                'roleValue' => $roleValue,
+                'expireTs' => $privilegeExpiredTs
+            ]);
 
-            foreach ($possibleClasses as $className) {
-                if (class_exists($className)) {
-                    $usedClass = $className;
-                    Log::info('Found Agora class: ' . $className);
-
-                    try {
-                        // Try buildTokenWithUid method
-                        if (method_exists($className, 'buildTokenWithUid')) {
-                            $token = $className::buildTokenWithUid(
-                                self::$appId,
-                                self::$appCertificate,
-                                $channelName,
-                                $uid,
-                                $roleValue,
-                                $privilegeExpiredTs
-                            );
-                        }
-                        // Try buildTokenWithUserAccount method
-                        elseif (method_exists($className, 'buildTokenWithUserAccount')) {
-                            $token = $className::buildTokenWithUserAccount(
-                                self::$appId,
-                                self::$appCertificate,
-                                $channelName,
-                                (string)$uid,
-                                $roleValue,
-                                $privilegeExpiredTs
-                            );
-                        }
-                        // Try build method
-                        elseif (method_exists($className, 'build')) {
-                            $token = $className::build(
-                                self::$appId,
-                                self::$appCertificate,
-                                $channelName,
-                                $uid,
-                                $roleValue,
-                                $privilegeExpiredTs
-                            );
-                        }
-
-                        if ($token) {
-                            Log::info('Token generated successfully with class: ' . $className);
-                            break;
-                        }
-                    } catch (\Exception $e) {
-                        Log::warning('Failed with class ' . $className . ': ' . $e->getMessage());
-                        continue;
-                    }
-                }
-            }
-
-            // If no package class worked, use custom implementation
-            if (!$token) {
-                Log::info('No working Agora package class found, using custom implementation');
-                $token = self::generateTokenCustom($channelName, $uid, $expireTimeInSeconds, $role);
-                $usedClass = 'Custom';
-            }
+            // Use BoogieFromZk\AgoraToken\RtcTokenBuilder
+            $token = RtcTokenBuilder::buildTokenWithUid(
+                self::$appId,
+                self::$appCertificate,
+                $channelName,
+                $uid,
+                $roleValue,
+                $privilegeExpiredTs
+            );
 
             if ($token) {
-                Log::info('Agora token generated successfully', [
-                    'channel' => $channelName,
-                    'uid' => $uid,
-                    'role' => $role,
-                    'class_used' => $usedClass,
-                    'token_length' => strlen($token),
-                    'expires_at' => Carbon::createFromTimestamp($privilegeExpiredTs)->toISOString()
-                ]);
+                Log::info('Token generated successfully');
                 return $token;
+            } else {
+                Log::error('Token generation returned null');
+                return null;
             }
-
-            Log::error('All token generation methods failed');
-            return null;
 
         } catch (\Exception $e) {
             Log::error('Failed to generate Agora token', [
