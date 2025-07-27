@@ -277,22 +277,58 @@ class StreamController extends BaseController
     public function latest(Request $request)
     {
         try {
-            $limit = $request->get('limit', 10);
+            $query = Stream::with(['user'])
+                ->where('deleted_flag', 'N')
+                ->where('status', 'live')
+                ->orderBy('created_at', 'desc');
 
-            $streams = Stream::with('user')
-                ->live()
-                ->orderBy('started_at', 'desc')
-                ->limit($limit)
-                ->get();
+            // Make sure to select all necessary fields including channel_name
+            $streams = $query->select([
+                'id',
+                'title',
+                'description',
+                'banner_image_url',
+                'status',
+                'user_id',
+                'channel_name',  // Make sure this is included
+                'created_at',
+                'updated_at'
+            ])->get();
 
-            return $this->sendResponse('Latest live streams retrieved successfully', [
-                'streams' => $streams->map(function ($stream) {
-                    return $this->formatStreamResponse($stream);
-                })
+            // Transform the data to ensure channel_name is available
+            $transformedStreams = $streams->map(function ($stream) {
+                $streamData = $stream->toArray();
+
+                // Ensure channel_name exists, generate if missing
+                if (empty($streamData['channel_name'])) {
+                    $streamData['channel_name'] = $stream->channel_name ?? "stream_{$stream->id}_" . time();
+                }
+
+                // Add streamer info
+                $streamData['streamer'] = [
+                    'id' => $stream->user->id ?? null,
+                    'name' => $stream->user->name ?? null,
+                    'username' => $stream->user->username ?? null,
+                ];
+
+                return $streamData;
+            });
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'streams' => $transformedStreams,
+                    'total' => $transformedStreams->count()
+                ]
             ]);
 
         } catch (\Exception $e) {
-            return $this->sendError('Failed to retrieve latest streams', $e->getMessage(), 500);
+            \Log::error('Error fetching latest streams: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch streams'
+            ], 500);
         }
     }
 

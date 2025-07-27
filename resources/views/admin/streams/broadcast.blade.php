@@ -290,6 +290,22 @@ function liveBroadcast() {
         async getStreamToken() {
             try {
                 console.log('Requesting token for stream:', this.streamId);
+
+                // First, let's test if Agora is configured
+                const testResponse = await fetch('/admin/api/test-agora', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                        'Accept': 'application/json'
+                    }
+                });
+
+                if (testResponse.ok) {
+                    const testData = await testResponse.json();
+                    console.log('Agora test response:', testData);
+                }
+
                 const url = `/admin/api/streams/${this.streamId}/token`;
                 console.log('Token URL:', url);
 

@@ -14,10 +14,27 @@ class AgoraHelper
 
     public static function init(): void
     {
-        self::$appId = env('AGORA_APP_ID') ?: $_ENV['AGORA_APP_ID'] ?? null;
-        self::$appCertificate = env('AGORA_APP_CERTIFICATE') ?: $_ENV['AGORA_APP_CERTIFICATE'] ?? null;
+        // Try multiple ways to get the environment variables
+        self::$appId = config('services.agora.app_id') ?: env('AGORA_APP_ID') ?: $_ENV['AGORA_APP_ID'] ?? null;
+        self::$appCertificate = config('services.agora.app_certificate') ?: env('AGORA_APP_CERTIFICATE') ?: $_ENV['AGORA_APP_CERTIFICATE'] ?? null;
+
+        // Log the configuration for debugging
+        Log::info('AgoraHelper init', [
+            'app_id_set' => !empty(self::$appId),
+            'app_id_length' => self::$appId ? strlen(self::$appId) : 0,
+            'certificate_set' => !empty(self::$appCertificate),
+            'certificate_length' => self::$appCertificate ? strlen(self::$appCertificate) : 0,
+            'config_app_id' => config('services.agora.app_id'),
+            'env_app_id' => env('AGORA_APP_ID') ? 'Set' : 'Not set'
+        ]);
 
         if (!self::$appId || !self::$appCertificate) {
+            Log::error('Agora credentials not configured properly', [
+                'app_id_empty' => empty(self::$appId),
+                'certificate_empty' => empty(self::$appCertificate),
+                'app_id_value' => self::$appId ? 'Set (' . strlen(self::$appId) . ' chars)' : 'Empty',
+                'certificate_value' => self::$appCertificate ? 'Set (' . strlen(self::$appCertificate) . ' chars)' : 'Empty'
+            ]);
             throw new \Exception('Agora credentials not configured properly. Check AGORA_APP_ID and AGORA_APP_CERTIFICATE in .env file.');
         }
     }

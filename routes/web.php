@@ -29,11 +29,6 @@ Route::get('/debug-streaming', function () {
     return view('debug-streaming');
 });
 
-// Watch live stream by user ID
-Route::get('/watch/{userId}', function ($userId) {
-    return view('watch-stream', compact('userId'));
-});
-
 // Public API endpoint for stream data (bypasses API middleware)
 Route::get('/api/streams/latest', function () {
     try {
@@ -46,6 +41,76 @@ Route::get('/api/streams/latest', function () {
             'message' => 'Error fetching streams: ' . $e->getMessage()
         ], 500);
     }
+});
+
+// Public API endpoint for viewer count (bypasses API middleware)
+// Note: Temporarily disabled due to routing conflicts
+// Route::get('/api/streams/{id}/viewers', function ($id) {
+//     try {
+//         $controller = new \App\Http\Controllers\API\V1\StreamController();
+//         $request = request();
+//         return $controller->viewers($request, $id);
+//     } catch (\Exception $e) {
+//         return response()->json([
+//             'success' => false,
+//             'message' => 'Error fetching viewers: ' . $e->getMessage()
+//         ], 500);
+//     }
+// });
+
+// Public API endpoint for getting viewer tokens (bypasses API middleware)
+Route::post('/api/streams/viewer-token', function () {
+    try {
+        $channelName = request('channel_name');
+        $uid = request('uid', null);
+        
+        if (!$channelName) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Channel name is required'
+            ], 400);
+        }
+
+        // Generate a random UID if not provided
+        if (!$uid) {
+            $uid = rand(100000, 999999);
+        }
+
+        // Initialize AgoraHelper
+        \App\Helpers\AgoraHelper::init();
+
+        // Generate token for viewer (subscriber role)
+        $token = \App\Helpers\AgoraHelper::generateRtcToken($channelName, (int)$uid, 3600, 'subscriber');
+
+        if (!$token) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to generate token'
+            ], 500);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'token' => $token,
+                'app_id' => \App\Helpers\AgoraHelper::getAppId(),
+                'channel_name' => $channelName,
+                'uid' => $uid,
+                'expires_in' => 3600
+            ]
+        ]);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Error generating token: ' . $e->getMessage()
+        ], 500);
+    }
+});
+
+// Watch live stream by user ID
+Route::get('/watch/{userId}', function ($userId) {
+    return view('watch-stream', compact('userId'));
 });
 
 Route::get('/test-mail', function () {

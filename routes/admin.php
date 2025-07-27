@@ -74,6 +74,35 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::post('/streams/{id}/chats', [StreamManagementController::class, 'sendAdminMessage']);
             Route::get('/streams/{id}/token', [StreamManagementController::class, 'getStreamToken']);
             Route::delete('/chats/{chatId}', [StreamManagementController::class, 'deleteChat']);
+
+            // Debug route for Agora configuration
+            Route::get('/test-agora', function () {
+                try {
+                    $appId = env('AGORA_APP_ID');
+                    $appCertificate = env('AGORA_APP_CERTIFICATE');
+
+                    $configAppId = config('services.agora.app_id');
+                    $configCertificate = config('services.agora.app_certificate');
+
+                    $isConfigured = \App\Helpers\AgoraHelper::isConfigured();
+
+                    return response()->json([
+                        'success' => true,
+                        'env_app_id' => $appId ? 'Set (' . strlen($appId) . ' chars)' : 'Not set',
+                        'env_certificate' => $appCertificate ? 'Set (' . strlen($appCertificate) . ' chars)' : 'Not set',
+                        'config_app_id' => $configAppId ? 'Set (' . strlen($configAppId) . ' chars)' : 'Not set',
+                        'config_certificate' => $configCertificate ? 'Set (' . strlen($configCertificate) . ' chars)' : 'Not set',
+                        'agora_helper_configured' => $isConfigured,
+                        'test_timestamp' => now()->toISOString()
+                    ]);
+                } catch (\Exception $e) {
+                    return response()->json([
+                        'success' => false,
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString()
+                    ], 500);
+                }
+            });
         });
 
         // User Management
