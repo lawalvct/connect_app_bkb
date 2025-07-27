@@ -112,8 +112,8 @@
                 </div>
 
                 <!-- Streams -->
-                <a href="#"
-                   class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-primary-light hover:text-primary transition-colors duration-200">
+                <a href="{{ route('admin.streams.index') }}"
+                   class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-primary-light hover:text-primary  {{ request()->routeIs('admin.streams*') ? 'bg-primary-light text-primary' : '' }} transition-colors duration-200">
                     <i class="fas fa-video w-6"></i>
                     <span class="ml-3">Live Streams</span>
                 </a>

@@ -112,8 +112,8 @@
                                         required>
                                     <option value="">Select Currency</option>
                                     <option value="USD" {{ old('currency', $plan->currency) === 'USD' ? 'selected' : '' }}>USD</option>
-                                    <option value="EUR" {{ old('currency', $plan->currency) === 'EUR' ? 'selected' : '' }}>EUR</option>
-                                    <option value="GBP" {{ old('currency', $plan->currency) === 'GBP' ? 'selected' : '' }}>GBP</option>
+                                    {{-- <option value="EUR" {{ old('currency', $plan->currency) === 'EUR' ? 'selected' : '' }}>EUR</option>
+                                    <option value="GBP" {{ old('currency', $plan->currency) === 'GBP' ? 'selected' : '' }}>GBP</option> --}}
                                     <option value="NGN" {{ old('currency', $plan->currency) === 'NGN' ? 'selected' : '' }}>NGN</option>
                                 </select>
                                 @error('currency')

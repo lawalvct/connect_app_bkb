@@ -25,6 +25,9 @@ class Stream extends Model
         'currency',
         'max_viewers',
         'current_viewers',
+        'free_minutes',
+        'stream_type',
+        'go_live_immediately',
         'scheduled_at',
         'started_at',
         'ended_at',
@@ -33,6 +36,7 @@ class Stream extends Model
     protected $casts = [
         'is_paid' => 'boolean',
         'price' => 'decimal:2',
+        'go_live_immediately' => 'boolean',
         'scheduled_at' => 'datetime',
         'started_at' => 'datetime',
         'ended_at' => 'datetime',
@@ -68,6 +72,22 @@ class Stream extends Model
     public function completedPayments(): HasMany
     {
         return $this->hasMany(StreamPayment::class)->where('status', 'completed');
+    }
+
+    // Alias methods for backward compatibility with views
+    public function streamViewers(): HasMany
+    {
+        return $this->viewers();
+    }
+
+    public function streamChats(): HasMany
+    {
+        return $this->chats();
+    }
+
+    public function streamPayments(): HasMany
+    {
+        return $this->payments();
     }
 
     // Scopes

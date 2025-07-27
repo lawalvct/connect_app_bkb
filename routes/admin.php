@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\Admin\StoryManagementController;
 use App\Http\Controllers\Admin\AdManagementController;
 use App\Http\Controllers\Admin\SubscriptionManagementController;
+use App\Http\Controllers\Admin\StreamManagementController;
 
 // Admin Authentication Routes
 Route::prefix('admin')->name('admin.')->group(function () {
@@ -62,6 +63,17 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('/subscriptions/stats', [SubscriptionManagementController::class, 'getStats']);
             Route::get('/subscription-plans', [SubscriptionManagementController::class, 'getPlans']);
             Route::get('/subscription-plans/stats', [SubscriptionManagementController::class, 'getPlanStats']);
+
+            // Stream Management API
+            Route::get('/streams', [StreamManagementController::class, 'getStreams']);
+            Route::get('/streams/stats', [StreamManagementController::class, 'getStats']);
+            Route::get('/streams/{id}/viewers', [StreamManagementController::class, 'getViewers']);
+            Route::get('/streams/{id}/chats', [StreamManagementController::class, 'getChats']);
+            Route::post('/streams/{id}/start', [StreamManagementController::class, 'startStream']);
+            Route::post('/streams/{id}/end', [StreamManagementController::class, 'endStream']);
+            Route::post('/streams/{id}/chats', [StreamManagementController::class, 'sendAdminMessage']);
+            Route::get('/streams/{id}/token', [StreamManagementController::class, 'getStreamToken']);
+            Route::delete('/chats/{chatId}', [StreamManagementController::class, 'deleteChat']);
         });
 
         // User Management
@@ -129,6 +141,18 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::put('/{plan}/status', [SubscriptionManagementController::class, 'updatePlanStatus'])->name('update-status');
                 Route::delete('/{plan}', [SubscriptionManagementController::class, 'destroyPlan'])->name('destroy');
             });
+        });
+
+        // Stream Management
+        Route::prefix('streams')->name('streams.')->group(function () {
+            Route::get('/', [StreamManagementController::class, 'index'])->name('index');
+            Route::get('/create', [StreamManagementController::class, 'create'])->name('create');
+            Route::post('/', [StreamManagementController::class, 'store'])->name('store');
+            Route::get('/{stream}', [StreamManagementController::class, 'show'])->name('show');
+            Route::get('/{stream}/edit', [StreamManagementController::class, 'edit'])->name('edit');
+            Route::get('/{stream}/broadcast', [StreamManagementController::class, 'broadcast'])->name('broadcast');
+            Route::put('/{stream}', [StreamManagementController::class, 'update'])->name('update');
+            Route::delete('/{stream}', [StreamManagementController::class, 'destroy'])->name('destroy');
         });
 
         // Logout
