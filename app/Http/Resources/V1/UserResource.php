@@ -124,6 +124,7 @@ class UserResource extends JsonResource
                         'id' => $image->id,
                         'file_name' => $image->file_name ?? $image->profile,
                         'file_url' => $image->file_url ?? $image->profile_url,
+                        'profile_url' => $this->buildCompleteProfileUrl($image->file_url ?? $image->profile_url, $image->file_name ?? $image->profile),
                         'file_type' => $image->file_type ?? 'image',
                         'is_primary' => $image->is_primary ?? false,
                         'created_at' => $image->created_at ?
@@ -147,6 +148,7 @@ class UserResource extends JsonResource
                         'id' => $upload->id,
                         'file_name' => $upload->file_name,
                         'file_url' => $upload->file_url,
+                        'profile_url' => $this->buildCompleteProfileUrl($upload->file_url, $upload->file_name),
                         'file_type' => $upload->file_type ?? 'image',
                         'file_size' => $upload->file_size ?? null,
                         'is_primary' => $upload->is_primary ?? false,
@@ -236,5 +238,40 @@ class UserResource extends JsonResource
 
         // For local storage
         return url('uploads/profiles/' . $this->profile);
+    }
+
+    /**
+     * Build complete profile URL by concatenating file_url and file_name
+     *
+     * @param string|null $fileUrl
+     * @param string|null $fileName
+     * @return string|null
+     */
+    private function buildCompleteProfileUrl($fileUrl, $fileName)
+    {
+        if (!$fileName) {
+            return null;
+        }
+
+        // If fileName is already a complete URL, return it as is
+        if (filter_var($fileName, FILTER_VALIDATE_URL)) {
+            return $fileName;
+        }
+
+        // If fileUrl is empty or null, use default path
+        if (!$fileUrl) {
+            $fileUrl = 'uploads/profiles/';
+        }
+
+        // Remove trailing slash from fileUrl if present
+        $fileUrl = rtrim($fileUrl, '/');
+
+        // If fileUrl is already a complete URL, concatenate directly
+        if (filter_var($fileUrl, FILTER_VALIDATE_URL)) {
+            return $fileUrl . '/' . $fileName;
+        }
+
+        // For local storage, build complete URL with domain
+        return url($fileUrl . '/' . $fileName);
     }
 }

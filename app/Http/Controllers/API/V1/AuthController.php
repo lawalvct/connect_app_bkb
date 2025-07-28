@@ -75,9 +75,9 @@ public function register(RegisterRequest $request)
         // Prepare registration data
         $registrationData = $request->validated();
 
-       if ($request->hasFile('profile_image')) {
+       if ($request->hasFile('profile_media')) {
     try {
-        $profileImage = $request->file('profile_image');
+        $profileImage = $request->file('profile_media');
 
         // Validate file
         if (!$profileImage->isValid()) {
@@ -91,15 +91,25 @@ public function register(RegisterRequest $request)
             'mime_type' => $profileImage->getMimeType()
         ]);
 
-        // Upload file using our helper
+        // Upload file using our helper to public/uploads/profiles
         $fileData = StorageUploadHelper::uploadFile(
             $profileImage,
             'profiles'
         );
 
-        // Update the user data with the file information
-        $registrationData['profile'] = $fileData['filename'];
-        $registrationData['profile_url'] = 'uploads/profiles/';
+        if ($fileData['success']) {
+            // Store the filename in 'profile' column and the directory path in 'profile_url' column
+            $registrationData['profile'] = $fileData['filename'];
+            $registrationData['profile_url'] = 'uploads/profiles/';
+
+            Log::info('Profile image upload successful', [
+                'filename' => $fileData['filename'],
+                'path' => $fileData['path'],
+                'full_url' => $fileData['full_url']
+            ]);
+        } else {
+            Log::warning('Profile image upload failed but no exception thrown');
+        }
 
     } catch (\Exception $e) {
         Log::error('Profile image upload failed during registration', [
@@ -111,8 +121,6 @@ public function register(RegisterRequest $request)
         Log::info('Continuing registration without profile image');
     }
 }
-
-
         // Process social circles if provided
         if ($request->has('social_circles')) {
             $registrationData['social_circles'] = $request->social_circles;
