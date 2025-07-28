@@ -136,6 +136,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/{id}/details', [ConnectionController::class, 'getUserDetailsById']);
         Route::get('/stats', [ConnectionController::class, 'getUserStats']);
         Route::get('/swipe-stats', [ConnectionController::class, 'getSwipeStats']);
+        Route::post('/discover-by-post', [ConnectionController::class, 'getUsersByPost']);
 
         // Discovery with rate limiting
         Route::middleware(['swipe.limit'])->group(function () {
