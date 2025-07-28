@@ -4,8 +4,9 @@ namespace App\Http\Resources\V1;
 
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 use App\Helpers\TimezoneHelper;
-use App\Models\User; // Make sure User model is imported
+use App\Models\User;
 
 class UserResource extends JsonResource
 {
@@ -109,12 +110,12 @@ class UserResource extends JsonResource
             }),
 
             // Profile Images
-            'profile_images' => $this->when($this->relationLoaded('profileImages'), function () {
+            'profile_images' => $this->when($this->relationLoaded('profileImages'), function () use ($userModelInstance) {
                 if (!$this->profileImages) {
                     return [];
                 }
 
-                return $this->profileImages->map(function ($image) {
+                return $this->profileImages->map(function ($image) use ($userModelInstance) {
                     if (!$image) {
                         return null;
                     }
@@ -132,12 +133,12 @@ class UserResource extends JsonResource
             }),
 
             // Profile Uploads (legacy support)
-            'profile_uploads' => $this->when($this->relationLoaded('profileUploads'), function () {
+            'profile_uploads' => $this->when($this->relationLoaded('profileUploads'), function () use ($userModelInstance) {
                 if (!$this->profileUploads) {
                     return [];
                 }
 
-                return $this->profileUploads->map(function ($upload) {
+                return $this->profileUploads->map(function ($upload) use ($userModelInstance) {
                     if (!$upload) {
                         return null;
                     }
@@ -222,7 +223,15 @@ class UserResource extends JsonResource
 
         // If using cloud storage
         if (config('filesystems.default') === 's3') {
-            return Storage::disk('s3')->url('profiles/' . $this->profile);
+            try {
+                // Try to get a public URL
+                if (Storage::disk('s3')->exists('profiles/' . $this->profile)) {
+                    return config('filesystems.disks.s3.url') . '/profiles/' . $this->profile;
+                }
+            } catch (\Exception $e) {
+                // Log error and continue to fallback
+                Log::warning('Failed to generate S3 URL for profile: ' . $this->profile, ['error' => $e->getMessage()]);
+            }
         }
 
         // For local storage
