@@ -974,4 +974,92 @@ class ConnectionController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * @OA\Get(
+     *     path="/api/v1/connections/sent",
+     *     summary="Get sent connection requests",
+     *     tags={"Connections"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(response=200, description="Sent requests retrieved successfully")
+     * )
+     */
+    public function getSentRequests(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+
+            if (!$user) {
+                return response()->json([
+                    'message' => 'User not authenticated'
+                ], 401);
+            }
+
+            // Get requests where current user is the sender
+            $sentRequests = UserRequest::with(['receiver.profileImages', 'receiver.country'])
+                ->where('sender_id', $user->id)
+                ->where('deleted_flag', 'N')
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            \Log::info('Getting sent requests', [
+                'user_id' => $user->id,
+                'count' => $sentRequests->count()
+            ]);
+
+            if ($sentRequests->isEmpty()) {
+                return response()->json([
+                    'status' => 1,
+                    'message' => 'No sent requests found',
+                    'data' => []
+                ], $this->successStatus);
+            }
+
+            // Transform the data for response
+            $transformedRequests = $sentRequests->map(function ($request) {
+                return [
+                    'id' => $request->id,
+                    'receiver_id' => $request->receiver_id,
+                    'status' => $request->status,
+                    'message' => $request->message,
+                    'request_type' => $request->request_type,
+                    'created_at' => $request->created_at,
+                    'updated_at' => $request->updated_at,
+                    'receiver' => [
+                        'id' => $request->receiver->id,
+                        'name' => $request->receiver->name,
+                        'username' => $request->receiver->username,
+                        'email' => $request->receiver->email,
+                        'profile_image' => $request->receiver->profileImages->first()?->image_url ?? null,
+                        'country' => $request->receiver->country ? [
+                            'id' => $request->receiver->country->id,
+                            'name' => $request->receiver->country->name,
+                            'code' => $request->receiver->country->code,
+                        ] : null,
+                        'bio' => $request->receiver->bio,
+                        'is_verified' => $request->receiver->is_verified ?? false,
+                    ]
+                ];
+            });
+
+            return response()->json([
+                'status' => 1,
+                'message' => 'Sent requests retrieved successfully',
+                'data' => $transformedRequests
+            ], $this->successStatus);
+
+        } catch (\Exception $e) {
+            \Log::error('Get sent requests failed', [
+                'user_id' => $request->user()?->id ?? 'unknown',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to retrieve sent requests',
+                'debug' => config('app.debug') ? $e->getMessage() : null
+            ], 500);
+        }
+    }
 }
