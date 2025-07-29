@@ -185,6 +185,78 @@ class UserHelper
         return $shuffledResults;
     }
 
+    // Fallback method to get any latest users (ID >= 500) when social circle filtering fails
+    public static function getAnyLatestUsers($currentUserId, $lastId = null, $countryId = null, $limit = 10)
+    {
+        Log::info('getAnyLatestUsers called with params:', [
+            'currentUserId' => $currentUserId,
+            'lastId' => $lastId,
+            'countryId' => $countryId,
+            'limit' => $limit
+        ]);
+
+        $query = User::where('deleted_flag', 'N')
+            ->where('id', '!=', $currentUserId)
+            ->where('id', '>=', 500) // Only include users with ID 500 and above (exclude testing users)
+            ->whereNull('deleted_at');
+
+        if ($countryId) {
+            $query->where('country_id', $countryId);
+        }
+
+        // Exclude already swiped users
+        try {
+            $swipedUserIds = UserRequestsHelper::getSwipedUserIds($currentUserId);
+            if (!empty($swipedUserIds)) {
+                $query->whereNotIn('id', $swipedUserIds);
+                Log::info('Excluded swiped users:', ['count' => count($swipedUserIds)]);
+            }
+        } catch (\Exception $e) {
+            Log::error('Error getting swiped users:', ['error' => $e->getMessage()]);
+        }
+
+        // Exclude blocked users
+        try {
+            $blockedUserIds = BlockUserHelper::blockUserList($currentUserId);
+            if (!empty($blockedUserIds)) {
+                $query->whereNotIn('id', $blockedUserIds);
+                Log::info('Excluded blocked users:', ['count' => count($blockedUserIds)]);
+            }
+        } catch (\Exception $e) {
+            Log::error('Error getting blocked users:', ['error' => $e->getMessage()]);
+        }
+
+        // Apply pagination with lastId for latest users
+        if ($lastId) {
+            $query->where('id', '<', $lastId); // Use < for descending order pagination
+        }
+
+        // Get count before applying limit
+        $totalCount = $query->count();
+        Log::info('Total available users found before limit:', ['count' => $totalCount]);
+
+        // Order by ID descending (latest users first) with some randomness
+        $fetchLimit = min($limit * 3, 50); // Get 3x the needed amount or max 50
+
+        $results = $query->with(['profileImages', 'country', 'socialCircles'])
+            ->orderBy('id', 'desc') // Latest users first
+            ->limit($fetchLimit)
+            ->get();
+
+        // Add some randomness by shuffling and taking only the needed amount
+        $shuffledResults = $results->shuffle()->take($limit);
+
+        Log::info('Final results after shuffle:', ['count' => $shuffledResults->count()]);
+
+        // Add connection counts for each user
+        foreach ($shuffledResults as $user) {
+            $user->total_connections = UserRequestsHelper::getConnectionCount($user->id);
+            $user->is_connected_to_current_user = UserRequestsHelper::areUsersConnected($currentUserId, $user->id);
+        }
+
+        return $shuffledResults;
+    }
+
     public static function getById($id)
     {
         return User::where('id', $id)
@@ -430,7 +502,7 @@ public static function getAllDetailByUserId($id)
     public static function getRandomUserFromSocialCircle($socialCircleId, $currentUserId, $excludeUserIds = [])
     {
         try {
-            \Log::info('Getting random user from social circle', [
+            Log::info('Getting random user from social circle', [
                 'social_circle_id' => $socialCircleId,
                 'current_user_id' => $currentUserId,
                 'exclude_user_ids' => $excludeUserIds
@@ -473,7 +545,7 @@ public static function getAllDetailByUserId($id)
                 ->first();
 
             if ($randomUser) {
-                \Log::info('Found random user from social circle', [
+                Log::info('Found random user from social circle', [
                         'user_id' => $randomUser->id,
                         'name' => $randomUser->name
                 ]);
@@ -481,12 +553,12 @@ public static function getAllDetailByUserId($id)
                 // Get additional user details
                 $randomUser = self::getAllDetailByUserId($randomUser->id);
             } else {
-                \Log::info('No random user found in social circle');
+                Log::info('No random user found in social circle');
             }
 
             return $randomUser;
         } catch (\Exception $e) {
-            \Log::error('Error getting random user from social circle', [
+            Log::error('Error getting random user from social circle', [
                 'social_circle_id' => $socialCircleId,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()

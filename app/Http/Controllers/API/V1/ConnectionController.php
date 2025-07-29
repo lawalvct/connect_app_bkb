@@ -306,6 +306,13 @@ class ConnectionController extends Controller
             \Log::info('Results from user\'s own social circles:', ['count' => $getData->count()]);
         }
 
+        // If still no users found, try getting any users with ID >= 500 regardless of social circles
+        if ($getData->isEmpty()) {
+            \Log::info('No users found in any social circles, trying any users >= 500');
+            $getData = UserHelper::getAnyLatestUsers($user->id, $lastId, $countryId, $limit);
+            \Log::info('Results from any users >= 500:', ['count' => $getData->count()]);
+        }
+
         // After getting users, check if it's time to show an ad
         $swipeCount = UserSwipe::getTodayRecord($user->id)->total_swipes ?? 0;
 
