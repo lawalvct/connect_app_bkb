@@ -218,6 +218,17 @@ class UserResource extends JsonResource
             return null;
         }
 
+        // Clean up profile filename
+        $cleanProfile = $this->cleanFileName($this->profile);
+
+        // Check if this is a legacy user (ID 1-3354) and use old server URL
+        if ($this->id >= 1 && $this->id <= 3354) {
+            // For legacy users, always use the old server URL with clean filename
+            return 'https://connectapp.talosmart.xyz/uploads/profiles/' . $cleanProfile;
+        }
+
+        // For new users (ID > 3354), use current project logic
+
         // If profile_url is already set and is a full URL, return it
         if ($this->profile_url && filter_var($this->profile_url, FILTER_VALIDATE_URL)) {
             return $this->profile_url;
@@ -227,17 +238,17 @@ class UserResource extends JsonResource
         if (config('filesystems.default') === 's3') {
             try {
                 // Try to get a public URL
-                if (Storage::disk('s3')->exists('profiles/' . $this->profile)) {
-                    return config('filesystems.disks.s3.url') . '/profiles/' . $this->profile;
+                if (Storage::disk('s3')->exists('profiles/' . $cleanProfile)) {
+                    return config('filesystems.disks.s3.url') . '/profiles/' . $cleanProfile;
                 }
             } catch (\Exception $e) {
                 // Log error and continue to fallback
-                Log::warning('Failed to generate S3 URL for profile: ' . $this->profile, ['error' => $e->getMessage()]);
+                Log::warning('Failed to generate S3 URL for profile: ' . $cleanProfile, ['error' => $e->getMessage()]);
             }
         }
 
-        // For local storage
-        return url('uploads/profiles/' . $this->profile);
+        // For local storage (new users)
+        return url('uploads/profiles/' . $cleanProfile);
     }
 
     /**
@@ -258,6 +269,17 @@ class UserResource extends JsonResource
             return $fileName;
         }
 
+        // Clean up fileName - remove any duplications or malformed parts
+        $cleanFileName = $this->cleanFileName($fileName);
+
+        // Check if this is a legacy user (ID 1-3354) and use old server URL
+        if ($this->id >= 1 && $this->id <= 3354) {
+            // For legacy users, always use the old server URL with clean filename
+            return 'https://connectapp.talosmart.xyz/uploads/profiles/' . $cleanFileName;
+        }
+
+        // For new users (ID > 3354), use current project logic
+
         // If fileUrl is empty or null, use default path
         if (!$fileUrl) {
             $fileUrl = 'uploads/profiles/';
@@ -268,10 +290,42 @@ class UserResource extends JsonResource
 
         // If fileUrl is already a complete URL, concatenate directly
         if (filter_var($fileUrl, FILTER_VALIDATE_URL)) {
-            return $fileUrl . '/' . $fileName;
+            return $fileUrl . '/' . $cleanFileName;
         }
 
         // For local storage, build complete URL with domain
-        return url($fileUrl . '/' . $fileName);
+        return url($fileUrl . '/' . $cleanFileName);
+    }
+
+    /**
+     * Clean filename by removing duplications and invalid characters
+     *
+     * @param string $fileName
+     * @return string
+     */
+    private function cleanFileName($fileName)
+    {
+        if (!$fileName) {
+            return '';
+        }
+
+        // Remove any URL parts if they somehow got into the filename
+        $fileName = basename($fileName);
+
+        // Handle duplicated filenames (e.g., "file.jpegfile.jpeg" -> "file.jpeg")
+        $pathInfo = pathinfo($fileName);
+        $extension = isset($pathInfo['extension']) ? $pathInfo['extension'] : '';
+        $basename = isset($pathInfo['filename']) ? $pathInfo['filename'] : $fileName;
+
+        // Check if the basename contains the extension duplicated
+        if ($extension && str_ends_with($basename, $extension)) {
+            // Remove the duplicated extension from basename
+            $basename = substr($basename, 0, -strlen($extension));
+        }
+
+        // Reconstruct the clean filename
+        $cleanFileName = $extension ? $basename . '.' . $extension : $basename;
+
+        return $cleanFileName;
     }
 }
