@@ -1242,7 +1242,8 @@ class ConnectionController extends Controller
                 return $discoveredUser;
             });
 
-            $formattedUsers = Utility::convertString($usersWithRecentPosts);
+            // Use UserResource collection to properly handle profile URLs with legacy user logic
+            $formattedUsers = \App\Http\Resources\V1\UserResource::collection($usersWithRecentPosts);
 
             return response()->json([
                 'status' => 1,
