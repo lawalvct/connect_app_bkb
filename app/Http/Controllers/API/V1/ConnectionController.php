@@ -247,8 +247,8 @@ class ConnectionController extends Controller
             \Log::info('Users with country filter:', ['count' => $usersWithCountry]);
         }
 
-        // Pass the current user ID to the function
-        $getData = UserHelper::getSocialCircleWiseUsers2($socialIds, $user->id, $lastId, $countryId, $limit);
+        // Get latest users with some randomness instead of purely random
+        $getData = UserHelper::getLatestSocialCircleUsers($socialIds, $user->id, $lastId, $countryId, $limit);
 
         \Log::info('Results from UserHelper:', ['count' => $getData->count()]);
 

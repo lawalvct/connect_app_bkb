@@ -4,17 +4,19 @@ namespace App\Helpers;
 
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\URL;
 use App\Models\User;
+use App\Models\UserSwipe;
 use App\Helpers\CountryHelper;
 use App\Helpers\PostHelper;
 use App\Helpers\SocialCircleHelper;
 use App\Helpers\UserRequestsHelper;
 use App\Helpers\UserSubscriptionHelper;
 use App\Helpers\BlockUserHelper;
-use Auth;
-use Mail;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
 use Carbon\Carbon;
 
 class UserHelper
@@ -100,6 +102,86 @@ class UserHelper
 
     return $results;
 }
+
+    // New method to get latest users with some randomness based on user ID
+    public static function getLatestSocialCircleUsers($socialIds, $currentUserId, $lastId = null, $countryId = null, $limit = 10)
+    {
+        Log::info('getLatestSocialCircleUsers called with params:', [
+            'socialIds' => $socialIds,
+            'currentUserId' => $currentUserId,
+            'lastId' => $lastId,
+            'countryId' => $countryId,
+            'limit' => $limit
+        ]);
+
+        $query = User::where('deleted_flag', 'N')
+            ->where('id', '!=', $currentUserId)
+            ->whereNull('deleted_at');
+
+        // Handle multiple social IDs
+        if (!empty($socialIds) && is_array($socialIds)) {
+            $query->whereHas('socialCircles', function ($q) use ($socialIds) {
+                $q->whereIn('social_circles.id', $socialIds);
+            });
+        }
+
+        if ($countryId) {
+            $query->where('country_id', $countryId);
+        }
+
+        // Exclude already swiped users
+        try {
+            $swipedUserIds = UserRequestsHelper::getSwipedUserIds($currentUserId);
+            if (!empty($swipedUserIds)) {
+                $query->whereNotIn('id', $swipedUserIds);
+                Log::info('Excluded swiped users:', ['count' => count($swipedUserIds)]);
+            }
+        } catch (\Exception $e) {
+            Log::error('Error getting swiped users:', ['error' => $e->getMessage()]);
+        }
+
+        // Exclude blocked users
+        try {
+            $blockedUserIds = BlockUserHelper::blockUserList($currentUserId);
+            if (!empty($blockedUserIds)) {
+                $query->whereNotIn('id', $blockedUserIds);
+                Log::info('Excluded blocked users:', ['count' => count($blockedUserIds)]);
+            }
+        } catch (\Exception $e) {
+            Log::error('Error getting blocked users:', ['error' => $e->getMessage()]);
+        }
+
+        // Apply pagination with lastId for latest users
+        if ($lastId) {
+            $query->where('id', '<', $lastId); // Use < for descending order pagination
+        }
+
+        // Get count before applying limit
+        $totalCount = $query->count();
+        Log::info('Total users found before limit:', ['count' => $totalCount]);
+
+        // Order by ID descending (latest users first) with some randomness
+        // We'll get more users than needed and then shuffle for randomness
+        $fetchLimit = min($limit * 3, 50); // Get 3x the needed amount or max 50
+
+        $results = $query->with(['profileImages', 'country', 'socialCircles'])
+            ->orderBy('id', 'desc') // Latest users first
+            ->limit($fetchLimit)
+            ->get();
+
+        // Add some randomness by shuffling and taking only the needed amount
+        $shuffledResults = $results->shuffle()->take($limit);
+
+        Log::info('Final results after shuffle:', ['count' => $shuffledResults->count()]);
+
+        // Add connection counts for each user
+        foreach ($shuffledResults as $user) {
+            $user->total_connections = UserRequestsHelper::getConnectionCount($user->id);
+            $user->is_connected_to_current_user = UserRequestsHelper::areUsersConnected($currentUserId, $user->id);
+        }
+
+        return $shuffledResults;
+    }
 
     public static function getById($id)
     {
