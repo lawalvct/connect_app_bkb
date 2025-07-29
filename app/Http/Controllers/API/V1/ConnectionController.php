@@ -220,6 +220,29 @@ class ConnectionController extends Controller
 
         \Log::info('Current user in social circle:', ['exists' => $userInCircle]);
 
+        // Debug: Check total users in the specified social circles (without other filters)
+        $totalUsersInSocialCircles = DB::table('users')
+            ->join('user_social_circles', 'users.id', '=', 'user_social_circles.user_id')
+            ->whereIn('user_social_circles.social_id', $socialIds)
+            ->where('users.deleted_flag', 'N')
+            ->where('user_social_circles.deleted_flag', 'N')
+            ->whereNull('users.deleted_at')
+            ->count();
+
+        \Log::info('Total users in social circles (all users):', ['count' => $totalUsersInSocialCircles]);
+
+        // Debug: Check how many users exist with ID >= 500
+        $usersAbove500 = DB::table('users')
+            ->join('user_social_circles', 'users.id', '=', 'user_social_circles.user_id')
+            ->whereIn('user_social_circles.social_id', $socialIds)
+            ->where('users.deleted_flag', 'N')
+            ->where('user_social_circles.deleted_flag', 'N')
+            ->where('users.id', '>=', 500)
+            ->whereNull('users.deleted_at')
+            ->count();
+
+        \Log::info('Users with ID >= 500 in social circles:', ['count' => $usersAbove500]);
+
         // Debug: Count total users in social circles (excluding testing users below ID 500)
         $totalUsersInCircles = DB::table('users')
             ->join('user_social_circles', 'users.id', '=', 'user_social_circles.user_id')
@@ -232,6 +255,27 @@ class ConnectionController extends Controller
             ->count();
 
         \Log::info('Total users in social circles (excluding current user and testing users):', ['count' => $totalUsersInCircles]);
+
+        // Debug: Check what social circles exist and their user counts
+        $socialCircleStats = DB::table('social_circles')
+            ->leftJoin('user_social_circles', 'social_circles.id', '=', 'user_social_circles.social_id')
+            ->whereIn('social_circles.id', $socialIds)
+            ->select('social_circles.id', 'social_circles.name',
+                     DB::raw('COUNT(user_social_circles.user_id) as user_count'))
+            ->groupBy('social_circles.id', 'social_circles.name')
+            ->get();
+
+        \Log::info('Social circle statistics:', ['circles' => $socialCircleStats->toArray()]);
+
+        // Debug: Check what social circles the current user belongs to
+        $userSocialCircles = DB::table('user_social_circles')
+            ->join('social_circles', 'user_social_circles.social_id', '=', 'social_circles.id')
+            ->where('user_social_circles.user_id', $user->id)
+            ->where('user_social_circles.deleted_flag', 'N')
+            ->select('social_circles.id', 'social_circles.name')
+            ->get();
+
+        \Log::info('Current user belongs to social circles:', ['circles' => $userSocialCircles->toArray()]);
 
         // Debug: Count users with country filter (excluding testing users below ID 500)
         if ($countryId) {
@@ -253,6 +297,14 @@ class ConnectionController extends Controller
         $getData = UserHelper::getLatestSocialCircleUsers($socialIds, $user->id, $lastId, $countryId, $limit);
 
         \Log::info('Results from UserHelper:', ['count' => $getData->count()]);
+
+        // If no users found and user has social circles, try getting users from user's own social circles
+        if ($getData->isEmpty() && $userSocialCircles->isNotEmpty()) {
+            \Log::info('No users found in requested circles, trying user\'s own social circles');
+            $userOwnSocialIds = $userSocialCircles->pluck('id')->toArray();
+            $getData = UserHelper::getLatestSocialCircleUsers($userOwnSocialIds, $user->id, $lastId, $countryId, $limit);
+            \Log::info('Results from user\'s own social circles:', ['count' => $getData->count()]);
+        }
 
         // After getting users, check if it's time to show an ad
         $swipeCount = UserSwipe::getTodayRecord($user->id)->total_swipes ?? 0;
@@ -306,6 +358,12 @@ class ConnectionController extends Controller
                         'social_ids' => $socialIds,
                         'current_user_excluded' => $user->id,
                         'testing_users_excluded' => 'Users with ID < 500 excluded'
+                    ],
+                    'detailed_stats' => [
+                        'all_users_in_circles' => $totalUsersInSocialCircles ?? 0,
+                        'users_above_500_in_circles' => $usersAbove500 ?? 0,
+                        'current_user_social_circles' => $userSocialCircles->pluck('id')->toArray() ?? [],
+                        'requested_social_ids' => $socialIds
                     ]
                 ]
             ], $this->successStatus);
@@ -323,6 +381,12 @@ class ConnectionController extends Controller
                         'No users in specified social circles',
                         'No users matching country filter',
                         'Testing users (ID < 500) excluded'
+                    ],
+                    'detailed_stats' => [
+                        'all_users_in_circles' => $totalUsersInSocialCircles ?? 0,
+                        'users_above_500_in_circles' => $usersAbove500 ?? 0,
+                        'current_user_social_circles' => $userSocialCircles->pluck('id')->toArray() ?? [],
+                        'requested_social_ids' => $socialIds
                     ]
                 ]
             ], $this->successStatus);
