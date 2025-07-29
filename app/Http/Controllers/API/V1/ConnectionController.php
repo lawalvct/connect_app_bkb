@@ -107,12 +107,8 @@ class ConnectionController extends Controller
             $user->load(['profileImages', 'country']);
         }
 
-        $userData = Utility::convertString($user);
-
-        // Add country details using CountryResource
-        if ($user->country) {
-            $userData['country_details'] = new CountryResource($user->country);
-        }
+        // Use UserResource to properly handle profile URLs with legacy user logic
+        $userData = new \App\Http\Resources\V1\UserResource($user);
 
         return response()->json([
             'message' => 'Successfully!',
