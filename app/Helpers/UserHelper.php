@@ -104,6 +104,7 @@ class UserHelper
 }
 
     // New method to get latest users with some randomness based on user ID
+    // Excludes testing users (ID < 500) to only show real users
     public static function getLatestSocialCircleUsers($socialIds, $currentUserId, $lastId = null, $countryId = null, $limit = 10)
     {
         Log::info('getLatestSocialCircleUsers called with params:', [
@@ -116,6 +117,7 @@ class UserHelper
 
         $query = User::where('deleted_flag', 'N')
             ->where('id', '!=', $currentUserId)
+            ->where('id', '>=', 500) // Only include users with ID 500 and above (exclude testing users)
             ->whereNull('deleted_at');
 
         // Handle multiple social IDs

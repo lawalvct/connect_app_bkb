@@ -220,19 +220,20 @@ class ConnectionController extends Controller
 
         \Log::info('Current user in social circle:', ['exists' => $userInCircle]);
 
-        // Debug: Count total users in social circles
+        // Debug: Count total users in social circles (excluding testing users below ID 500)
         $totalUsersInCircles = DB::table('users')
             ->join('user_social_circles', 'users.id', '=', 'user_social_circles.user_id')
             ->whereIn('user_social_circles.social_id', $socialIds)
             ->where('users.deleted_flag', 'N')
             ->where('user_social_circles.deleted_flag', 'N')
             ->where('users.id', '!=', $user->id)
+            ->where('users.id', '>=', 500) // Exclude testing users below ID 500
             ->whereNull('users.deleted_at')
             ->count();
 
-        \Log::info('Total users in social circles (excluding current user):', ['count' => $totalUsersInCircles]);
+        \Log::info('Total users in social circles (excluding current user and testing users):', ['count' => $totalUsersInCircles]);
 
-        // Debug: Count users with country filter
+        // Debug: Count users with country filter (excluding testing users below ID 500)
         if ($countryId) {
             $usersWithCountry = DB::table('users')
                 ->join('user_social_circles', 'users.id', '=', 'user_social_circles.user_id')
@@ -240,11 +241,12 @@ class ConnectionController extends Controller
                 ->where('users.deleted_flag', 'N')
                 ->where('user_social_circles.deleted_flag', 'N')
                 ->where('users.id', '!=', $user->id)
+                ->where('users.id', '>=', 500) // Exclude testing users below ID 500
                 ->where('users.country_id', $countryId)
                 ->whereNull('users.deleted_at')
                 ->count();
 
-            \Log::info('Users with country filter:', ['count' => $usersWithCountry]);
+            \Log::info('Users with country filter (excluding testing users):', ['count' => $usersWithCountry]);
         }
 
         // Get latest users with some randomness instead of purely random
@@ -302,7 +304,8 @@ class ConnectionController extends Controller
                     'filters_applied' => [
                         'country_id' => $countryId,
                         'social_ids' => $socialIds,
-                        'current_user_excluded' => $user->id
+                        'current_user_excluded' => $user->id,
+                        'testing_users_excluded' => 'Users with ID < 500 excluded'
                     ]
                 ]
             ], $this->successStatus);
@@ -318,7 +321,8 @@ class ConnectionController extends Controller
                         'All users already swiped',
                         'All users blocked',
                         'No users in specified social circles',
-                        'No users matching country filter'
+                        'No users matching country filter',
+                        'Testing users (ID < 500) excluded'
                     ]
                 ]
             ], $this->successStatus);
