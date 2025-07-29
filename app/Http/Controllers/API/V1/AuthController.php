@@ -939,40 +939,98 @@ public function resendVerificationEmail(Request $request)
                 'registration_step' => 5
             ];
 
-            // Handle profile image upload
-          if ($request->hasFile('profile_image') && $request->file('profile_image')->isValid()) {
-    try {
-        $fileData = StorageUploadHelper::uploadFile(
-            $request->file('profile_image'),
-            'profiles'
-        );
+            // Handle profile image upload (using same logic as main register function)
+            if ($request->hasFile('profile_media')) {
+                try {
+                    $profileImage = $request->file('profile_media');
 
-        $updateData['profile'] = $fileData['filename'];
-        $updateData['profile_url'] = 'uploads/profiles/';
+                    // Validate file
+                    if (!$profileImage->isValid()) {
+                        return $this->sendError('Invalid profile image: ' . $profileImage->getErrorMessage(), null, 400);
+                    }
 
-        Log::info('Profile image uploaded in step 5', [
-            'filename' => $fileData['filename'],
-            'url' => $fileData['url']
-        ]);
-    } catch (\Exception $e) {
-        Log::error('Profile image upload failed in step 5', [
-            'error' => $e->getMessage()
-        ]);
-        // Continue without profile image
-    }
-}
+                    // Log file details for debugging
+                    Log::info('Processing profile image upload in step 5', [
+                        'original_name' => $profileImage->getClientOriginalName(),
+                        'size' => $profileImage->getSize(),
+                        'mime_type' => $profileImage->getMimeType(),
+                        'user_id' => $user->id,
+                        'email' => $user->email
+                    ]);
 
-            $user->update($updateData);
+                    // Upload file using our helper to public/uploads/profiles
+                    $fileData = StorageUploadHelper::uploadFile(
+                        $profileImage,
+                        'profiles'
+                    );
+
+                    if ($fileData['success']) {
+                        // Store the filename in 'profile' column and the directory path in 'profile_url' column
+                        $updateData['profile'] = $fileData['filename'];
+                        $updateData['profile_url'] = 'uploads/profiles/';
+
+                        Log::info('Profile image upload successful in step 5', [
+                            'user_id' => $user->id,
+                            'filename' => $fileData['filename'],
+                            'path' => $fileData['path'],
+                            'full_url' => $fileData['full_url']
+                        ]);
+                    } else {
+                        Log::warning('Profile image upload failed but no exception thrown in step 5', [
+                            'user_id' => $user->id,
+                            'file_data' => $fileData
+                        ]);
+                    }
+
+                } catch (\Exception $e) {
+                    Log::error('Profile image upload failed during step 5', [
+                        'user_id' => $user->id,
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString()
+                    ]);
+
+                    // Continue registration without profile image
+                    Log::info('Continuing step 5 without profile image');
+                }
+            }
+
+            // Update user data
+            $updated = $user->update($updateData);
+
+            if (!$updated) {
+                Log::error('Failed to update user in step 5', [
+                    'user_id' => $user->id,
+                    'update_data' => $updateData
+                ]);
+                return $this->sendError('Failed to update user profile', null, 500);
+            }
+
+            // Refresh user data from database
+            $user->refresh();
+
+            Log::info('Step 5 completed successfully', [
+                'user_id' => $user->id,
+                'profile' => $user->profile,
+                'profile_url' => $user->profile_url,
+                'bio' => $user->bio,
+                'registration_step' => $user->registration_step
+            ]);
 
             return $this->sendResponse('Step 5 completed successfully', [
                 'user_id' => $user->id,
                 'profile_url' => $user->profile_url,
                 'filename' => $user->profile,
-
+                'bio' => $user->bio,
                 'next_step' => 6
             ]);
 
         } catch (\Exception $e) {
+            Log::error('Step 5 registration failed', [
+                'email' => $request->input('email'),
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
             return $this->sendError('Step 5 failed: ' . $e->getMessage(), null, 500);
         }
     }

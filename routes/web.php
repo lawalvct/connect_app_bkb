@@ -4,6 +4,9 @@ use App\Http\Controllers\API\V1\AdController;
 use App\Http\Controllers\API\V1\AuthController;
 use App\Http\Controllers\API\V1\SubscriptionController;
 use Illuminate\Support\Facades\Route;
+use App\Helpers\StorageUploadHelper;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 Route::get('/', function () {
     return view('welcome');
@@ -17,6 +20,49 @@ Route::get('/login', function () {
 // Test route for live streaming functionality
 Route::get('/test-streaming', function () {
     return view('test-streaming');
+});
+
+// Debug route for file upload testing
+Route::get('/test-upload', function () {
+    return view('test-upload');
+});
+
+Route::post('/test-upload', function (Request $request) {
+    try {
+        if ($request->hasFile('profile_image')) {
+            $file = $request->file('profile_image');
+
+            Log::info('Test upload started', [
+                'original_name' => $file->getClientOriginalName(),
+                'size' => $file->getSize(),
+                'mime_type' => $file->getMimeType(),
+                'is_valid' => $file->isValid()
+            ]);
+
+            $result = StorageUploadHelper::uploadFile($file, 'profiles');
+
+            return response()->json([
+                'success' => true,
+                'message' => 'File uploaded successfully',
+                'data' => $result
+            ]);
+        } else {
+            return response()->json([
+                'success' => false,
+                'message' => 'No file provided'
+            ]);
+        }
+    } catch (\Exception $e) {
+        Log::error('Test upload failed', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+
+        return response()->json([
+            'success' => false,
+            'message' => $e->getMessage()
+        ]);
+    }
 });
 
 // Simple test route (no external CDNs)

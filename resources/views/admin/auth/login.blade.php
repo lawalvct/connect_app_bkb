@@ -218,7 +218,7 @@
         <div class="login-card">
             <h1 class="page-title">Admin Login</h1>
             <p class="page-subtitle">
-          
+
                 You will receive an OTP in your email after logging in.
             </p>
 
