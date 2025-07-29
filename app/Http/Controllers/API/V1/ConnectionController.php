@@ -293,7 +293,8 @@ class ConnectionController extends Controller
                 return $userItem;
             });
 
-            $getData = Utility::convertString($getData);
+            // Use UserResource collection to properly handle profile URLs with legacy user logic
+            $getData = \App\Http\Resources\V1\UserResource::collection($getData);
 
             return response()->json([
                 'message' => 'Successfully!',
