@@ -1220,39 +1220,39 @@ class ConnectionController extends Controller
             $socialCircleIds = array_unique($socialCircleIds);
 
             // Build query for users
-            $query = User::where('deleted_flag', 'N')
-                        ->where('id', '!=', $user->id)
-                        ->whereNull('deleted_at');
+            $query = User::where('users.deleted_flag', 'N')
+                        ->where('users.id', '!=', $user->id)
+                        ->whereNull('users.deleted_at');
 
             // Filter by social circles if provided
             if (!empty($socialCircleIds)) {
                 $query->whereHas('socialCircles', function ($q) use ($socialCircleIds) {
                     $q->whereIn('social_id', $socialCircleIds)
-                      ->where('deleted_flag', 'N');
+                      ->where('user_social_circles.deleted_flag', 'N');
                 });
             }
 
             // Filter by country if provided
             if ($countryId) {
-                $query->where('country_id', $countryId);
+                $query->where('users.country_id', $countryId);
             }
 
             // Exclude already swiped users
             $swipedUserIds = UserRequestsHelper::getSwipedUserIds($user->id);
             if (!empty($swipedUserIds)) {
-                $query->whereNotIn('id', $swipedUserIds);
+                $query->whereNotIn('users.id', $swipedUserIds);
             }
 
             // Exclude blocked users
             $blockedUserIds = BlockUserHelper::blockUserList($user->id);
             if (!empty($blockedUserIds)) {
-                $query->whereNotIn('id', $blockedUserIds);
+                $query->whereNotIn('users.id', $blockedUserIds);
             }
 
             // Prioritize users with recent posts
             $usersWithRecentPosts = $query->whereHas('posts', function ($q) {
-                $q->where('created_at', '>=', now()->subDays(3))
-                  ->where('is_published', true);
+                $q->where('posts.created_at', '>=', now()->subDays(3))
+                  ->where('posts.is_published', true);
             })
             ->with(['profileImages', 'country', 'socialCircles'])
             ->inRandomOrder()
@@ -1264,12 +1264,12 @@ class ConnectionController extends Controller
                 $remainingLimit = $limit - $usersWithRecentPosts->count();
                 $existingUserIds = $usersWithRecentPosts->pluck('id')->toArray();
 
-                $additionalUsers = User::where('deleted_flag', 'N')
-                    ->where('id', '!=', $user->id)
-                    ->whereNotIn('id', $existingUserIds)
-                    ->whereNotIn('id', $swipedUserIds)
-                    ->whereNotIn('id', $blockedUserIds)
-                    ->whereNull('deleted_at')
+                $additionalUsers = User::where('users.deleted_flag', 'N')
+                    ->where('users.id', '!=', $user->id)
+                    ->whereNotIn('users.id', $existingUserIds)
+                    ->whereNotIn('users.id', $swipedUserIds)
+                    ->whereNotIn('users.id', $blockedUserIds)
+                    ->whereNull('users.deleted_at')
                     ->with(['profileImages', 'country', 'socialCircles'])
                     ->inRandomOrder()
                     ->limit($remainingLimit)
