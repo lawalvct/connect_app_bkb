@@ -80,6 +80,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('user', [UserController::class, 'show']);
     Route::get('user/{id}', [UserController::class, 'getUserById']);
     Route::post('profile', [ProfileController::class, 'update']);
+    Route::get('profile', [ProfileController::class, 'index']);
     Route::post('profile/social-links', [ProfileController::class, 'updateSocialLinks']);
     Route::post('profile/upload', [ProfileController::class, 'uploadProfilePicture']);
     Route::post('profile/upload-multiple', [ProfileController::class, 'uploadMultipleProfilePictures']);

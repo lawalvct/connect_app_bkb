@@ -3,6 +3,7 @@ namespace App\Http\Controllers\API\V1;
 
 use App\Http\Controllers\API\BaseController;
 use App\Http\Resources\V1\UserResource;
+use App\Http\Resources\V1\UserProfileUploadResource;
 use App\Models\ProfileMultiUpload;
 use App\Models\User;
 use App\Models\UserProfileUpload;
@@ -10,11 +11,78 @@ use App\Helpers\FileUploadHelper;
 use App\Helpers\S3UploadHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 class ProfileController extends BaseController
 {
+    /**
+     * Get all profile images and videos for the authenticated user.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function index(Request $request)
+    {
+        try {
+            $user = $request->user();
+
+            // Validate pagination parameters
+            $validator = Validator::make($request->all(), [
+                'per_page' => 'nullable|integer|min:1|max:100',
+                'page' => 'nullable|integer|min:1',
+                'type' => 'nullable|in:image,video,all',
+            ]);
+
+            if ($validator->fails()) {
+                return $this->sendError('Validation error', $validator->errors(), 422);
+            }
+
+            // Get pagination parameters
+            $perPage = $request->get('per_page', 20);
+            $type = $request->get('type', 'all');
+
+            // Build query
+            $query = UserProfileUpload::where('user_id', $user->id)
+                ->where('deleted_flag', 'N');
+
+            // Filter by type if specified
+            if ($type !== 'all') {
+                $query->where('file_type', $type);
+            }
+
+            // Get user's profile uploads with pagination
+            $profileUploads = $query->orderBy('created_at', 'desc')
+                ->paginate($perPage);
+
+            return $this->sendResponse('Profile uploads retrieved successfully', [
+                'uploads' => UserProfileUploadResource::collection($profileUploads->items()),
+                'pagination' => [
+                    'current_page' => $profileUploads->currentPage(),
+                    'last_page' => $profileUploads->lastPage(),
+                    'per_page' => $profileUploads->perPage(),
+                    'total' => $profileUploads->total(),
+                    'has_more' => $profileUploads->hasMorePages(),
+                    'from' => $profileUploads->firstItem(),
+                    'to' => $profileUploads->lastItem(),
+                ],
+                'stats' => [
+                    'total_images' => UserProfileUpload::where('user_id', $user->id)
+                        ->where('deleted_flag', 'N')
+                        ->where('file_type', 'image')
+                        ->count(),
+                    'total_videos' => UserProfileUpload::where('user_id', $user->id)
+                        ->where('deleted_flag', 'N')
+                        ->where('file_type', 'video')
+                        ->count(),
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return $this->sendError('Failed to retrieve profile uploads', $e->getMessage(), 500);
+        }
+    }
+
     /**
      * Update the authenticated user's profile.
      *
@@ -301,7 +369,7 @@ class ProfileController extends BaseController
             $user->tokens()->delete();
 
             // Log the account deletion
-            \Log::info('User account deleted', [
+            Log::info('User account deleted', [
                 'user_id' => $user->id,
                 'email' => $user->email,
                 'ip_address' => $request->ip(),
@@ -310,7 +378,7 @@ class ProfileController extends BaseController
 
             return $this->sendResponse('Account deleted successfully');
         } catch (\Exception $e) {
-            \Log::error('Account deletion failed', [
+            Log::error('Account deletion failed', [
                 'user_id' => $user->id,
                 'error' => $e->getMessage(),
             ]);
@@ -924,14 +992,14 @@ class ProfileController extends BaseController
             } else {
                 // Upload locally
                 $filename = time() . '_' . $imageFile->getClientOriginalName();
-                $path = 'uploads/profile/';
+                $path = 'uploads/profiles/';
 
                 $imageFile->storeAs($path, $filename, 'public');
 
                 $imageData = [
                     'user_id' => $user->id,
                     'file_name' => $filename,
-                    'file_url' => $path . $filename,
+                    'file_url' => $path ,
                     'file_type' => 'image',
                     'deleted_flag' => 'N',
                 ];
