@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
 
 class Stream extends Model
@@ -88,6 +89,32 @@ class Stream extends Model
     public function streamPayments(): HasMany
     {
         return $this->payments();
+    }
+
+    // Multi-camera relationships
+    public function cameras(): HasMany
+    {
+        return $this->hasMany(StreamCamera::class);
+    }
+
+    public function activeCameras(): HasMany
+    {
+        return $this->hasMany(StreamCamera::class)->where('is_active', true);
+    }
+
+    public function primaryCamera(): HasMany
+    {
+        return $this->hasMany(StreamCamera::class)->where('is_primary', true);
+    }
+
+    public function cameraSwithces(): HasMany
+    {
+        return $this->hasMany(CameraSwitch::class);
+    }
+
+    public function mixerSettings(): HasOne
+    {
+        return $this->hasOne(StreamMixerSetting::class);
     }
 
     // Scopes
@@ -244,5 +271,63 @@ class Stream extends Model
         }
 
         return $this->completedPayments()->where('user_id', $user->id)->exists();
+    }
+
+    // Multi-camera methods
+    public function addCamera(string $cameraName, string $deviceType = null): StreamCamera
+    {
+        return StreamCamera::create([
+            'stream_id' => $this->id,
+            'camera_name' => $cameraName,
+            'stream_key' => StreamCamera::generateStreamKey(),
+            'device_type' => $deviceType,
+            'agora_uid' => StreamCamera::generateAgoraUid(),
+            'is_active' => false,
+            'is_primary' => $this->cameras()->count() === 0, // First camera is primary
+            'resolution' => '720p',
+        ]);
+    }
+
+    public function switchToCamera(int $cameraId, int $switchedBy): bool
+    {
+        $camera = $this->cameras()->find($cameraId);
+
+        if (!$camera || !$camera->is_active) {
+            return false;
+        }
+
+        $currentPrimary = $this->primaryCamera()->first();
+
+        // Record the switch
+        CameraSwitch::create([
+            'stream_id' => $this->id,
+            'from_camera_id' => $currentPrimary?->id,
+            'to_camera_id' => $cameraId,
+            'switched_by' => $switchedBy,
+            'switched_at' => now(),
+        ]);
+
+        // Make the camera primary
+        return $camera->markAsPrimary();
+    }
+
+    public function getCurrentCamera(): ?StreamCamera
+    {
+        return $this->primaryCamera()->first();
+    }
+
+    public function initializeMixerSettings(): StreamMixerSetting
+    {
+        return $this->mixerSettings ?: StreamMixerSetting::createDefault($this->id);
+    }
+
+    public function hasMultipleCameras(): bool
+    {
+        return $this->cameras()->count() > 1;
+    }
+
+    public function getActiveCameraCount(): int
+    {
+        return $this->activeCameras()->count();
     }
 }

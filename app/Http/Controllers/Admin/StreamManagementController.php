@@ -6,6 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\Stream;
 use App\Models\StreamChat;
 use App\Models\StreamViewer;
+use App\Models\StreamCamera;
+use App\Models\CameraSwitch;
+use App\Models\StreamMixerSetting;
 use App\Models\User;
 use App\Helpers\AgoraHelper;
 use Illuminate\Http\Request;
@@ -122,6 +125,22 @@ class StreamManagementController extends Controller
         }
 
         return view('admin.streams.broadcast', compact('stream'));
+    }
+
+    /**
+     * Show camera management page for multi-camera streaming
+     */
+    public function cameraManagement($id)
+    {
+        $stream = Stream::findOrFail($id);
+
+        // Only allow camera management for live or upcoming streams
+        if (!in_array($stream->status, ['upcoming', 'live'])) {
+            return redirect()->route('admin.streams.show', $stream)
+                ->with('error', 'Cannot manage cameras for this stream. Stream must be upcoming or live.');
+        }
+
+        return view('admin.streams.camera-management', compact('stream'));
     }
 
     /**
@@ -545,6 +564,310 @@ class StreamManagementController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to generate token: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    // ===== MULTI-CAMERA MANAGEMENT METHODS =====
+
+    /**
+     * Get cameras for a stream
+     */
+    public function getCameras($streamId)
+    {
+        try {
+            $stream = Stream::findOrFail($streamId);
+            $cameras = $stream->cameras()->orderBy('created_at', 'asc')->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $cameras->map(function ($camera) {
+                    return [
+                        'id' => $camera->id,
+                        'camera_name' => $camera->camera_name,
+                        'stream_key' => $camera->stream_key,
+                        'device_type' => $camera->device_type,
+                        'agora_uid' => $camera->agora_uid,
+                        'is_active' => $camera->is_active,
+                        'is_primary' => $camera->is_primary,
+                        'resolution' => $camera->resolution,
+                        'status' => $camera->status,
+                        'last_seen_at' => $camera->last_seen_at,
+                        'created_at' => $camera->created_at,
+                    ];
+                })
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to get cameras: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Add a new camera to stream
+     */
+    public function addCamera(Request $request, $streamId)
+    {
+        $validator = Validator::make($request->all(), [
+            'camera_name' => 'required|string|max:255',
+            'device_type' => 'nullable|string|in:phone,laptop,camera,tablet,other',
+            'resolution' => 'nullable|string|in:480p,720p,1080p,4K',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $stream = Stream::findOrFail($streamId);
+
+            $camera = $stream->addCamera(
+                $request->camera_name,
+                $request->device_type
+            );
+
+            if ($request->resolution) {
+                $camera->update(['resolution' => $request->resolution]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Camera added successfully',
+                'data' => [
+                    'id' => $camera->id,
+                    'camera_name' => $camera->camera_name,
+                    'stream_key' => $camera->stream_key,
+                    'device_type' => $camera->device_type,
+                    'agora_uid' => $camera->agora_uid,
+                    'is_active' => $camera->is_active,
+                    'is_primary' => $camera->is_primary,
+                    'resolution' => $camera->resolution,
+                    'status' => $camera->status,
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to add camera: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Remove a camera from stream
+     */
+    public function removeCamera($streamId, $cameraId)
+    {
+        try {
+            $stream = Stream::findOrFail($streamId);
+            $camera = $stream->cameras()->findOrFail($cameraId);
+
+            // Don't allow removing the primary camera if there are other cameras
+            if ($camera->is_primary && $stream->cameras()->count() > 1) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Cannot remove primary camera. Switch to another camera first.'
+                ], 400);
+            }
+
+            $camera->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Camera removed successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to remove camera: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Switch to a different camera
+     */
+    public function switchCamera(Request $request, $streamId)
+    {
+        $validator = Validator::make($request->all(), [
+            'camera_id' => 'required|exists:stream_cameras,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $stream = Stream::findOrFail($streamId);
+            $adminId = auth('admin')->user()->id;
+
+            $success = $stream->switchToCamera($request->camera_id, $adminId);
+
+            if (!$success) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Camera is not active or not found'
+                ], 400);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Camera switched successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to switch camera: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Update camera status (connect/disconnect)
+     */
+    public function updateCameraStatus(Request $request, $streamId, $cameraId)
+    {
+        $validator = Validator::make($request->all(), [
+            'is_active' => 'required|boolean',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $stream = Stream::findOrFail($streamId);
+            $camera = $stream->cameras()->findOrFail($cameraId);
+
+            if ($request->is_active) {
+                $camera->connect();
+            } else {
+                $camera->disconnect();
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Camera status updated successfully',
+                'data' => [
+                    'is_active' => $camera->is_active,
+                    'status' => $camera->status,
+                    'last_seen_at' => $camera->last_seen_at,
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update camera status: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get mixer settings for a stream
+     */
+    public function getMixerSettings($streamId)
+    {
+        try {
+            $stream = Stream::findOrFail($streamId);
+            $settings = $stream->initializeMixerSettings();
+
+            return response()->json([
+                'success' => true,
+                'data' => $settings
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to get mixer settings: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Update mixer settings
+     */
+    public function updateMixerSettings(Request $request, $streamId)
+    {
+        $validator = Validator::make($request->all(), [
+            'layout_type' => 'nullable|in:single,picture_in_picture,split_screen,quad_view',
+            'transition_effect' => 'nullable|in:fade,cut,slide,zoom',
+            'transition_duration' => 'nullable|integer|min:100|max:5000',
+            'mixer_config' => 'nullable|array',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $stream = Stream::findOrFail($streamId);
+            $settings = $stream->initializeMixerSettings();
+
+            $updateData = array_filter($validator->validated());
+            $settings->update($updateData);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Mixer settings updated successfully',
+                'data' => $settings->fresh()
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update mixer settings: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get camera switching history
+     */
+    public function getCameraSwitchHistory($streamId)
+    {
+        try {
+            $stream = Stream::findOrFail($streamId);
+            $switches = $stream->cameraSwitches()
+                ->with(['fromCamera', 'toCamera', 'switchedBy'])
+                ->recent(20)
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $switches->map(function ($switch) {
+                    return [
+                        'id' => $switch->id,
+                        'from_camera' => $switch->fromCamera?->camera_name,
+                        'to_camera' => $switch->toCamera->camera_name,
+                        'switched_by' => $switch->switchedBy->name,
+                        'switched_at' => $switch->switched_at,
+                    ];
+                })
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to get switch history: ' . $e->getMessage()
             ], 500);
         }
     }

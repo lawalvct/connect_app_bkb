@@ -22,6 +22,9 @@
                     style="display: none;">
                 <i class="fas fa-stop mr-2"></i>End Broadcast
             </button>
+            <a href="{{ route('admin.streams.cameras', $stream) }}" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                <i class="fas fa-video mr-2"></i>Camera Management
+            </a>
             <a href="{{ route('admin.streams.show', $stream) }}" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
                 <i class="fas fa-arrow-left mr-2"></i>Back to Stream
             </a>

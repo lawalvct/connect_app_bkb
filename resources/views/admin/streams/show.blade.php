@@ -37,6 +37,10 @@
                    class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
                     <i class="fas fa-broadcast-tower mr-2"></i>Broadcast Studio
                 </a>
+                <a href="{{ route('admin.streams.cameras', $stream) }}"
+                   class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                    <i class="fas fa-video mr-2"></i>Camera Management
+                </a>
             @endif
             <a href="{{ route('admin.streams.edit', $stream) }}" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
                 <i class="fas fa-edit mr-2"></i>Edit Stream
@@ -95,7 +99,7 @@
                                 @endif
                                 <div>
                                     <span class="font-medium text-gray-500">Creator:</span>
-                                    <p>{{ $stream->user->name }}</p>
+                                    <p>{{ $stream->user ? $stream->user->name : 'Unknown User' }}</p>
                                 </div>
                                 <div>
                                     <span class="font-medium text-gray-500">Created:</span>
@@ -186,11 +190,11 @@
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <div class="flex items-center">
                                         <div class="flex-shrink-0 h-8 w-8">
-                                            <img class="h-8 w-8 rounded-full" src="{{ $viewer->user->profile_picture ?? '/images/default-avatar.png' }}" alt="">
+                                            <img class="h-8 w-8 rounded-full" src="{{ $viewer->user ? ($viewer->user->profile_picture ?? '/images/default-avatar.png') : '/images/default-avatar.png' }}" alt="">
                                         </div>
                                         <div class="ml-3">
-                                            <div class="text-sm font-medium text-gray-900">{{ $viewer->user->name }}</div>
-                                            <div class="text-sm text-gray-500">{{ $viewer->user->email }}</div>
+                                            <div class="text-sm font-medium text-gray-900">{{ $viewer->user ? $viewer->user->name : 'Unknown User' }}</div>
+                                            <div class="text-sm text-gray-500">{{ $viewer->user ? $viewer->user->email : 'No email' }}</div>
                                         </div>
                                     </div>
                                 </td>
@@ -262,11 +266,11 @@
                     @forelse($stream->streamChats()->with('user')->latest()->limit(50)->get()->reverse() as $chat)
                     <div class="flex items-start space-x-3 mb-3">
                         <div class="flex-shrink-0">
-                            <img class="h-8 w-8 rounded-full" src="{{ $chat->user->profile_picture ?? '/images/default-avatar.png' }}" alt="">
+                            <img class="h-8 w-8 rounded-full" src="{{ $chat->user ? ($chat->user->profile_picture ?? '/images/default-avatar.png') : '/images/default-avatar.png' }}" alt="">
                         </div>
                         <div class="flex-1">
                             <div class="flex items-center space-x-2">
-                                <span class="text-sm font-medium text-gray-900">{{ $chat->user->name }}</span>
+                                <span class="text-sm font-medium text-gray-900">{{ $chat->user ? $chat->user->name : 'Unknown User' }}</span>
                                 @if($chat->is_admin)
                                 <span class="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full font-medium">ADMIN</span>
                                 @endif
@@ -407,11 +411,11 @@
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <div class="flex items-center">
                                         <div class="flex-shrink-0 h-8 w-8">
-                                            <img class="h-8 w-8 rounded-full" src="{{ $payment->user->profile_picture ?? '/images/default-avatar.png' }}" alt="">
+                                            <img class="h-8 w-8 rounded-full" src="{{ $payment->user ? ($payment->user->profile_picture ?? '/images/default-avatar.png') : '/images/default-avatar.png' }}" alt="">
                                         </div>
                                         <div class="ml-3">
-                                            <div class="text-sm font-medium text-gray-900">{{ $payment->user->name }}</div>
-                                            <div class="text-sm text-gray-500">{{ $payment->user->email }}</div>
+                                            <div class="text-sm font-medium text-gray-900">{{ $payment->user ? $payment->user->name : 'Unknown User' }}</div>
+                                            <div class="text-sm text-gray-500">{{ $payment->user ? $payment->user->email : 'No email' }}</div>
                                         </div>
                                     </div>
                                 </td>

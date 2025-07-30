@@ -14,6 +14,8 @@ use Intervention\Image\Encoders\WebpEncoder;
 use FFMpeg\FFMpeg;
 use FFMpeg\Format\Video\X264;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\File;
+use App\Helpers\StorageUploadHelper;
 
 class MediaProcessingService
 {
@@ -21,7 +23,7 @@ class MediaProcessingService
     protected $imageManager;
     protected $allowedImageTypes = ['jpeg', 'jpg', 'png', 'gif', 'webp'];
     protected $allowedVideoTypes = ['mp4', 'mov', 'avi', 'wmv', 'flv', 'webm'];
-    protected $baseUploadPath = 'uploads/post';
+    protected $baseUploadPath = 'posts'; // Changed to match StorageUploadHelper pattern
 
     public function __construct()
     {
@@ -40,7 +42,6 @@ class MediaProcessingService
 
         // Generate unique filename
         $filename = $this->generateFilename($fileExtension);
-        $basePath = "{$this->baseUploadPath}/{$postId}";
 
         // Determine file type
         $type = $this->determineFileType($fileExtension, $mimeType);
@@ -54,30 +55,290 @@ class MediaProcessingService
 
         try {
             if ($type === 'image') {
-                $result = array_merge($result, $this->processImage($file, $basePath, $filename, $fileExtension));
+                $result = array_merge($result, $this->processImageLocal($file, $filename, $fileExtension, $postId));
             } elseif ($type === 'video') {
-                $result = array_merge($result, $this->processVideo($file, $basePath, $filename));
+                $result = array_merge($result, $this->processVideoLocal($file, $filename, $postId));
             } else {
                 // Handle other file types (documents, etc.)
-                $result = array_merge($result, $this->processDocument($file, $basePath, $filename));
+                $result = array_merge($result, $this->processDocumentLocal($file, $filename, $postId));
             }
 
             return $result;
 
         } catch (\Exception $e) {
-            Log::error('Media processing failed', [
+            Log::error('Media processing failed, falling back to simple upload', [
                 'file' => $originalName,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
 
-            throw new \Exception('Failed to process media file: ' . $e->getMessage());
+            // Fallback: Simple file upload without processing
+            try {
+                $folder = "posts/{$postId}";
+                $uploadResult = StorageUploadHelper::uploadFile($file, $folder);
+
+                if (!$uploadResult['success']) {
+                    throw new \Exception('Fallback upload also failed');
+                }
+
+                return [
+                    'type' => 'document', // Treat as document if processing fails
+                    'original_name' => $originalName,
+                    'file_size' => $file->getSize(),
+                    'mime_type' => $mimeType,
+                    'file_path' => $uploadResult['path'],
+                    'file_url' => $uploadResult['full_url'],
+                    'width' => null,
+                    'height' => null,
+                    'duration' => null,
+                    'thumbnail_path' => null,
+                    'thumbnail_url' => null,
+                    'compressed_versions' => null,
+                ];
+
+            } catch (\Exception $fallbackError) {
+                Log::error('Fallback upload also failed', [
+                    'file' => $originalName,
+                    'error' => $fallbackError->getMessage()
+                ]);
+                throw new \Exception('Failed to process media file: ' . $e->getMessage());
+            }
         }
     }
 
     /**
-     * Process image file
+     * Process image file locally using StorageUploadHelper approach
      */
+    protected function processImageLocal(UploadedFile $file, string $filename, string $extension, string $postId): array
+    {
+        try {
+            // Get image dimensions BEFORE uploading (while file is still accessible)
+            $width = null;
+            $height = null;
+            $image = null;
+
+            try {
+                // Read image to get dimensions and for thumbnail creation
+                $image = $this->imageManager->read($file->getPathname());
+                $width = $image->width();
+                $height = $image->height();
+            } catch (\Exception $imageError) {
+                Log::warning('Could not read image for dimensions', [
+                    'file' => $file->getClientOriginalName(),
+                    'error' => $imageError->getMessage()
+                ]);
+                // Continue without dimensions - upload the file anyway
+            }
+
+            // Create subfolder for post images
+            $folder = "posts/{$postId}";
+
+            // Use StorageUploadHelper to save the file
+            $uploadResult = StorageUploadHelper::uploadFile($file, $folder);
+
+            if (!$uploadResult['success']) {
+                throw new \Exception('Failed to upload image file');
+            }
+
+            // Generate thumbnail path
+            $thumbnailFilename = 'thumb_' . $uploadResult['filename'];
+            $thumbnailPath = 'uploads/' . $folder . '/' . $thumbnailFilename;
+            $thumbnailUrl = null;
+
+            // Create thumbnail if image was successfully read
+            if ($image !== null) {
+                try {
+                    $this->createThumbnailLocal($image, $folder, $thumbnailFilename);
+                    $thumbnailUrl = asset($thumbnailPath);
+                } catch (\Exception $thumbError) {
+                    Log::warning('Thumbnail creation failed but continuing', [
+                        'error' => $thumbError->getMessage(),
+                        'file' => $uploadResult['filename']
+                    ]);
+                    // Continue without thumbnail
+                }
+            }
+
+            return [
+                'file_path' => $uploadResult['path'],
+                'file_url' => $uploadResult['full_url'],
+                'width' => $width,
+                'height' => $height,
+                'thumbnail_path' => $thumbnailUrl ? $thumbnailPath : null,
+                'thumbnail_url' => $thumbnailUrl,
+                'compressed_versions' => null, // Can add compression logic later
+            ];
+
+        } catch (\Exception $e) {
+            Log::error('Local image processing failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Process video file locally
+     */
+    protected function processVideoLocal(UploadedFile $file, string $filename, string $postId): array
+    {
+        try {
+            // Create subfolder for post videos
+            $folder = "posts/{$postId}";
+
+            // Use StorageUploadHelper to save the file
+            $uploadResult = StorageUploadHelper::uploadFile($file, $folder);
+
+            if (!$uploadResult['success']) {
+                throw new \Exception('Failed to upload video file');
+            }
+
+            // Get video info (you can expand this to get duration, dimensions etc.)
+            $duration = null;
+            $width = null;
+            $height = null;
+
+            // Generate thumbnail for video (basic implementation)
+            $thumbnailFilename = 'thumb_' . pathinfo($uploadResult['filename'], PATHINFO_FILENAME) . '.jpg';
+            $thumbnailPath = 'uploads/' . $folder . '/' . $thumbnailFilename;
+
+            // Create a basic video thumbnail (you can enhance this later)
+            $this->createVideoThumbnailLocal($uploadResult['path'], $folder, $thumbnailFilename);
+
+            return [
+                'file_path' => $uploadResult['path'],
+                'file_url' => $uploadResult['full_url'],
+                'width' => $width,
+                'height' => $height,
+                'duration' => $duration,
+                'thumbnail_path' => $thumbnailPath,
+                'thumbnail_url' => asset($thumbnailPath),
+                'compressed_versions' => null,
+            ];
+
+        } catch (\Exception $e) {
+            Log::error('Local video processing failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Process document file locally
+     */
+    protected function processDocumentLocal(UploadedFile $file, string $filename, string $postId): array
+    {
+        try {
+            // Create subfolder for post documents
+            $folder = "posts/{$postId}";
+
+            // Use StorageUploadHelper to save the file
+            $uploadResult = StorageUploadHelper::uploadFile($file, $folder);
+
+            if (!$uploadResult['success']) {
+                throw new \Exception('Failed to upload document file');
+            }
+
+            return [
+                'file_path' => $uploadResult['path'],
+                'file_url' => $uploadResult['full_url'],
+                'width' => null,
+                'height' => null,
+                'duration' => null,
+                'thumbnail_path' => null,
+                'thumbnail_url' => null,
+                'compressed_versions' => null,
+            ];
+
+        } catch (\Exception $e) {
+            Log::error('Local document processing failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Create thumbnail locally
+     */
+    protected function createThumbnailLocal($image, string $folder, string $thumbnailFilename): void
+    {
+        try {
+            // Create thumbnail directory
+            $thumbnailDir = public_path('uploads/' . $folder);
+            if (!File::exists($thumbnailDir)) {
+                File::makeDirectory($thumbnailDir, 0755, true);
+            }
+
+            // Clone the image to avoid modifying the original
+            $thumbnail = clone $image;
+
+            // Resize image to thumbnail (maintain aspect ratio)
+            $thumbnail = $thumbnail->scale(width: 300);
+
+            // Save thumbnail
+            $thumbnailPath = $thumbnailDir . '/' . $thumbnailFilename;
+
+            // Encode as JPEG with error handling
+            try {
+                $encoded = $thumbnail->encode(new JpegEncoder(quality: 80));
+                File::put($thumbnailPath, $encoded->toString());
+            } catch (\Exception $encodeError) {
+                // Try saving as PNG if JPEG fails
+                $encoded = $thumbnail->encode(new PngEncoder());
+                $thumbnailPath = str_replace('.jpg', '.png', $thumbnailPath);
+                File::put($thumbnailPath, $encoded->toString());
+            }
+
+        } catch (\Exception $e) {
+            Log::error('Thumbnail creation failed', [
+                'error' => $e->getMessage(),
+                'folder' => $folder,
+                'filename' => $thumbnailFilename
+            ]);
+            // Don't throw - thumbnail is optional
+        }
+    }
+
+    /**
+     * Create video thumbnail locally (basic implementation)
+     */
+    protected function createVideoThumbnailLocal(string $videoPath, string $folder, string $thumbnailFilename): void
+    {
+        try {
+            // Create a simple placeholder thumbnail for videos
+            // You can enhance this later with FFMpeg to extract actual video frames
+            $thumbnailDir = public_path('uploads/' . $folder);
+            if (!File::exists($thumbnailDir)) {
+                File::makeDirectory($thumbnailDir, 0755, true);
+            }
+
+            // Create a simple placeholder image for now
+            $image = $this->imageManager->create(300, 200)->fill('rgb(200, 200, 200)');
+            $thumbnailPath = $thumbnailDir . '/' . $thumbnailFilename;
+            $encoded = $image->encode(new JpegEncoder(quality: 80));
+            File::put($thumbnailPath, $encoded);
+
+        } catch (\Exception $e) {
+            Log::error('Video thumbnail creation failed', [
+                'error' => $e->getMessage(),
+                'video_path' => $videoPath,
+                'filename' => $thumbnailFilename
+            ]);
+            // Don't throw - thumbnail is optional
+        }
+    }
+
+    /* ===== COMMENTED OUT S3 LOGIC - CAN BE RESTORED LATER =====
+
+    /**
+     * Process image file (S3 version - COMMENTED OUT)
+     */
+    /*
     protected function processImage(UploadedFile $file, string $basePath, string $filename, string $extension): array
     {
         $image = $this->imageManager->read($file->getPathname()); // Reads image and auto-orients
@@ -98,6 +359,7 @@ class MediaProcessingService
             'jpg', 'jpeg' => $image->encode(new JpegEncoder(quality: 85)),
             default => $image->encode(new JpegEncoder(quality: 85)) // Fallback
         };
+
         $this->localDisk->put($originalPath, $encodedOriginal->toString());
 
         // Create different sizes
@@ -138,10 +400,12 @@ class MediaProcessingService
             'compressed_versions' => $compressedVersions,
         ];
     }
+    */
 
     /**
-     * Process video file
+     * Process video file (S3 version - COMMENTED OUT)
      */
+    /*
     protected function processVideo(UploadedFile $file, string $basePath, string $filename): array
     {
         // Create directory if it doesn't exist
@@ -169,8 +433,9 @@ class MediaProcessingService
     }
 
     /**
-     * Process document file
+     * Process document file (S3 version - COMMENTED OUT)
      */
+    /*
     protected function processDocument(UploadedFile $file, string $basePath, string $filename): array
     {
         // Create directory if it doesn't exist
@@ -186,8 +451,9 @@ class MediaProcessingService
     }
 
     /**
-     * Generate video thumbnail
+     * Generate video thumbnail (S3 version - COMMENTED OUT)
      */
+    /*
     protected function generateVideoThumbnail(UploadedFile $file, string $basePath, string $filename): ?string
     {
         try {
@@ -217,8 +483,9 @@ class MediaProcessingService
     }
 
     /**
-     * Get video information
+     * Get video information (S3 version - COMMENTED OUT)
      */
+    /*
     protected function getVideoInfo(UploadedFile $file): array
     {
         // Placeholder for FFProbe logic
@@ -237,6 +504,9 @@ class MediaProcessingService
             'duration' => null,
         ];
     }
+    */
+
+    /* ===== END COMMENTED OUT S3 LOGIC ===== */
 
     /**
      * Determine file type based on extension and mime type
@@ -264,147 +534,5 @@ class MediaProcessingService
     protected function generateFilename(string $extension): string
     {
         return Str::uuid() . '.' . $extension;
-    }
-
-    /**
-     * Delete media files from local storage
-     */
-    public function deleteMedia(array $filePaths): void
-    {
-        foreach ($filePaths as $path) {
-            if ($path && $this->localDisk->exists($path)) {
-                $this->localDisk->delete($path);
-            }
-        }
-    }
-
-    /**
-     * Process and upload a file
-     *
-     * @param \Illuminate\Http\UploadedFile $file
-     * @param string $path
-     * @param string $type
-     * @return array
-     */
-    public function processUpload(UploadedFile $file, string $path, string $type = null): array
-    {
-        $fileExtension = strtolower($file->getClientOriginalExtension());
-        $mimeType = $file->getMimeType();
-        $originalName = $file->getClientOriginalName();
-
-        // Generate unique filename
-        $filename = $this->generateFilename($fileExtension);
-
-        // Determine file type if not provided
-        if (!$type) {
-            $type = $this->determineFileType($fileExtension, $mimeType);
-        }
-
-        $result = [
-            'type' => $type,
-            'original_name' => $originalName,
-            'file_size' => $file->getSize(),
-            'mime_type' => $mimeType,
-        ];
-
-        try {
-            // Create directory if it doesn't exist
-            $this->ensureDirectoryExists($path);
-
-            // Upload the file locally
-            $filePath = "{$path}/{$filename}";
-            $this->localDisk->putFileAs($path, $file, $filename);
-
-            $result['file_path'] = $filePath;
-            $result['file_url'] = asset("storage/{$filePath}");
-
-            // For images, we can generate thumbnails
-            if ($type === 'image') {
-                try {
-                    $image = $this->imageManager->read($file->getPathname());
-                    $result['width'] = $image->width();
-                    $result['height'] = $image->height();
-
-                    // Create directory if it doesn't exist
-                    $this->ensureDirectoryExists("{$path}/thumbnails");
-
-                    // Generate thumbnail
-                    $thumbnailPath = "{$path}/thumbnails/{$filename}";
-                    $thumbnail = clone $image;
-                    $thumbnail->cover(300, 300);
-                    $thumbnailData = $thumbnail->encode(new JpegEncoder(quality: 80));
-                    $this->localDisk->put($thumbnailPath, $thumbnailData->toString());
-                    $result['thumbnail_url'] = asset("storage/{$thumbnailPath}");
-                } catch (\Exception $e) {
-                    // Log but continue if thumbnail generation fails
-                    Log::warning('Thumbnail generation failed', [
-                        'file' => $originalName,
-                        'error' => $e->getMessage()
-                    ]);
-                }
-            }
-
-            // For videos, we can generate a thumbnail frame
-            if ($type === 'video') {
-                $thumbnailPath = $this->generateVideoThumbnail($file, $path, $filename);
-                if ($thumbnailPath) {
-                    $result['thumbnail_url'] = asset("storage/{$thumbnailPath}");
-                }
-            }
-
-            return $result;
-
-        } catch (\Exception $e) {
-            Log::error('File upload failed', [
-                'file' => $originalName,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-
-            throw new \Exception('Failed to upload file: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Ensure directory exists
-     */
-    protected function ensureDirectoryExists(string $path): void
-    {
-        if (!$this->localDisk->exists($path)) {
-            $this->localDisk->makeDirectory($path, 0755, true);
-        }
-    }
-
-    /**
-     * Delete a file
-     */
-    public function deleteFile(string $filePath): bool
-    {
-        try {
-            if ($filePath && $this->localDisk->exists($filePath)) {
-                $this->localDisk->delete($filePath);
-
-                // Also try to delete thumbnail if it exists
-                              $pathInfo = pathinfo($filePath);
-                $thumbnailPath = $pathInfo['dirname'] . '/thumbnails/' . $pathInfo['basename'];
-                if ($this->localDisk->exists($thumbnailPath)) {
-                    $this->localDisk->delete($thumbnailPath);
-                }
-
-                Log::info('File deleted successfully', ['file_path' => $filePath]);
-                return true;
-            }
-
-            Log::warning('File not found for deletion', ['file_path' => $filePath]);
-            return false;
-
-        } catch (\Exception $e) {
-            Log::error('File deletion failed', [
-                'file_path' => $filePath,
-                'error' => $e->getMessage()
-            ]);
-
-            return false;
-        }
     }
 }

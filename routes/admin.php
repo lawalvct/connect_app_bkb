@@ -75,6 +75,16 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('/streams/{id}/token', [StreamManagementController::class, 'getStreamToken']);
             Route::delete('/chats/{chatId}', [StreamManagementController::class, 'deleteChat']);
 
+            // Multi-Camera Management API
+            Route::get('/streams/{id}/cameras', [StreamManagementController::class, 'getCameras']);
+            Route::post('/streams/{id}/cameras', [StreamManagementController::class, 'addCamera']);
+            Route::delete('/streams/{id}/cameras/{cameraId}', [StreamManagementController::class, 'removeCamera']);
+            Route::post('/streams/{id}/switch-camera', [StreamManagementController::class, 'switchCamera']);
+            Route::put('/streams/{id}/cameras/{cameraId}/status', [StreamManagementController::class, 'updateCameraStatus']);
+            Route::get('/streams/{id}/mixer-settings', [StreamManagementController::class, 'getMixerSettings']);
+            Route::put('/streams/{id}/mixer-settings', [StreamManagementController::class, 'updateMixerSettings']);
+            Route::get('/streams/{id}/camera-switches', [StreamManagementController::class, 'getCameraSwitchHistory']);
+
             // Debug route for Agora configuration
             Route::get('/test-agora', function () {
                 try {
@@ -180,6 +190,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('/{stream}', [StreamManagementController::class, 'show'])->name('show');
             Route::get('/{stream}/edit', [StreamManagementController::class, 'edit'])->name('edit');
             Route::get('/{stream}/broadcast', [StreamManagementController::class, 'broadcast'])->name('broadcast');
+            Route::get('/{stream}/cameras', [StreamManagementController::class, 'cameraManagement'])->name('cameras');
             Route::put('/{stream}', [StreamManagementController::class, 'update'])->name('update');
             Route::delete('/{stream}', [StreamManagementController::class, 'destroy'])->name('destroy');
         });
