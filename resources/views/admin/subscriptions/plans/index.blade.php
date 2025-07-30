@@ -89,7 +89,7 @@
                 </div>
 
                 <!-- Quick Stats -->
-                <div class="mt-6 grid grid-cols-2 md:grid-cols-8 gap-4">
+                <div class="mt-6 grid grid-cols-2 md:grid-cols-6 gap-4">
                     <div class="text-center p-3 bg-blue-50 rounded-md">
                         <p class="text-sm text-blue-600">Total Plans</p>
                         <p class="text-xl font-bold text-blue-900" x-text="stats.total_plans || '0'">0</p>
@@ -110,20 +110,20 @@
                         <p class="text-sm text-indigo-600">Total Revenue</p>
                         <p class="text-xl font-bold text-indigo-900" x-text="'$' + (stats.total_plan_revenue || '0')">$0</p>
                     </div>
-                    <div class="text-center p-3 bg-yellow-50 rounded-md">
+                    {{-- <div class="text-center p-3 bg-yellow-50 rounded-md">
                         <p class="text-sm text-yellow-600">Avg Price</p>
                         <p class="text-xl font-bold text-yellow-900" x-text="'$' + (stats.avg_plan_price ? Math.round(stats.avg_plan_price) : '0')">$0</p>
-                    </div>
+                    </div> --}}
                     <div class="text-center p-3 bg-pink-50 rounded-md">
                         <p class="text-sm text-pink-600">Popular Plan</p>
                         <p class="text-sm font-bold text-pink-900" x-text="stats.most_popular_plan || 'N/A'">N/A</p>
                     </div>
-                    <div class="text-center p-3 bg-orange-50 rounded-md">
+                    {{-- <div class="text-center p-3 bg-orange-50 rounded-md">
                         <p class="text-sm text-orange-600">Growth</p>
                         <p class="text-xl font-bold text-orange-900">
                             <span x-text="stats.subscription_growth ? (stats.subscription_growth > 0 ? '+' : '') + stats.subscription_growth + '%' : '0%'">0%</span>
                         </p>
-                    </div>
+                    </div> --}}
                 </div>
             </div>
         </div>

@@ -215,12 +215,12 @@
                         </div>
 
                         @if($ad->target_audience)
-                            <div class="mt-6">
+                            {{-- <div class="mt-6">
                                 <h4 class="font-medium text-gray-900 mb-3">Target Audience</h4>
                                 <div class="bg-gray-50 p-4 rounded-md">
                                     <pre class="text-sm text-gray-700 whitespace-pre-wrap">{{ json_encode($ad->target_audience, JSON_PRETTY_PRINT) }}</pre>
                                 </div>
-                            </div>
+                            </div> --}}
                         @endif
                     </div>
                 </div>

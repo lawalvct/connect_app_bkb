@@ -185,7 +185,7 @@ class UserManagementController extends Controller
             }
 
             // Get paginated results - include social circles relationship
-            $users = $query->select(['id', 'name', 'email', 'is_active', 'is_banned', 'banned_until', 'created_at', 'email_verified_at'])
+            $users = $query->select(['id', 'name', 'email', 'profile', 'profile_url', 'is_active', 'is_banned', 'banned_until', 'created_at', 'email_verified_at'])
                 ->with(['socialCircles:id,name,color']) // Load social circles with only needed fields
                 ->withCount('socialCircles') // Count social circles
                 ->orderBy('created_at', 'desc')
@@ -197,8 +197,10 @@ class UserManagementController extends Controller
                 // Set default counts
                 $user->posts_count = 0;
                 $user->streams_count = 0;
-                // Add default profile picture if not set
-                $user->profile_picture = '/images/default-avatar.png';
+
+                // Add profile picture using the same logic as UserResource
+                $user->profile_picture = $this->getProfileUrl($user);
+
                 // Set default phone if not available
                 $user->phone = $user->phone ?? 'No phone';
 
@@ -484,5 +486,82 @@ class UserManagementController extends Controller
             Log::error('Error exporting users: ' . $e->getMessage());
             return redirect()->back()->with('error', 'Failed to export users');
         }
+    }
+
+    /**
+     * Get the profile URL for the user (same logic as UserResource)
+     *
+     * @param User $user
+     * @return string
+     */
+    private function getProfileUrl($user)
+    {
+        if (!$user->profile) {
+            return '/images/default-avatar.png';
+        }
+
+        // Clean up profile filename
+        $cleanProfile = $this->cleanFileName($user->profile);
+
+        // Check if this is a legacy user (ID 1-3354) and use old server URL
+        if ($user->id >= 1 && $user->id <= 3354) {
+            // For legacy users, always use the old server URL with clean filename
+            return 'https://connectapp.talosmart.xyz/uploads/profiles/' . $cleanProfile;
+        }
+
+        // For new users (ID > 3354), use current project logic
+
+        // If profile_url is already set and is a full URL, return it
+        if ($user->profile_url && filter_var($user->profile_url, FILTER_VALIDATE_URL)) {
+            return $user->profile_url;
+        }
+
+        // If using cloud storage
+        if (config('filesystems.default') === 's3') {
+            try {
+                // Try to get a public URL
+                if (\Illuminate\Support\Facades\Storage::disk('s3')->exists('profiles/' . $cleanProfile)) {
+                    return config('filesystems.disks.s3.url') . '/profiles/' . $cleanProfile;
+                }
+            } catch (\Exception $e) {
+                // Log error and continue to fallback
+                Log::warning('Failed to generate S3 URL for profile: ' . $cleanProfile, ['error' => $e->getMessage()]);
+            }
+        }
+
+        // For local storage (new users)
+        return url('uploads/profiles/' . $cleanProfile);
+    }
+
+    /**
+     * Clean filename by removing duplications and invalid characters (same logic as UserResource)
+     *
+     * @param string $fileName
+     * @return string
+     */
+    private function cleanFileName($fileName)
+    {
+        if (!$fileName) {
+            return '';
+        }
+
+        // Remove any URL parts if they somehow got into the filename
+        $fileName = basename($fileName);
+
+        // Handle duplicated filenames (e.g., "file.jpegfile.jpeg" -> "file.jpeg")
+        $pathInfo = pathinfo($fileName);
+        $extension = isset($pathInfo['extension']) ? $pathInfo['extension'] : '';
+        $basename = isset($pathInfo['filename']) ? $pathInfo['filename'] : $fileName;
+
+        // Check if the basename contains the extension duplicated
+        if ($extension && str_ends_with($basename, $extension)) {
+            // Remove the duplicated extension from basename
+            $basename = substr($basename, 0, -strlen($extension));
+        }
+
+        // Reconstruct the clean filename
+        $cleanFileName = $extension ? $basename . '.' . $extension : $basename;
+
+        return $cleanFileName;
     }
 }

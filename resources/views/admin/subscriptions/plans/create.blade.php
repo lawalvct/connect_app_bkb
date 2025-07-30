@@ -106,8 +106,8 @@
                                         required>
                                     <option value="">Select Currency</option>
                                     <option value="USD" {{ old('currency') === 'USD' ? 'selected' : '' }}>USD</option>
-                                    <option value="EUR" {{ old('currency') === 'EUR' ? 'selected' : '' }}>EUR</option>
-                                    <option value="GBP" {{ old('currency') === 'GBP' ? 'selected' : '' }}>GBP</option>
+                                    {{-- <option value="EUR" {{ old('currency') === 'EUR' ? 'selected' : '' }}>EUR</option>
+                                    <option value="GBP" {{ old('currency') === 'GBP' ? 'selected' : '' }}>GBP</option> --}}
                                     <option value="NGN" {{ old('currency') === 'NGN' ? 'selected' : '' }}>NGN</option>
                                 </select>
                                 @error('currency')

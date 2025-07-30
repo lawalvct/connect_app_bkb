@@ -131,8 +131,8 @@
                                             required>
                                         <option value="NGN">NGN - Nigerian Naira</option>
                                         <option value="USD">USD - US Dollar</option>
-                                        <option value="EUR">EUR - Euro</option>
-                                        <option value="GBP">GBP - British Pound</option>
+                                        {{-- <option value="EUR">EUR - Euro</option>
+                                        <option value="GBP">GBP - British Pound</option> --}}
                                     </select>
                                     <div x-show="errors.currency" class="text-red-500 text-sm mt-1" x-text="errors.currency?.[0]"></div>
                                 </div>

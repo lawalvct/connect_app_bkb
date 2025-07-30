@@ -122,7 +122,7 @@
                 <a href="#"
                    class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-primary-light hover:text-primary transition-colors duration-200">
                     <i class="fas fa-chart-bar w-6"></i>
-                    <span class="ml-3">Analytics</span>
+                    <span class="ml-3">Notifications</span>
                 </a>
 
                 <!-- Settings -->

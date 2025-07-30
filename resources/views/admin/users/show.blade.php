@@ -34,7 +34,7 @@
                         <!-- Profile Picture -->
                         <div class="flex-shrink-0">
                             <img class="h-20 w-20 rounded-full object-cover border-4 border-gray-200"
-                                 src="{{ $user->profile_picture ?? '/images/default-avatar.png' }}"
+                                 src="https://connectapp.talosmart.xyz/uploads/profiles/{{ $user->profile}}"
                                  alt="{{ $user->name }}">
                         </div>
 
