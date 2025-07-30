@@ -12,6 +12,7 @@ use App\Helpers\FileUploadHelper;
 use App\Http\Resources\V1\ConversationResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 
 class MessageController extends BaseController
 {
@@ -67,31 +68,97 @@ class MessageController extends BaseController
      */
     public function store(Request $request, $conversationId)
     {
-        // Dynamic validation based on message type
+        // Debug: Log all request data
+        Log::info('MessageController store - Request data:', [
+            'all_data' => $request->all(),
+            'input_type' => $request->input('type'),
+            'has_file' => $request->hasFile('file'),
+            'content_type' => $request->header('Content-Type'),
+            'method' => $request->method()
+        ]);
+
+        // Handle Postman's special form-data format
+        $requestData = $request->all();
+        $parsedData = [];
+
+        // Check if request data is in Postman's UID format
+        if (is_array($requestData) && isset($requestData[0]) && isset($requestData[0]['uid'])) {
+            Log::info('Detected Postman UID format, parsing...');
+
+            foreach ($requestData as $item) {
+                if (isset($item['name']) && isset($item['value'])) {
+                    if ($item['type'] === 'file' && isset($item['value'][0])) {
+                        // Handle file - we need to get it differently for Postman format
+                        $parsedData[$item['name']] = $request->file($item['name']);
+                    } else {
+                        $parsedData[$item['name']] = $item['value'];
+                    }
+                }
+            }
+
+            Log::info('Parsed Postman data:', $parsedData);
+        } else {
+            $parsedData = $requestData;
+        }
+
+        // Get the type from parsed data
+        $messageType = $parsedData['type'] ?? $request->input('type');
+
+        // Debug: Check if messageType is null or empty
+        if (empty($messageType)) {
+            Log::error('MessageController store - Type is empty or null', [
+                'messageType' => $messageType,
+                'request_all' => $request->all(),
+                'parsed_data' => $parsedData,
+                'request_keys' => array_keys($request->all())
+            ]);
+        }
+
+        // Basic validation that always applies
         $rules = [
             'type' => 'required|in:text,image,video,audio,file,location',
             'reply_to_message_id' => 'nullable|exists:messages,id',
         ];
 
         // Add specific validation based on type
-        if ($request->type === 'text') {
+        if ($messageType === 'text') {
             $rules['message'] = 'required|string|max:4000';
-        } elseif (in_array($request->type, ['image', 'video', 'audio', 'file'])) {
+        } elseif (in_array($messageType, ['image', 'video', 'audio', 'file'])) {
             $rules['file'] = 'required|file';
             $rules['message'] = 'nullable|string|max:1000'; // Optional caption
 
             // Add file-specific validation
-            $this->addFileValidationRules($rules, $request->type);
-        } elseif ($request->type === 'location') {
+            $this->addFileValidationRules($rules, $messageType);
+        } elseif ($messageType === 'location') {
             $rules['latitude'] = 'required|numeric|between:-90,90';
             $rules['longitude'] = 'required|numeric|between:-180,180';
             $rules['address'] = 'nullable|string|max:500';
             $rules['message'] = 'nullable|string|max:1000';
         }
 
-        $validator = Validator::make($request->all(), $rules);
+        // Debug: Log the rules being applied
+        Log::info('MessageController store - Validation rules:', ['rules' => $rules]);
+
+        // Create validation data from parsed data or request
+        $validationData = [];
+        if (!empty($parsedData)) {
+            $validationData = $parsedData;
+            // For file uploads, we still need to get from request
+            if ($request->hasFile('file')) {
+                $validationData['file'] = $request->file('file');
+            }
+        } else {
+            $validationData = $request->all();
+        }
+
+        $validator = Validator::make($validationData, $rules);
 
         if ($validator->fails()) {
+            Log::error('MessageController store - Validation failed:', [
+                'errors' => $validator->errors()->toArray(),
+                'validation_data' => $validationData,
+                'rules_applied' => $rules
+            ]);
             return $this->sendError('Validation Error', $validator->errors(), 422);
         }
 
@@ -110,25 +177,28 @@ class MessageController extends BaseController
             $messageData = [
                 'conversation_id' => $conversationId,
                 'user_id' => $request->user()->id,
-                'type' => $request->type,
-                'reply_to_message_id' => $request->reply_to_message_id,
+                'type' => $parsedData['type'] ?? $request->input('type'),
+                'reply_to_message_id' => $parsedData['reply_to_message_id'] ?? $request->input('reply_to_message_id'),
             ];
 
+            // Get the final type
+            $finalType = $parsedData['type'] ?? $request->input('type');
+
             // Handle different message types
-            if ($request->type === 'text') {
-                $messageData['message'] = $request->message;
+            if ($finalType === 'text') {
+                $messageData['message'] = $parsedData['message'] ?? $request->input('message');
                 $messageData['metadata'] = null;
-            } elseif (in_array($request->type, ['image', 'video', 'audio', 'file'])) {
+            } elseif (in_array($finalType, ['image', 'video', 'audio', 'file'])) {
                 // Handle file upload
-                $metadata = $this->handleFileUpload($request->file('file'), $request->type, $request->user()->id);
-                $messageData['message'] = $request->message ?: null; // Optional caption
+                $metadata = $this->handleFileUpload($request->file('file'), $finalType, $request->user()->id);
+                $messageData['message'] = $parsedData['message'] ?? $request->input('message') ?: null; // Optional caption
                 $messageData['metadata'] = $metadata;
-            } elseif ($request->type === 'location') {
-                $messageData['message'] = $request->message ?: null;
+            } elseif ($finalType === 'location') {
+                $messageData['message'] = $parsedData['message'] ?? $request->input('message') ?: null;
                 $messageData['metadata'] = [
-                    'latitude' => $request->latitude,
-                    'longitude' => $request->longitude,
-                    'address' => $request->address,
+                    'latitude' => $parsedData['latitude'] ?? $request->input('latitude'),
+                    'longitude' => $parsedData['longitude'] ?? $request->input('longitude'),
+                    'address' => $parsedData['address'] ?? $request->input('address'),
                 ];
             }
 
@@ -159,13 +229,26 @@ class MessageController extends BaseController
      */
     private function addFileValidationRules(&$rules, $type)
     {
-        $maxSizes = FileUploadHelper::getMaxFileSizes();
-        $allowedTypes = FileUploadHelper::getAllowedMimeTypes();
+        // Define max file sizes (in KB)
+        $maxSizes = [
+            'image' => 5120,  // 5MB
+            'video' => 51200, // 50MB
+            'audio' => 10240, // 10MB
+            'file' => 20480,  // 20MB
+        ];
 
-        $maxSizeKB = $maxSizes[$type] * 1024; // Convert MB to KB
-        $mimeTypes = implode(',', $allowedTypes[$type]);
+        // Define allowed mime types
+        $allowedTypes = [
+            'image' => 'jpg,jpeg,png,gif,webp',
+            'video' => 'mp4,mov,avi,wmv,flv,webm',
+            'audio' => 'mp3,wav,aac,ogg,m4a',
+            'file' => 'pdf,doc,docx,xls,xlsx,ppt,pptx,txt,zip,rar',
+        ];
 
-        $rules['file'] .= "|max:$maxSizeKB|mimes:" . str_replace('/', ',', str_replace(['application/', 'image/', 'video/', 'audio/'], '', $mimeTypes));
+        $maxSizeKB = $maxSizes[$type] ?? 10240;
+        $mimeTypes = $allowedTypes[$type] ?? 'jpg,jpeg,png,gif';
+
+        $rules['file'] .= "|max:$maxSizeKB|mimes:$mimeTypes";
 
         // Specific rules for each type
         switch ($type) {
@@ -186,13 +269,48 @@ class MessageController extends BaseController
      */
     private function handleFileUpload($file, $type, $userId)
     {
-        // Validate file type
-        if (!FileUploadHelper::validateFileType($file, $type)) {
-            throw new \Exception('Invalid file type for ' . $type);
-        }
+        try {
+            // Get file information before moving
+            $originalName = $file->getClientOriginalName();
+            $fileSize = $file->getSize();
+            $mimeType = $file->getMimeType();
+            $extension = $file->getClientOriginalExtension();
 
-        // Upload file and get metadata
-        return FileUploadHelper::uploadMessageFile($file, $type, $userId);
+            // Create uploads/messages directory if it doesn't exist
+            $uploadPath = public_path('uploads/messages');
+            if (!file_exists($uploadPath)) {
+                mkdir($uploadPath, 0755, true);
+            }
+
+            // Generate unique filename
+            $filename = 'user_' . $userId . '_' . time() . '_' . $type . '.' . $extension;
+
+            // Move file to public/uploads/messages
+            $file->move($uploadPath, $filename);
+
+            // Generate file URL
+            $fileUrl = url('uploads/messages/' . $filename);
+
+            // Return metadata
+            return [
+                'file_name' => $filename,
+                'file_path' => 'uploads/messages/' . $filename,
+                'file_url' => $fileUrl,
+                'file_size' => $fileSize,
+                'file_type' => $mimeType,
+                'original_name' => $originalName
+            ];
+        } catch (\Exception $e) {
+            Log::error('File upload error:', [
+                'error' => $e->getMessage(),
+                'file_info' => $file ? [
+                    'original_name' => $file->getClientOriginalName(),
+                    'mime_type' => $file->getMimeType(),
+                    'temp_path' => $file->getPathname()
+                ] : 'No file provided'
+            ]);
+            throw new \Exception('Failed to upload file: ' . $e->getMessage());
+        }
     }
 
        /**
@@ -259,6 +377,9 @@ class MessageController extends BaseController
      */
     public function sendDirectMessage(Request $request)
     {
+        // First, let's get the type from the request to build dynamic validation
+        $messageType = $request->input('type');
+
         // Dynamic validation based on message type
         $rules = [
             'recipient_id' => 'required|exists:users,id|different:user_id',
@@ -266,15 +387,15 @@ class MessageController extends BaseController
         ];
 
         // Add specific validation based on type
-        if ($request->type === 'text') {
+        if ($messageType === 'text') {
             $rules['message'] = 'required|string|max:4000';
-        } elseif (in_array($request->type, ['image', 'video', 'audio', 'file'])) {
+        } elseif (in_array($messageType, ['image', 'video', 'audio', 'file'])) {
             $rules['file'] = 'required|file';
             $rules['message'] = 'nullable|string|max:1000'; // Optional caption
 
             // Add file-specific validation
-            $this->addFileValidationRules($rules, $request->type);
-        } elseif ($request->type === 'location') {
+            $this->addFileValidationRules($rules, $messageType);
+        } elseif ($messageType === 'location') {
             $rules['latitude'] = 'required|numeric|between:-90,90';
             $rules['longitude'] = 'required|numeric|between:-180,180';
             $rules['address'] = 'nullable|string|max:500';
@@ -327,24 +448,24 @@ class MessageController extends BaseController
             $messageData = [
                 'conversation_id' => $conversation->id,
                 'user_id' => $currentUser->id,
-                'type' => $request->type,
+                'type' => $request->input('type'),
             ];
 
             // Handle different message types
-            if ($request->type === 'text') {
-                $messageData['message'] = $request->message;
+            if ($request->input('type') === 'text') {
+                $messageData['message'] = $request->input('message');
                 $messageData['metadata'] = null;
-            } elseif (in_array($request->type, ['image', 'video', 'audio', 'file'])) {
+            } elseif (in_array($request->input('type'), ['image', 'video', 'audio', 'file'])) {
                 // Handle file upload
-                $metadata = $this->handleFileUpload($request->file('file'), $request->type, $currentUser->id);
-                $messageData['message'] = $request->message ?: null; // Optional caption
+                $metadata = $this->handleFileUpload($request->file('file'), $request->input('type'), $currentUser->id);
+                $messageData['message'] = $request->input('message') ?: null; // Optional caption
                 $messageData['metadata'] = $metadata;
-            } elseif ($request->type === 'location') {
-                $messageData['message'] = $request->message ?: null;
+            } elseif ($request->input('type') === 'location') {
+                $messageData['message'] = $request->input('message') ?: null;
                 $messageData['metadata'] = [
-                    'latitude' => $request->latitude,
-                    'longitude' => $request->longitude,
-                    'address' => $request->address,
+                    'latitude' => $request->input('latitude'),
+                    'longitude' => $request->input('longitude'),
+                    'address' => $request->input('address'),
                 ];
             }
 
