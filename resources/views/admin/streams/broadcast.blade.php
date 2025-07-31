@@ -94,6 +94,30 @@
                                 <i :class="screenSharing ? 'fas fa-desktop' : 'fas fa-desktop'" class="mr-2"></i>
                                 <span x-text="screenSharing ? 'Stop Sharing' : 'Share Screen'">Share Screen</span>
                             </button>
+
+                            <!-- Multi-Camera Controls -->
+                            <div class="relative" x-data="{ showCameras: false }">
+                                <button @click="showCameras = !showCameras"
+                                        class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                                    <i class="fas fa-video mr-2"></i>Cameras
+                                    <i class="fas fa-chevron-down ml-1"></i>
+                                </button>
+                                <div x-show="showCameras" @click.away="showCameras = false"
+                                     class="absolute top-full left-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg p-4 min-w-64 z-50">
+                                    <div class="space-y-2">
+                                        <div class="flex items-center justify-between mb-3">
+                                            <h4 class="font-medium text-gray-900">Camera Sources</h4>
+                                            <a href="{{ route('admin.streams.cameras', $stream) }}"
+                                               class="text-blue-600 hover:text-blue-700 text-sm">
+                                                Manage
+                                            </a>
+                                        </div>
+                                        <div id="cameraSourcesList" class="space-y-2">
+                                            <p class="text-sm text-gray-500">Loading camera sources...</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Main Broadcast Button -->
@@ -232,7 +256,7 @@ function liveBroadcast() {
         // Stream info
         streamId: {{ $stream->id }},
         channelName: '{{ $stream->channel_name }}',
-        appId: '{{ env('AGORA_APP_ID') }}',
+        appId: '{{ config('services.agora.app_id') }}',
         token: null,
         uid: null,
 
@@ -275,19 +299,17 @@ function liveBroadcast() {
             this.agoraClient = AgoraRTC.createClient({ mode: "live", codec: "vp8" });
             this.agoraClient.setClientRole("host");
 
-            // Set up event listeners
-            this.setupAgoraEventListeners();
+            // Setup event listeners
+            this.setupEventListeners();
 
-            // Get token from server
-            await this.getStreamToken();
+            // Load camera sources
+            await this.loadCameraSources();
 
-            // Initialize local tracks
-            await this.initializeLocalTracks();
+            // Load viewers and chat
+            this.loadViewers();
+            this.loadChat();
 
-            // Start polling for viewers and chat
-            this.startPolling();
-
-            console.log('Live broadcast initialized successfully');
+            console.log('Live broadcast initialized');
         },
 
         async getStreamToken() {
@@ -371,6 +393,77 @@ function liveBroadcast() {
             } catch (error) {
                 console.error('Error initializing tracks:', error);
                 alert('Failed to access camera/microphone: ' + error.message);
+            }
+        },
+
+        async loadCameraSources() {
+            try {
+                // Get available camera devices
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+
+                console.log('Available camera devices:', videoDevices);
+
+                // Update camera sources list in dropdown
+                const cameraList = document.getElementById('cameraSourcesList');
+                if (cameraList && videoDevices.length > 0) {
+                    cameraList.innerHTML = videoDevices.map(device => `
+                        <button onclick="liveBroadcast().switchCameraSource('${device.deviceId}', '${device.label || 'Camera'}')"
+                                class="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 rounded transition-colors">
+                            <i class="fas fa-video mr-2 text-gray-400"></i>
+                            ${device.label || 'Camera ' + (videoDevices.indexOf(device) + 1)}
+                        </button>
+                    `).join('');
+                } else if (cameraList) {
+                    cameraList.innerHTML = '<p class="text-sm text-gray-500">No cameras detected</p>';
+                }
+
+            } catch (error) {
+                console.error('Error loading camera sources:', error);
+            }
+        },
+
+        async switchCameraSource(deviceId, deviceName) {
+            try {
+                console.log('Switching to camera:', deviceName, deviceId);
+
+                if (this.localVideoTrack) {
+                    // Stop current video track
+                    this.localVideoTrack.stop();
+                    this.localVideoTrack.close();
+                }
+
+                // Create new video track with selected camera
+                this.localVideoTrack = await AgoraRTC.createCameraVideoTrack({
+                    cameraId: deviceId,
+                    encoderConfig: {
+                        width: 1280,
+                        height: 720,
+                        frameRate: 30,
+                        bitrateMin: 1000,
+                        bitrateMax: 3000,
+                    }
+                });
+
+                // Play new video
+                this.localVideoTrack.play('localVideo');
+
+                // If streaming, republish with new track
+                if (this.isStreaming && this.agoraClient) {
+                    try {
+                        await this.agoraClient.unpublish([this.localVideoTrack]);
+                        await this.agoraClient.publish([this.localVideoTrack]);
+                        console.log('Republished with new camera source');
+                    } catch (republishError) {
+                        console.error('Error republishing with new camera:', republishError);
+                    }
+                }
+
+                alert(`Switched to: ${deviceName}`);
+
+            } catch (error) {
+                console.error('Error switching camera source:', error);
+                alert('Failed to switch camera: ' + error.message);
             }
         },
 

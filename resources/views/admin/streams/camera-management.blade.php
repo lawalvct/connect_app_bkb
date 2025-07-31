@@ -28,7 +28,7 @@
 @endsection
 
 @section('content')
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6" x-data="cameraManagement()">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6" x-data="cameraManagement()" x-init="init()">>
     <div class="grid grid-cols-1 xl:grid-cols-4 gap-6">
 
         <!-- Camera Grid -->
@@ -45,14 +45,13 @@
                     </div>
                 </div>
                 <div class="p-6">
-                    <div class="relative bg-black rounded-lg overflow-hidden" style="aspect-ratio: 16/9;">
+                                        <div class="relative bg-black rounded-lg overflow-hidden" style="aspect-ratio: 16/9;">
                         <div id="activeCameraPreview" class="w-full h-full"></div>
-                        <div class="absolute top-4 left-4 bg-black bg-opacity-75 text-white px-3 py-2 rounded">
-                            <i class="fas fa-video mr-2"></i>
-                            <span x-text="activeCameraName">Primary Camera</span>
+                        <div class="absolute top-4 left-4 bg-black bg-opacity-75 text-white px-3 py-2 rounded" x-text="activeCameraName">
+                            Primary Camera
                         </div>
                         <div x-show="isLive" class="absolute top-4 right-4 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold animate-pulse">
-                            <i class="fas fa-circle mr-1"></i>LIVE
+                            LIVE
                         </div>
                     </div>
                 </div>
@@ -64,7 +63,7 @@
                     <div class="flex justify-between items-center">
                         <h3 class="text-lg font-medium text-gray-900">Camera Sources</h3>
                         <button @click="showAddCameraModal = true" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
-                            <i class="fas fa-plus mr-2"></i>Add Camera
+                            <i class="fas fa-plus mr-2"></i>Add Camera Device
                         </button>
                     </div>
                 </div>
@@ -154,13 +153,24 @@
                         </template>
 
                         <!-- Empty State -->
-                        <div x-show="cameras.length === 0" class="col-span-full text-center py-12">
+                        <div x-show="cameras.length === 0 && !detectingDevices" class="col-span-full text-center py-12">
                             <i class="fas fa-video text-6xl text-gray-300 mb-4"></i>
                             <h3 class="text-lg font-medium text-gray-900 mb-2">No cameras configured</h3>
-                            <p class="text-gray-500 mb-4">Add your first camera to start multi-camera streaming</p>
-                            <button @click="showAddCameraModal = true" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
-                                <i class="fas fa-plus mr-2"></i>Add Camera
+                            <p class="text-gray-500 mb-4">Detect available camera devices to start multi-cam streaming</p>
+                            <button @click="detectDevices()" :disabled="detectingDevices"
+                                    class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md disabled:opacity-50 mr-3">
+                                <i class="fas fa-search mr-2"></i>Detect Camera Devices
                             </button>
+                            <button @click="showAddCameraModal = true" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                                <i class="fas fa-plus mr-2"></i>Add Manual Camera
+                            </button>
+                        </div>
+
+                        <!-- Detecting State -->
+                        <div x-show="detectingDevices" class="col-span-full text-center py-12">
+                            <i class="fas fa-spinner fa-spin text-4xl text-blue-500 mb-4"></i>
+                            <h3 class="text-lg font-medium text-gray-900 mb-2">Detecting Devices...</h3>
+                            <p class="text-gray-500">Scanning for available camera devices</p>
                         </div>
                     </div>
                 </div>
@@ -244,6 +254,60 @@
         </div>
     </div>
 
+    <!-- Device Detection Modal -->
+    <div x-show="showDeviceModal"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         @click.away="showDeviceModal = false"
+         class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50"
+         style="display: none;">
+        <div class="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4" @click.stop>
+            <div class="px-6 py-4 border-b border-gray-200">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-lg font-medium text-gray-900">Available Camera Devices</h3>
+                    <button @click="showDeviceModal = false" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="px-6 py-4">
+                <div x-show="availableDevices.length === 0" class="text-center py-8">
+                    <i class="fas fa-exclamation-triangle text-yellow-500 text-3xl mb-4"></i>
+                    <p class="text-gray-600">No camera devices found. Make sure cameras are connected and permissions are granted.</p>
+                </div>
+                <div x-show="availableDevices.length > 0" class="space-y-3">
+                    <p class="text-sm text-gray-600 mb-4">Found <span x-text="availableDevices.length"></span> camera device(s). Click "Add" to use them:</p>
+                    <template x-for="device in availableDevices" :key="device.deviceId">
+                        <div class="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
+                            <div class="flex-1">
+                                <h4 class="font-medium text-gray-900" x-text="device.label || 'Unknown Camera'"></h4>
+                                <p class="text-xs text-gray-500" x-text="'ID: ' + device.deviceId.substring(0, 20) + '...'"></p>
+                            </div>
+                            <button @click="addDeviceAsCamera(device)"
+                                    class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded text-sm font-medium">
+                                <i class="fas fa-plus mr-1"></i>Add
+                            </button>
+                        </div>
+                    </template>
+                </div>
+            </div>
+            <div class="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+                <button @click="showDeviceModal = false"
+                        class="bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                    Close
+                </button>
+                <button @click="detectDevices()"
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                    <i class="fas fa-refresh mr-2"></i>Refresh
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Add Camera Modal -->
     <div x-show="showAddCameraModal" @click.away="showAddCameraModal = false"
          class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
@@ -302,199 +366,426 @@
     </div>
 </div>
 
+<!-- Agora SDK -->
+<script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.19.0.js"></script>
+
 <script>
 function cameraManagement() {
     return {
+        // Stream data
+        streamId: {{ $stream->id }},
+        channelName: '{{ $stream->channel_name }}',
+        appId: '{{ config('services.agora.app_id') }}',
+
+        // Camera management
         cameras: [],
+        availableDevices: [],
         switchHistory: [],
         activeCameraName: 'Primary Camera',
         isLive: false,
+
+        // UI State
         showAddCameraModal: false,
+        showDeviceModal: false,
         adding: false,
+        detectingDevices: false,
+
+        // Form data
         newCamera: {
             camera_name: '',
             device_type: '',
-            resolution: ''
+            resolution: '',
+            device_id: null
         },
+
+        // Mixer settings
         mixerSettings: {
             layout_type: 'single',
             transition_effect: 'cut',
             transition_duration: 1000
         },
 
+        // Agora clients and tracks
+        agoraClient: null,
+        activeTracks: new Map(), // Map of camera id to video track
+
         async init() {
+            console.log('Initializing camera management...');
+
+            // Initialize Agora
+            this.agoraClient = AgoraRTC.createClient({ mode: "live", codec: "vp8" });
+            this.agoraClient.setClientRole("host");
+
             await this.loadCameras();
             await this.loadMixerSettings();
             await this.loadSwitchHistory();
             this.startPolling();
+
+            // Auto-detect devices on load (comment out for manual testing)
+            // await this.detectDevices();
+
+            console.log('Camera management initialized. Available devices:', this.availableDevices.length);
         },
 
-        async loadCameras() {
+        async detectDevices() {
+            this.detectingDevices = true;
+            console.log('Starting device detection...');
+
             try {
-                const response = await fetch(`/admin/api/streams/{{ $stream->id }}/cameras`);
-                const data = await response.json();
-                if (data.success) {
-                    this.cameras = data.data;
-                    const primaryCamera = this.cameras.find(c => c.is_primary);
-                    if (primaryCamera) {
-                        this.activeCameraName = primaryCamera.camera_name;
+                console.log('Detecting camera devices...');
+
+                // Request camera permissions
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                stream.getTracks().forEach(track => track.stop()); // Stop the test stream
+
+                // Get list of devices
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+
+                console.log('Found video devices:', videoDevices);
+                this.availableDevices = videoDevices;
+
+                // Force Alpine.js to update
+                this.$nextTick(() => {
+                    console.log('Alpine updated. Devices in state:', this.availableDevices.length);
+                    console.log('Should show modal:', videoDevices.length > 0);
+
+                    if (videoDevices.length > 0) {
+                        this.showDeviceModal = true;
+                        console.log('Modal should be visible now. showDeviceModal:', this.showDeviceModal);
+
+                        // Force UI update after a brief delay
+                        setTimeout(() => {
+                            console.log('Final check - Modal visible:', this.showDeviceModal);
+                        }, 100);
+                    } else {
+                        alert('No camera devices found. Please connect a camera and try again.');
                     }
-                }
-            } catch (error) {
-                console.error('Failed to load cameras:', error);
-            }
-        },
-
-        async loadMixerSettings() {
-            try {
-                const response = await fetch(`/admin/api/streams/{{ $stream->id }}/mixer-settings`);
-                const data = await response.json();
-                if (data.success) {
-                    this.mixerSettings = { ...this.mixerSettings, ...data.data };
-                }
-            } catch (error) {
-                console.error('Failed to load mixer settings:', error);
-            }
-        },
-
-        async loadSwitchHistory() {
-            try {
-                const response = await fetch(`/admin/api/streams/{{ $stream->id }}/camera-switches`);
-                const data = await response.json();
-                if (data.success) {
-                    this.switchHistory = data.data;
-                }
-            } catch (error) {
-                console.error('Failed to load switch history:', error);
-            }
-        },
-
-        async addCamera() {
-            this.adding = true;
-            try {
-                const response = await fetch(`/admin/api/streams/{{ $stream->id }}/cameras`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                    },
-                    body: JSON.stringify(this.newCamera)
                 });
 
-                const data = await response.json();
-                if (data.success) {
-                    this.cameras.push(data.data);
-                    this.newCamera = { camera_name: '', device_type: '', resolution: '' };
-                    this.showAddCameraModal = false;
-                    this.showNotification('Camera added successfully', 'success');
-                } else {
-                    this.showNotification(data.message || 'Failed to add camera', 'error');
-                }
             } catch (error) {
-                this.showNotification('Failed to add camera', 'error');
+                console.error('Error detecting devices:', error);
+                alert('Could not access camera devices. Please ensure cameras are connected and permissions are granted.');
             }
-            this.adding = false;
+            this.detectingDevices = false;
+        },
+
+        async addDeviceAsCamera(device) {
+            try {
+                const cameraName = device.label || `Camera ${this.cameras.length + 1}`;
+
+                // Create new camera entry
+                const newCamera = {
+                    camera_name: cameraName,
+                    device_type: this.getDeviceType(device.label),
+                    resolution: '720p', // Default resolution
+                    device_id: device.deviceId,
+                    is_active: false,
+                    is_primary: this.cameras.length === 0 // First camera is primary
+                };
+
+                // Test the device by creating a preview
+                await this.testCameraDevice(device.deviceId, newCamera);
+
+                // Add to cameras list
+                this.cameras.push({
+                    ...newCamera,
+                    id: Date.now(), // Temporary ID for UI
+                    status: 'ready'
+                });
+
+                this.showDeviceModal = false;
+                this.showNotification(`Camera "${cameraName}" added successfully`, 'success');
+
+            } catch (error) {
+                console.error('Error adding camera:', error);
+                this.showNotification('Failed to add camera: ' + error.message, 'error');
+            }
+        },
+
+        async testCameraDevice(deviceId, cameraData) {
+            try {
+                // Create video track for this device
+                const videoTrack = await AgoraRTC.createCameraVideoTrack({
+                    cameraId: deviceId,
+                    encoderConfig: this.getEncoderConfig(cameraData.resolution)
+                });
+
+                // Store the track
+                const cameraId = cameraData.id || Date.now();
+                this.activeTracks.set(cameraId, videoTrack);
+
+                // Play preview after DOM update
+                this.$nextTick(() => {
+                    const previewElement = document.getElementById(`camera-preview-${cameraId}`);
+                    if (previewElement) {
+                        videoTrack.play(previewElement);
+                    }
+                });
+
+                return true;
+            } catch (error) {
+                console.error('Error testing camera device:', error);
+                throw new Error('Failed to initialize camera: ' + error.message);
+            }
+        },
+
+        getDeviceType(label) {
+            if (!label) return 'unknown';
+            const lowerLabel = label.toLowerCase();
+            if (lowerLabel.includes('phone') || lowerLabel.includes('mobile')) return 'phone';
+            if (lowerLabel.includes('laptop') || lowerLabel.includes('built-in')) return 'laptop';
+            if (lowerLabel.includes('usb') || lowerLabel.includes('webcam')) return 'camera';
+            if (lowerLabel.includes('tablet')) return 'tablet';
+            return 'other';
+        },
+
+        getEncoderConfig(resolution) {
+            const configs = {
+                '480p': { width: 640, height: 480, frameRate: 30, bitrateMin: 400, bitrateMax: 1000 },
+                '720p': { width: 1280, height: 720, frameRate: 30, bitrateMin: 1000, bitrateMax: 2000 },
+                '1080p': { width: 1920, height: 1080, frameRate: 30, bitrateMin: 2000, bitrateMax: 4000 },
+                '4K': { width: 3840, height: 2160, frameRate: 30, bitrateMin: 8000, bitrateMax: 15000 }
+            };
+            return configs[resolution] || configs['720p'];
+        },
+
+        async switchCamera(cameraId) {
+            try {
+                const camera = this.cameras.find(c => c.id === cameraId);
+                if (!camera) throw new Error('Camera not found');
+
+                // Set all cameras as non-primary
+                this.cameras.forEach(c => c.is_primary = false);
+
+                // Set selected camera as primary
+                camera.is_primary = true;
+                this.activeCameraName = camera.camera_name;
+
+                // If streaming, switch the active video track
+                if (this.isLive && this.agoraClient) {
+                    const newTrack = this.activeTracks.get(cameraId);
+                    if (newTrack) {
+                        // Unpublish current track and publish new one
+                        await this.agoraClient.unpublish();
+                        await this.agoraClient.publish([newTrack]);
+
+                        // Update main preview
+                        const mainPreview = document.getElementById('activeCameraPreview');
+                        if (mainPreview) {
+                            mainPreview.innerHTML = '';
+                            newTrack.play(mainPreview);
+                        }
+                    }
+                }
+
+                // Record switch in history
+                this.recordCameraSwitch(camera.camera_name);
+
+                this.showNotification('Switched to ' + camera.camera_name, 'success');
+
+            } catch (error) {
+                console.error('Error switching camera:', error);
+                this.showNotification('Failed to switch camera: ' + error.message, 'error');
+            }
+        },
+
+        async toggleCameraConnection(cameraId, shouldActivate) {
+            try {
+                const camera = this.cameras.find(c => c.id === cameraId);
+                if (!camera) throw new Error('Camera not found');
+
+                if (shouldActivate) {
+                    // Activate camera - create video track if not exists
+                    if (!this.activeTracks.has(cameraId)) {
+                        await this.testCameraDevice(camera.device_id, camera);
+                    }
+                    camera.is_active = true;
+                    camera.status = 'connected';
+                } else {
+                    // Deactivate camera - stop track
+                    const track = this.activeTracks.get(cameraId);
+                    if (track) {
+                        track.stop();
+                        track.close();
+                        this.activeTracks.delete(cameraId);
+                    }
+                    camera.is_active = false;
+                    camera.status = 'disconnected';
+
+                    // Clear preview
+                    const previewElement = document.getElementById(`camera-preview-${cameraId}`);
+                    if (previewElement) {
+                        previewElement.innerHTML = '<i class="fas fa-video text-2xl opacity-50"></i>';
+                    }
+                }
+
+                this.showNotification(
+                    `Camera ${shouldActivate ? 'connected' : 'disconnected'} successfully`,
+                    'success'
+                );
+
+            } catch (error) {
+                console.error('Error toggling camera connection:', error);
+                this.showNotification('Failed to toggle camera connection: ' + error.message, 'error');
+            }
         },
 
         async removeCamera(cameraId) {
             if (!confirm('Are you sure you want to remove this camera?')) return;
 
             try {
-                const response = await fetch(`/admin/api/streams/{{ $stream->id }}/cameras/${cameraId}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                    }
-                });
-
-                const data = await response.json();
-                if (data.success) {
-                    this.cameras = this.cameras.filter(c => c.id !== cameraId);
-                    this.showNotification('Camera removed successfully', 'success');
-                } else {
-                    this.showNotification(data.message || 'Failed to remove camera', 'error');
+                const camera = this.cameras.find(c => c.id === cameraId);
+                if (camera && camera.is_primary) {
+                    throw new Error('Cannot remove primary camera. Switch to another camera first.');
                 }
+
+                // Stop and remove track
+                const track = this.activeTracks.get(cameraId);
+                if (track) {
+                    track.stop();
+                    track.close();
+                    this.activeTracks.delete(cameraId);
+                }
+
+                // Remove from cameras list
+                this.cameras = this.cameras.filter(c => c.id !== cameraId);
+
+                this.showNotification('Camera removed successfully', 'success');
+
             } catch (error) {
-                this.showNotification('Failed to remove camera', 'error');
+                console.error('Error removing camera:', error);
+                this.showNotification(error.message, 'error');
             }
         },
 
-        async switchCamera(cameraId) {
+        async addCamera() {
             try {
-                const response = await fetch(`/admin/api/streams/{{ $stream->id }}/switch-camera`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                    },
-                    body: JSON.stringify({ camera_id: cameraId })
-                });
+                this.adding = true;
 
-                const data = await response.json();
-                if (data.success) {
-                    await this.loadCameras();
-                    await this.loadSwitchHistory();
-                    this.showNotification('Camera switched successfully', 'success');
-                } else {
-                    this.showNotification(data.message || 'Failed to switch camera', 'error');
+                // Validate form data
+                if (!this.newCamera.camera_name.trim()) {
+                    throw new Error('Camera name is required');
                 }
+
+                // Create new camera entry
+                const camera = {
+                    id: Date.now(), // Temporary ID for UI
+                    camera_name: this.newCamera.camera_name,
+                    device_type: this.newCamera.device_type || 'other',
+                    resolution: this.newCamera.resolution || '720p',
+                    device_id: this.newCamera.device_id,
+                    is_active: false,
+                    is_primary: this.cameras.length === 0, // First camera is primary
+                    status: 'ready'
+                };
+
+                // Add to cameras list
+                this.cameras.push(camera);
+
+                // Reset form
+                this.newCamera = {
+                    camera_name: '',
+                    device_type: '',
+                    resolution: '',
+                    device_id: null
+                };
+
+                // Close modal
+                this.showAddCameraModal = false;
+
+                this.showNotification(`Camera "${camera.camera_name}" added successfully`, 'success');
+
             } catch (error) {
-                this.showNotification('Failed to switch camera', 'error');
+                console.error('Error adding camera:', error);
+                this.showNotification(error.message, 'error');
+            } finally {
+                this.adding = false;
             }
         },
 
-        async toggleCameraConnection(cameraId, isActive) {
-            try {
-                const response = await fetch(`/admin/api/streams/{{ $stream->id }}/cameras/${cameraId}/status`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                    },
-                    body: JSON.stringify({ is_active: isActive })
-                });
+        recordCameraSwitch(toCameraName) {
+            const currentPrimary = this.switchHistory.length > 0 ?
+                this.switchHistory[0].to_camera : 'None';
 
-                const data = await response.json();
-                if (data.success) {
-                    const camera = this.cameras.find(c => c.id === cameraId);
-                    if (camera) {
-                        camera.is_active = data.data.is_active;
-                        camera.status = data.data.status;
-                        camera.last_seen_at = data.data.last_seen_at;
-                    }
-                    this.showNotification('Camera status updated successfully', 'success');
-                } else {
-                    this.showNotification(data.message || 'Failed to update camera status', 'error');
-                }
-            } catch (error) {
-                this.showNotification('Failed to update camera status', 'error');
+            this.switchHistory.unshift({
+                id: Date.now(),
+                from_camera: currentPrimary,
+                to_camera: toCameraName,
+                switched_at: new Date().toISOString()
+            });
+
+            // Keep only last 20 switches
+            if (this.switchHistory.length > 20) {
+                this.switchHistory = this.switchHistory.slice(0, 20);
             }
+        },
+
+        async startStreaming() {
+            try {
+                this.isLive = true;
+
+                // Get primary camera track
+                const primaryCamera = this.cameras.find(c => c.is_primary);
+                if (!primaryCamera) throw new Error('No primary camera selected');
+
+                const primaryTrack = this.activeTracks.get(primaryCamera.id);
+                if (!primaryTrack) throw new Error('Primary camera not connected');
+
+                // Join Agora channel and publish
+                await this.agoraClient.join(
+                    this.appId,
+                    this.channelName,
+                    null, // token - should be fetched from server
+                    null  // uid - auto assigned
+                );
+
+                await this.agoraClient.publish([primaryTrack]);
+
+                console.log('Started streaming with camera:', primaryCamera.camera_name);
+
+            } catch (error) {
+                console.error('Error starting stream:', error);
+                this.isLive = false;
+                throw error;
+            }
+        },
+
+        async stopStreaming() {
+            try {
+                if (this.agoraClient) {
+                    await this.agoraClient.leave();
+                }
+                this.isLive = false;
+                console.log('Stopped streaming');
+            } catch (error) {
+                console.error('Error stopping stream:', error);
+            }
+        },
+
+        // Legacy methods for compatibility with existing backend
+        async loadCameras() {
+            // This would load from database if needed
+            console.log('Loading cameras from database...');
+        },
+
+        async loadMixerSettings() {
+            console.log('Loading mixer settings...');
+        },
+
+        async loadSwitchHistory() {
+            console.log('Loading switch history...');
         },
 
         async updateMixerSettings() {
-            try {
-                const response = await fetch(`/admin/api/streams/{{ $stream->id }}/mixer-settings`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-                    },
-                    body: JSON.stringify(this.mixerSettings)
-                });
-
-                const data = await response.json();
-                if (data.success) {
-                    this.mixerSettings = { ...this.mixerSettings, ...data.data };
-                }
-            } catch (error) {
-                console.error('Failed to update mixer settings:', error);
-            }
+            console.log('Updating mixer settings...');
         },
 
         startPolling() {
+            // Poll for viewer updates, etc.
             setInterval(() => {
-                this.loadCameras();
-            }, 5000); // Poll every 5 seconds
+                // Update viewer count, etc.
+            }, 5000);
         },
 
         formatDateTime(dateString) {
@@ -502,13 +793,11 @@ function cameraManagement() {
         },
 
         showNotification(message, type) {
-            // Basic notification - can be enhanced with a proper notification system
-            if (type === 'success') {
-                console.log('✓ ' + message);
-            } else {
-                console.error('✗ ' + message);
+            console.log(`${type.toUpperCase()}: ${message}`);
+            // You can implement a proper notification system here
+            if (type === 'error') {
+                alert('Error: ' + message);
             }
-            // You can implement a more sophisticated notification system here
         }
     }
 }

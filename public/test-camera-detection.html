@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Camera Detection Test</title>
+        <script
+            src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"
+            defer
+        ></script>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link
+            rel="stylesheet"
+            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+        />
+    </head>
+    <body class="bg-gray-100">
+        <div class="container mx-auto px-4 py-8" x-data="cameraTest()">
+            <div class="max-w-4xl mx-auto">
+                <h1 class="text-3xl font-bold mb-8">Camera Detection Test</h1>
+
+                <!-- Status Display -->
+                <div class="bg-white p-6 rounded-lg shadow mb-6">
+                    <h2 class="text-xl font-semibold mb-4">Status</h2>
+                    <div class="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                            <strong>Modal Visible:</strong>
+                            <span
+                                x-text="showModal"
+                                class="text-blue-600"
+                            ></span>
+                        </div>
+                        <div>
+                            <strong>Devices Found:</strong>
+                            <span
+                                x-text="devices.length"
+                                class="text-green-600"
+                            ></span>
+                        </div>
+                        <div>
+                            <strong>Detecting:</strong>
+                            <span
+                                x-text="detecting"
+                                class="text-orange-600"
+                            ></span>
+                        </div>
+                        <div>
+                            <strong>Permission Status:</strong>
+                            <span
+                                x-text="permissionStatus"
+                                class="text-purple-600"
+                            ></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Controls -->
+                <div class="bg-white p-6 rounded-lg shadow mb-6">
+                    <h2 class="text-xl font-semibold mb-4">Controls</h2>
+                    <div class="space-x-4">
+                        <button
+                            @click="detectCameras()"
+                            :disabled="detecting"
+                            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded disabled:opacity-50"
+                        >
+                            <i class="fas fa-search mr-2"></i>
+                            <span x-show="!detecting">Detect Cameras</span>
+                            <span x-show="detecting">Detecting...</span>
+                        </button>
+
+                        <button
+                            @click="showModal = true"
+                            class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded"
+                        >
+                            <i class="fas fa-eye mr-2"></i>Show Modal
+                        </button>
+
+                        <button
+                            @click="showModal = false"
+                            class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded"
+                        >
+                            <i class="fas fa-eye-slash mr-2"></i>Hide Modal
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Device List -->
+                <div class="bg-white p-6 rounded-lg shadow mb-6">
+                    <h2 class="text-xl font-semibold mb-4">Detected Devices</h2>
+                    <div
+                        x-show="devices.length === 0"
+                        class="text-gray-500 text-center py-8"
+                    >
+                        <i class="fas fa-video-slash text-4xl mb-2"></i>
+                        <p>No devices detected yet</p>
+                    </div>
+                    <div x-show="devices.length > 0" class="space-y-3">
+                        <template
+                            x-for="device in devices"
+                            :key="device.deviceId"
+                        >
+                            <div class="border border-gray-200 rounded-lg p-4">
+                                <div class="flex justify-between items-start">
+                                    <div>
+                                        <h3
+                                            class="font-medium"
+                                            x-text="device.label || 'Unknown Camera'"
+                                        ></h3>
+                                        <p
+                                            class="text-sm text-gray-500"
+                                            x-text="'ID: ' + device.deviceId"
+                                        ></p>
+                                        <p
+                                            class="text-sm text-gray-400"
+                                            x-text="'Group: ' + device.groupId"
+                                        ></p>
+                                    </div>
+                                    <button
+                                        @click="testCamera(device)"
+                                        class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-sm"
+                                    >
+                                        Test
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- Modal -->
+                <div
+                    x-show="showModal"
+                    x-transition:enter="transition ease-out duration-200"
+                    x-transition:enter-start="opacity-0"
+                    x-transition:enter-end="opacity-100"
+                    class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50"
+                >
+                    <div
+                        class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4"
+                        @click.stop
+                    >
+                        <div class="px-6 py-4 border-b">
+                            <div class="flex justify-between items-center">
+                                <h3 class="text-lg font-medium">
+                                    Camera Devices
+                                </h3>
+                                <button
+                                    @click="showModal = false"
+                                    class="text-gray-400 hover:text-gray-600"
+                                >
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="px-6 py-4">
+                            <p class="mb-4">
+                                Found
+                                <span x-text="devices.length"></span> camera
+                                device(s):
+                            </p>
+                            <div class="space-y-2">
+                                <template
+                                    x-for="device in devices"
+                                    :key="device.deviceId"
+                                >
+                                    <div class="p-3 border rounded">
+                                        <div
+                                            class="font-medium"
+                                            x-text="device.label || 'Unknown Camera'"
+                                        ></div>
+                                        <div
+                                            class="text-sm text-gray-500"
+                                            x-text="device.deviceId.substring(0, 30) + '...'"
+                                        ></div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                        <div class="px-6 py-4 border-t flex justify-end">
+                            <button
+                                @click="showModal = false"
+                                class="bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            function cameraTest() {
+                return {
+                    devices: [],
+                    showModal: false,
+                    detecting: false,
+                    permissionStatus: "unknown",
+
+                    async init() {
+                        console.log("Camera test initialized");
+                        // Auto-detect on load
+                        await this.detectCameras();
+                    },
+
+                    async detectCameras() {
+                        this.detecting = true;
+                        this.permissionStatus = "requesting";
+
+                        try {
+                            console.log("Requesting camera permission...");
+
+                            // Request permission
+                            const stream =
+                                await navigator.mediaDevices.getUserMedia({
+                                    video: true,
+                                    audio: false,
+                                });
+
+                            console.log(
+                                "Permission granted, stopping test stream..."
+                            );
+                            stream.getTracks().forEach((track) => track.stop());
+
+                            this.permissionStatus = "granted";
+
+                            // Get devices
+                            console.log("Enumerating devices...");
+                            const allDevices =
+                                await navigator.mediaDevices.enumerateDevices();
+                            const videoDevices = allDevices.filter(
+                                (device) => device.kind === "videoinput"
+                            );
+
+                            console.log("Found devices:", videoDevices);
+                            this.devices = videoDevices;
+
+                            if (videoDevices.length > 0) {
+                                console.log(
+                                    "Showing modal with",
+                                    videoDevices.length,
+                                    "devices"
+                                );
+                                this.showModal = true;
+                            } else {
+                                alert("No camera devices found");
+                            }
+                        } catch (error) {
+                            console.error("Camera detection error:", error);
+                            this.permissionStatus = "denied";
+                            alert(
+                                "Camera access denied or error: " +
+                                    error.message
+                            );
+                        }
+
+                        this.detecting = false;
+                    },
+
+                    async testCamera(device) {
+                        try {
+                            console.log("Testing camera:", device.label);
+                            const stream =
+                                await navigator.mediaDevices.getUserMedia({
+                                    video: { deviceId: device.deviceId },
+                                });
+                            console.log("Camera test successful");
+                            stream.getTracks().forEach((track) => track.stop());
+                            alert(
+                                'Camera "' +
+                                    (device.label || "Unknown") +
+                                    '" works!'
+                            );
+                        } catch (error) {
+                            console.error("Camera test failed:", error);
+                            alert("Camera test failed: " + error.message);
+                        }
+                    },
+                };
+            }
+        </script>
+    </body>
+</html>
