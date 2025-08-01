@@ -124,6 +124,9 @@
                                                 Manage
                                             </a>
                                         </div>
+
+                                      
+
                                         <div id="cameraSourcesList" class="space-y-2">
                                             <p class="text-sm text-gray-500">Loading camera sources...</p>
                                         </div>
