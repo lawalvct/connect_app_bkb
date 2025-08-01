@@ -614,6 +614,7 @@ class StreamManagementController extends Controller
             'camera_name' => 'required|string|max:255',
             'device_type' => 'nullable|string|in:phone,laptop,camera,tablet,other',
             'resolution' => 'nullable|string|in:480p,720p,1080p,4K',
+            'device_id' => 'nullable|string', // Allow device_id from frontend
         ]);
 
         if ($validator->fails()) {
@@ -628,11 +629,20 @@ class StreamManagementController extends Controller
 
             $camera = $stream->addCamera(
                 $request->camera_name,
-                $request->device_type
+                $request->device_type ?: 'other'
             );
 
+            // Update additional fields
+            $updateData = [];
             if ($request->resolution) {
-                $camera->update(['resolution' => $request->resolution]);
+                $updateData['resolution'] = $request->resolution;
+            }
+            if ($request->device_id) {
+                $updateData['device_id'] = $request->device_id;
+            }
+
+            if (!empty($updateData)) {
+                $camera->update($updateData);
             }
 
             return response()->json([
@@ -648,6 +658,7 @@ class StreamManagementController extends Controller
                     'is_primary' => $camera->is_primary,
                     'resolution' => $camera->resolution,
                     'status' => $camera->status,
+                    'device_id' => $camera->device_id ?? null,
                 ]
             ]);
 

@@ -28,7 +28,7 @@
 @endsection
 
 @section('content')
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6" x-data="cameraManagement()" x-init="init()">>>
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6" x-data="cameraManagement()" x-init="init()">
     <div class="grid grid-cols-1 xl:grid-cols-4 gap-6">
 
         <!-- Camera Grid -->
@@ -934,22 +934,114 @@ function cameraManagement() {
             }
         },
 
-        // Legacy methods for compatibility with existing backend
+        // Backend API methods
         async loadCameras() {
-            // This would load from database if needed
-            console.log('Loading cameras from database...');
+            try {
+                console.log('Loading cameras from database...');
+                const response = await fetch(`/admin/streams/${this.streamId}/cameras`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success) {
+                        this.cameras = data.data.map(camera => ({
+                            ...camera,
+                            is_active: camera.is_active || false,
+                            is_primary: camera.is_primary || false,
+                            status: camera.status || 'disconnected'
+                        }));
+
+                        // Set active camera name
+                        const primaryCamera = this.cameras.find(c => c.is_primary);
+                        if (primaryCamera) {
+                            this.activeCameraName = primaryCamera.camera_name;
+                        }
+
+                        console.log('Loaded cameras:', this.cameras.length);
+                    } else {
+                        console.error('Failed to load cameras:', data.message);
+                    }
+                } else {
+                    console.error('HTTP error loading cameras:', response.status);
+                }
+            } catch (error) {
+                console.error('Error loading cameras:', error);
+            }
         },
 
         async loadMixerSettings() {
-            console.log('Loading mixer settings...');
+            try {
+                console.log('Loading mixer settings...');
+                const response = await fetch(`/admin/streams/${this.streamId}/mixer-settings`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success) {
+                        this.mixerSettings = { ...this.mixerSettings, ...data.data };
+                        console.log('Loaded mixer settings');
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading mixer settings:', error);
+            }
         },
 
         async loadSwitchHistory() {
-            console.log('Loading switch history...');
+            try {
+                console.log('Loading switch history...');
+                const response = await fetch(`/admin/streams/${this.streamId}/camera-switches`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success) {
+                        this.switchHistory = data.data;
+                        console.log('Loaded switch history:', this.switchHistory.length);
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading switch history:', error);
+            }
         },
 
         async updateMixerSettings() {
-            console.log('Updating mixer settings...');
+            try {
+                console.log('Updating mixer settings...');
+                const response = await fetch(`/admin/streams/${this.streamId}/mixer-settings`, {
+                    method: 'PUT',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                    },
+                    body: JSON.stringify(this.mixerSettings)
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success) {
+                        console.log('Mixer settings updated');
+                    }
+                }
+            } catch (error) {
+                console.error('Error updating mixer settings:', error);
+            }
         },
 
         startPolling() {

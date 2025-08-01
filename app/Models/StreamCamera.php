@@ -17,6 +17,7 @@ class StreamCamera extends Model
         'camera_name',
         'stream_key',
         'device_type',
+        'device_id',
         'agora_uid',
         'is_active',
         'is_primary',

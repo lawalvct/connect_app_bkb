@@ -33,7 +33,7 @@
 @endsection
 
 @section('content')
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6" x-data="liveBroadcast()">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6" x-data="liveBroadcast()" x-init="init()">>
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Main Broadcast Area -->
         <div class="lg:col-span-2">
@@ -268,6 +268,7 @@ function liveBroadcast() {
         screenSharing: false,
         streamDuration: 0,
         viewerCount: 0,
+        selectedCameraName: 'Default Camera',
 
         // Agora client
         agoraClient: null,
@@ -301,6 +302,12 @@ function liveBroadcast() {
 
             // Setup event listeners
             this.setupEventListeners();
+
+            // Get streaming token
+            await this.getStreamToken();
+
+            // Initialize local tracks (camera and microphone)
+            await this.initializeLocalTracks();
 
             // Load camera sources
             await this.loadCameraSources();
@@ -398,25 +405,114 @@ function liveBroadcast() {
 
         async loadCameraSources() {
             try {
-                // Get available camera devices
+                // First, load cameras from the backend (those added in camera management)
+                const response = await fetch(`/admin/streams/${this.streamId}/cameras`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                    }
+                });
+
+                let backendCameras = [];
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success) {
+                        backendCameras = data.data.filter(camera => camera.is_active);
+                        console.log('Backend cameras:', backendCameras);
+                    }
+                }
+
+                // Also get available local camera devices
                 const devices = await navigator.mediaDevices.enumerateDevices();
                 const videoDevices = devices.filter(device => device.kind === 'videoinput');
-
-                console.log('Available camera devices:', videoDevices);
+                console.log('Available local camera devices:', videoDevices);
 
                 // Update camera sources list in dropdown
                 const cameraList = document.getElementById('cameraSourcesList');
-                if (cameraList && videoDevices.length > 0) {
-                    cameraList.innerHTML = videoDevices.map(device => `
-                        <button onclick="liveBroadcast().switchCameraSource('${device.deviceId}', '${device.label || 'Camera'}')"
-                                class="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 rounded transition-colors">
-                            <i class="fas fa-video mr-2 text-gray-400"></i>
-                            ${device.label || 'Camera ' + (videoDevices.indexOf(device) + 1)}
-                        </button>
-                    `).join('');
-                } else if (cameraList) {
-                    cameraList.innerHTML = '<p class="text-sm text-gray-500">No cameras detected</p>';
+                if (cameraList) {
+                    let cameraOptions = '';
+
+                    // Add backend cameras first (these have priority)
+                    if (backendCameras.length > 0) {
+                        cameraOptions += '<div class="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider border-b">Configured Cameras</div>';
+                        backendCameras.forEach(camera => {
+                            cameraOptions += `
+                                <button onclick="liveBroadcast().switchToBackendCamera('${camera.id}', '${camera.camera_name}', '${camera.device_id || ''}')"
+                                        class="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 rounded transition-colors">
+                                    <i class="fas fa-video mr-2 text-blue-500"></i>
+                                    <span class="font-medium">${camera.camera_name}</span>
+                                    ${camera.is_primary ? '<span class="ml-2 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">PRIMARY</span>' : ''}
+                                    <div class="text-xs text-gray-500">${camera.device_type} • ${camera.resolution}</div>
+                                </button>
+                            `;
+                        });
+                    }
+
+                    // Add local devices
+                    if (videoDevices.length > 0) {
+                        if (backendCameras.length > 0) {
+                            cameraOptions += '<div class="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider border-b border-t mt-2">Local Devices</div>';
+                        }
+                        videoDevices.forEach(device => {
+                            // Check if this device is already configured in backend
+                            const isConfigured = backendCameras.some(bc => bc.device_id === device.deviceId);
+                            if (!isConfigured) {
+                                cameraOptions += `
+                                    <button onclick="liveBroadcast().switchCameraSource('${device.deviceId}', '${device.label || 'Camera'}')"
+                                            class="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 rounded transition-colors">
+                                        <i class="fas fa-video mr-2 text-gray-400"></i>
+                                        <span>${device.label || 'Camera ' + (videoDevices.indexOf(device) + 1)}</span>
+                                        <div class="text-xs text-gray-500">Local device</div>
+                                    </button>
+                                `;
+                            }
+                        });
+                    }
+
+                    if (cameraOptions) {
+                        cameraList.innerHTML = cameraOptions;
+                    } else {
+                        cameraList.innerHTML = '<p class="text-sm text-gray-500 px-3 py-2">No cameras available</p>';
+                    }
                 }
+
+                // Auto-select primary camera if available
+                const primaryCamera = backendCameras.find(camera => camera.is_primary);
+                if (primaryCamera && primaryCamera.device_id) {
+                    console.log('Auto-selecting primary camera:', primaryCamera.camera_name);
+                    await this.switchToBackendCamera(primaryCamera.id, primaryCamera.camera_name, primaryCamera.device_id);
+                }
+
+            } catch (error) {
+                console.error('Error loading camera sources:', error);
+                const cameraList = document.getElementById('cameraSourcesList');
+                if (cameraList) {
+                    cameraList.innerHTML = '<p class="text-sm text-red-500 px-3 py-2">Error loading cameras</p>';
+                }
+            }
+        },
+
+        async switchToBackendCamera(cameraId, cameraName, deviceId) {
+            try {
+                console.log('Switching to backend camera:', cameraName, 'Device ID:', deviceId);
+
+                if (deviceId) {
+                    // Use the configured device ID
+                    await this.switchCameraSource(deviceId, cameraName);
+                } else {
+                    // Fallback to camera name matching
+                    await this.switchCameraSource(null, cameraName);
+                }
+
+                // Update UI to show selected camera
+                this.selectedCameraName = cameraName;
+
+            } catch (error) {
+                console.error('Error switching to backend camera:', error);
+                alert('Failed to switch to camera: ' + error.message);
+            }
+        },
 
             } catch (error) {
                 console.error('Error loading camera sources:', error);
