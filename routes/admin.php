@@ -77,7 +77,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
             // Multi-Camera Management API
             Route::get('/streams/{id}/cameras', [StreamManagementController::class, 'getCameras']);
-            Route::get('/streams/{id}/camera', [StreamManagementController::class, 'addCamera']);
+            Route::post('/streams/{id}/cameras', [StreamManagementController::class, 'addCamera']);
             Route::delete('/streams/{id}/cameras/{cameraId}', [StreamManagementController::class, 'removeCamera']);
             Route::post('/streams/{id}/switch-camera', [StreamManagementController::class, 'switchCamera']);
             Route::put('/streams/{id}/cameras/{cameraId}/status', [StreamManagementController::class, 'updateCameraStatus']);

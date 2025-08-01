@@ -5,7 +5,16 @@
 @section('header')
     <div class="flex justify-between items-center">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900">Live Broadcast: {{ $stream->title }}</h1>
+            <h1 class="text-2xl font-bold text-gray-900">L                            <input type="text"
+                                   x-model="newMessage"
+                                   placeholder="Type a message..."
+                                   class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                   maxlength="500">
+                            <button type="submit"
+                                    :disabled="!newMessage || !newMessage.trim()"
+                                    class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>ast: {{ $stream->title }}</h1>
             <div class="flex items-center mt-2 space-x-4">
                 <span class="px-3 py-1 rounded-full text-sm font-medium
                     @if($stream->status === 'live') bg-red-100 text-red-800
@@ -33,7 +42,7 @@
 @endsection
 
 @section('content')
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6" x-data="liveBroadcast()" x-init="init()">>
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6" x-data="liveBroadcast()" x-init="init()">
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Main Broadcast Area -->
         <div class="lg:col-span-2">
@@ -96,7 +105,7 @@
                             </button>
 
                             <!-- Multi-Camera Controls -->
-                            <div class="relative" x-data="{ showCameras: false }">
+                            <div class="relative">
                                 <button @click="showCameras = !showCameras"
                                         class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
                                     <i class="fas fa-video mr-2"></i>Cameras
@@ -123,7 +132,7 @@
                         <!-- Main Broadcast Button -->
                         <div>
                             <button x-show="!isStreaming" @click="startBroadcast()"
-                                    :disabled="connecting"
+                                    :disabled="connecting || false"
                                     class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-md text-lg font-medium transition-colors disabled:opacity-50">
                                 <span x-show="!connecting">
                                     <i class="fas fa-play mr-2"></i>Start Broadcast
@@ -143,20 +152,20 @@
                     <div x-show="isStreaming" class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                         <div class="bg-gray-50 p-3 rounded">
                             <div class="font-medium text-gray-500">Bitrate</div>
-                            <div class="text-lg font-bold" x-text="stats.bitrate + ' kbps'">0 kbps</div>
+                            <div class="text-lg font-bold" x-text="(stats?.bitrate || 0) + ' kbps'">0 kbps</div>
                         </div>
                         <div class="bg-gray-50 p-3 rounded">
                             <div class="font-medium text-gray-500">Resolution</div>
-                            <div class="text-lg font-bold" x-text="stats.resolution">0x0</div>
+                            <div class="text-lg font-bold" x-text="stats?.resolution || '0x0'">0x0</div>
                         </div>
                         <div class="bg-gray-50 p-3 rounded">
                             <div class="font-medium text-gray-500">FPS</div>
-                            <div class="text-lg font-bold" x-text="stats.fps">0</div>
+                            <div class="text-lg font-bold" x-text="stats?.fps || 0">0</div>
                         </div>
                         <div class="bg-gray-50 p-3 rounded">
                             <div class="font-medium text-gray-500">Network</div>
-                            <div class="text-lg font-bold" :class="stats.networkQuality >= 3 ? 'text-green-600' : stats.networkQuality >= 2 ? 'text-yellow-600' : 'text-red-600'"
-                                 x-text="getNetworkStatus(stats.networkQuality)">Good</div>
+                            <div class="text-lg font-bold" :class="(stats?.networkQuality || 0) >= 3 ? 'text-green-600' : (stats?.networkQuality || 0) >= 2 ? 'text-yellow-600' : 'text-red-600'"
+                                 x-text="getNetworkStatus(stats?.networkQuality || 0)">Good</div>
                         </div>
                     </div>
                 </div>
@@ -170,15 +179,15 @@
                 <div class="px-6 py-4 border-b border-gray-200">
                     <div class="flex justify-between items-center">
                         <h3 class="text-lg font-medium text-gray-900">Live Viewers</h3>
-                        <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm font-medium" x-text="viewerCount">0</span>
+                        <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm font-medium" x-text="viewerCount || 0">0</span>
                     </div>
                 </div>
                 <div class="p-4 max-h-64 overflow-y-auto">
-                    <div x-show="viewers.length === 0" class="text-center text-gray-500 py-8">
+                    <div x-show="!viewers || viewers.length === 0" class="text-center text-gray-500 py-8">
                         <i class="fas fa-users text-4xl mb-2 opacity-50"></i>
                         <p>No viewers yet</p>
                     </div>
-                    <div class="space-y-2" x-show="viewers.length > 0">
+                    <div class="space-y-2" x-show="viewers && viewers.length > 0">
                         <template x-for="viewer in viewers" :key="viewer.id">
                             <div class="flex items-center space-x-3 p-2 bg-gray-50 rounded">
                                 <img :src="viewer.avatar || '/images/default-avatar.png'"
@@ -203,11 +212,11 @@
                 <div class="p-4">
                     <!-- Chat Messages -->
                     <div id="chatMessages" class="h-64 overflow-y-auto mb-4 bg-gray-50 rounded p-3">
-                        <div x-show="chatMessages.length === 0" class="text-center text-gray-500 py-8">
+                        <div x-show="!chatMessages || chatMessages.length === 0" class="text-center text-gray-500 py-8">
                             <i class="fas fa-comments text-4xl mb-2 opacity-50"></i>
                             <p>No messages yet</p>
                         </div>
-                        <div class="space-y-2" x-show="chatMessages.length > 0">
+                        <div class="space-y-2" x-show="chatMessages && chatMessages.length > 0">
                             <template x-for="message in chatMessages" :key="message.id">
                                 <div class="flex items-start space-x-2">
                                     <img :src="message.avatar || '/images/default-avatar.png'"
@@ -252,7 +261,7 @@
 
 <script>
 function liveBroadcast() {
-    return {
+    const component = {
         // Stream info
         streamId: {{ $stream->id }},
         channelName: '{{ $stream->channel_name }}',
@@ -269,6 +278,7 @@ function liveBroadcast() {
         streamDuration: 0,
         viewerCount: 0,
         selectedCameraName: 'Default Camera',
+        showCameras: false,
 
         // Agora client
         agoraClient: null,
@@ -294,14 +304,18 @@ function liveBroadcast() {
         statsTimer: null,
 
         async init() {
-            console.log('Initializing live broadcast...');
+            console.log('Initializing live broadcast for stream:', this.streamId);
+            console.log('Alpine.js component context:', this);
+
+            // Small delay to ensure DOM is ready
+            await new Promise(resolve => setTimeout(resolve, 100));
 
             // Initialize Agora client
             this.agoraClient = AgoraRTC.createClient({ mode: "live", codec: "vp8" });
             this.agoraClient.setClientRole("host");
 
             // Setup event listeners
-            this.setupEventListeners();
+            this.setupAgoraEventListeners();
 
             // Get streaming token
             await this.getStreamToken();
@@ -310,13 +324,23 @@ function liveBroadcast() {
             await this.initializeLocalTracks();
 
             // Load camera sources
+            console.log('Loading camera sources...');
             await this.loadCameraSources();
 
             // Load viewers and chat
             this.loadViewers();
             this.loadChat();
 
-            console.log('Live broadcast initialized');
+            console.log('Live broadcast initialized successfully');
+        },
+
+        // Initial load methods
+        loadViewers() {
+            this.updateViewers();
+        },
+
+        loadChat() {
+            this.updateChat();
         },
 
         async getStreamToken() {
@@ -406,7 +430,8 @@ function liveBroadcast() {
         async loadCameraSources() {
             try {
                 // First, load cameras from the backend (those added in camera management)
-                const response = await fetch(`/admin/streams/${this.streamId}/cameras`, {
+                console.log('Loading cameras from backend for stream:', this.streamId);
+                const response = await fetch(`/admin/api/streams/${this.streamId}/cameras`, {
                     method: 'GET',
                     headers: {
                         'Accept': 'application/json',
@@ -414,13 +439,17 @@ function liveBroadcast() {
                     }
                 });
 
+                console.log('Backend cameras response status:', response.status);
                 let backendCameras = [];
                 if (response.ok) {
                     const data = await response.json();
+                    console.log('Backend cameras response data:', data);
                     if (data.success) {
-                        backendCameras = data.data.filter(camera => camera.is_active);
+                        backendCameras = data.data || [];
                         console.log('Backend cameras:', backendCameras);
                     }
+                } else {
+                    console.error('Failed to load backend cameras:', response.status, await response.text());
                 }
 
                 // Also get available local camera devices
@@ -430,20 +459,23 @@ function liveBroadcast() {
 
                 // Update camera sources list in dropdown
                 const cameraList = document.getElementById('cameraSourcesList');
+                console.log('Camera list element found:', !!cameraList);
+
                 if (cameraList) {
                     let cameraOptions = '';
 
                     // Add backend cameras first (these have priority)
                     if (backendCameras.length > 0) {
+                        console.log('Adding backend cameras to dropdown:', backendCameras.length);
                         cameraOptions += '<div class="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider border-b">Configured Cameras</div>';
                         backendCameras.forEach(camera => {
                             cameraOptions += `
-                                <button onclick="liveBroadcast().switchToBackendCamera('${camera.id}', '${camera.camera_name}', '${camera.device_id || ''}')"
+                                <button onclick="window.broadcastComponent.switchToBackendCamera('${camera.id}', '${camera.camera_name}', '${camera.device_id || ''}')"
                                         class="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 rounded transition-colors">
                                     <i class="fas fa-video mr-2 text-blue-500"></i>
                                     <span class="font-medium">${camera.camera_name}</span>
                                     ${camera.is_primary ? '<span class="ml-2 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">PRIMARY</span>' : ''}
-                                    <div class="text-xs text-gray-500">${camera.device_type} • ${camera.resolution}</div>
+                                    <div class="text-xs text-gray-500">${camera.device_type || 'Unknown'} • ${camera.resolution || '720p'}</div>
                                 </button>
                             `;
                         });
@@ -451,18 +483,21 @@ function liveBroadcast() {
 
                     // Add local devices
                     if (videoDevices.length > 0) {
+                        console.log('Adding local devices to dropdown:', videoDevices.length);
                         if (backendCameras.length > 0) {
                             cameraOptions += '<div class="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider border-b border-t mt-2">Local Devices</div>';
+                        } else {
+                            cameraOptions += '<div class="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider border-b">Available Cameras</div>';
                         }
-                        videoDevices.forEach(device => {
+                        videoDevices.forEach((device, index) => {
                             // Check if this device is already configured in backend
                             const isConfigured = backendCameras.some(bc => bc.device_id === device.deviceId);
                             if (!isConfigured) {
                                 cameraOptions += `
-                                    <button onclick="liveBroadcast().switchCameraSource('${device.deviceId}', '${device.label || 'Camera'}')"
+                                    <button onclick="window.broadcastComponent.switchCameraSource('${device.deviceId}', '${device.label || 'Camera'}')"
                                             class="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 rounded transition-colors">
                                         <i class="fas fa-video mr-2 text-gray-400"></i>
-                                        <span>${device.label || 'Camera ' + (videoDevices.indexOf(device) + 1)}</span>
+                                        <span>${device.label || 'Camera ' + (index + 1)}</span>
                                         <div class="text-xs text-gray-500">Local device</div>
                                     </button>
                                 `;
@@ -471,10 +506,20 @@ function liveBroadcast() {
                     }
 
                     if (cameraOptions) {
+                        console.log('Setting camera dropdown HTML:', cameraOptions.length, 'characters');
                         cameraList.innerHTML = cameraOptions;
+                        console.log('Camera dropdown updated successfully');
                     } else {
-                        cameraList.innerHTML = '<p class="text-sm text-gray-500 px-3 py-2">No cameras available</p>';
+                        console.log('No cameras found, showing fallback message');
+                        cameraList.innerHTML = `
+                            <p class="text-sm text-gray-500 px-3 py-2">No cameras available</p>
+                            <a href="{{ route('admin.streams.cameras', $stream) }}" class="block text-sm text-blue-600 hover:text-blue-700 px-3 py-2">
+                                <i class="fas fa-plus mr-2"></i>Add cameras in Camera Management
+                            </a>
+                        `;
                     }
+                } else {
+                    console.error('Camera list element not found!');
                 }
 
                 // Auto-select primary camera if available
@@ -511,11 +556,6 @@ function liveBroadcast() {
             } catch (error) {
                 console.error('Error switching to backend camera:', error);
                 alert('Failed to switch to camera: ' + error.message);
-            }
-        },
-
-            } catch (error) {
-                console.error('Error loading camera sources:', error);
             }
         },
 
@@ -876,7 +916,11 @@ function liveBroadcast() {
         updateViewerCount() {
             this.viewerCount = this.agoraClient.remoteUsers.length;
         }
-    }
+    };
+
+    // Make component globally accessible for onclick handlers
+    window.broadcastComponent = component;
+    return component;
 }
 
 // End broadcast function for header button

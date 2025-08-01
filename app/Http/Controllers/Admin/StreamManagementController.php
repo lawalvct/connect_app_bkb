@@ -228,9 +228,18 @@ class StreamManagementController extends Controller
                 ], 400);
             }
 
+            // Update stream to live status
             $stream->update([
                 'status' => 'live',
                 'started_at' => now()
+            ]);
+
+            // Log the stream start for debugging
+            \Log::info('Stream started successfully', [
+                'stream_id' => $stream->id,
+                'channel_name' => $stream->channel_name,
+                'user_id' => $stream->user_id,
+                'admin_id' => auth('admin')->id()
             ]);
 
             return response()->json([
@@ -240,6 +249,12 @@ class StreamManagementController extends Controller
             ]);
 
         } catch (\Exception $e) {
+            \Log::error('Failed to start stream', [
+                'stream_id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to start stream: ' . $e->getMessage()
@@ -274,6 +289,15 @@ class StreamManagementController extends Controller
                 'left_at' => now()
             ]);
 
+            // Log the stream end for debugging
+            Log::info('Stream ended successfully', [
+                'stream_id' => $stream->id,
+                'channel_name' => $stream->channel_name,
+                'user_id' => $stream->user_id,
+                'admin_id' => auth('admin')->id(),
+                'duration' => $stream->started_at ? now()->diffInMinutes($stream->started_at) : null
+            ]);
+
             return response()->json([
                 'success' => true,
                 'message' => 'Stream ended successfully',
@@ -281,6 +305,12 @@ class StreamManagementController extends Controller
             ]);
 
         } catch (\Exception $e) {
+            Log::error('Failed to end stream', [
+                'stream_id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to end stream: ' . $e->getMessage()

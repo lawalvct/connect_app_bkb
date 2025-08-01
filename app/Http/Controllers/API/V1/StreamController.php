@@ -278,7 +278,10 @@ class StreamController extends BaseController
     {
         try {
             $query = Stream::with(['user'])
-                ->where('deleted_flag', 'N')
+                ->where(function($q) {
+                    $q->where('deleted_flag', 'N')
+                      ->orWhereNull('deleted_flag');
+                })
                 ->where('status', 'live')
                 ->orderBy('created_at', 'desc');
 

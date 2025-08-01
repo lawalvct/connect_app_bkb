@@ -612,25 +612,58 @@ function cameraManagement() {
             try {
                 const cameraName = device.label || `Camera ${this.cameras.length + 1}`;
 
-                // Create new camera entry
-                const newCamera = {
+                // Prepare data for API
+                const cameraData = {
                     camera_name: cameraName,
                     device_type: this.getDeviceType(device.label),
                     resolution: '720p', // Default resolution
-                    device_id: device.deviceId,
+                    device_id: device.deviceId
+                };
+
+                // Save camera to database via API
+                console.log('Saving device camera to server:', cameraData);
+                const response = await fetch(`/admin/api/streams/${this.streamId}/cameras`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                    },
+                    body: JSON.stringify(cameraData)
+                });
+
+                const responseData = await response.json();
+
+                if (!response.ok) {
+                    if (responseData.errors) {
+                        const errorMessages = Object.values(responseData.errors).flat().join(', ');
+                        throw new Error(errorMessages);
+                    }
+                    throw new Error(responseData.message || 'Failed to save camera to server');
+                }
+
+                if (!responseData.success) {
+                    throw new Error(responseData.message || 'Failed to save camera to server');
+                }
+
+                // Camera saved successfully - create local entry
+                const newCamera = {
+                    ...responseData.data,
                     is_active: false,
-                    is_primary: this.cameras.length === 0 // First camera is primary
+                    status: 'ready'
                 };
 
                 // Test the device by creating a preview
-                await this.testCameraDevice(device.deviceId, newCamera);
+                try {
+                    await this.testCameraDevice(device.deviceId, newCamera);
+                    newCamera.is_active = true;
+                    newCamera.status = 'connected';
+                } catch (testError) {
+                    console.warn('Device test failed:', testError);
+                }
 
                 // Add to cameras list
-                this.cameras.push({
-                    ...newCamera,
-                    id: Date.now(), // Temporary ID for UI
-                    status: 'ready'
-                });
+                this.cameras.push(newCamera);
 
                 this.showDeviceModal = false;
                 this.showNotification(`Camera "${cameraName}" added successfully`, 'success');
@@ -829,28 +862,61 @@ function cameraManagement() {
                     }
                 }
 
-                // Create new camera entry
-                const camera = {
-                    id: Date.now(), // Temporary ID for UI
-                    camera_name: this.newCamera.camera_name,
+                // Prepare data for API
+                const cameraData = {
+                    camera_name: this.newCamera.camera_name.trim(),
                     device_type: deviceType,
                     resolution: this.newCamera.resolution || '720p',
-                    device_id: this.newCamera.device_id,
+                    device_id: this.newCamera.device_id || null
+                };
+
+                // Save camera to database via API
+                console.log('Saving camera to server:', cameraData);
+                const response = await fetch(`/admin/api/streams/${this.streamId}/cameras`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                    },
+                    body: JSON.stringify(cameraData)
+                });
+
+                const responseData = await response.json();
+
+                if (!response.ok) {
+                    if (responseData.errors) {
+                        const errorMessages = Object.values(responseData.errors).flat().join(', ');
+                        throw new Error(errorMessages);
+                    }
+                    throw new Error(responseData.message || 'Failed to save camera to server');
+                }
+
+                if (!responseData.success) {
+                    throw new Error(responseData.message || 'Failed to save camera to server');
+                }
+
+                // Camera saved successfully - add to local list
+                const camera = {
+                    ...responseData.data,
                     is_active: false,
-                    is_primary: this.cameras.length === 0, // First camera is primary
                     status: 'ready'
                 };
 
                 // If a device is selected, test it and create a preview
                 if (this.newCamera.device_id && selectedDevice) {
                     console.log('Testing camera device:', selectedDevice.label);
-                    await this.testCameraDevice(this.newCamera.device_id, camera);
-                    camera.is_active = true; // Auto-activate if device test succeeds
-                    camera.status = 'connected';
-
-                    this.showNotification(`Camera "${camera.camera_name}" added and connected successfully`, 'success');
+                    try {
+                        await this.testCameraDevice(this.newCamera.device_id, camera);
+                        camera.is_active = true;
+                        camera.status = 'connected';
+                        this.showNotification(`Camera "${camera.camera_name}" added and connected successfully`, 'success');
+                    } catch (testError) {
+                        console.warn('Device test failed:', testError);
+                        this.showNotification(`Camera "${camera.camera_name}" added but device connection failed`, 'warning');
+                    }
                 } else {
-                    this.showNotification(`Camera "${camera.camera_name}" added (not connected to device)`, 'success');
+                    this.showNotification(`Camera "${camera.camera_name}" added successfully`, 'success');
                 }
 
                 // Add to cameras list
@@ -869,7 +935,7 @@ function cameraManagement() {
 
             } catch (error) {
                 console.error('Error adding camera:', error);
-                this.showNotification(error.message, 'error');
+                this.showNotification(`Failed to add camera: ${error.message}`, 'error');
             } finally {
                 this.adding = false;
             }
