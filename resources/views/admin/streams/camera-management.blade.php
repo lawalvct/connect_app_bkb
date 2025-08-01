@@ -28,7 +28,7 @@
 @endsection
 
 @section('content')
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6" x-data="cameraManagement()" x-init="init()">>
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6" x-data="cameraManagement()" x-init="init()">>>
     <div class="grid grid-cols-1 xl:grid-cols-4 gap-6">
 
         <!-- Camera Grid -->
@@ -338,6 +338,49 @@
                     </div>
 
                     <div>
+                        <label for="camera_device" class="block text-sm font-medium text-gray-700 mb-2">Camera Device</label>
+                        <div class="space-y-2">
+                            <!-- Detect Devices Button -->
+                            <button type="button" @click="detectDevicesForForm()" :disabled="detectingDevices"
+                                    class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-md text-sm font-medium border border-gray-300 disabled:opacity-50">
+                                <i :class="detectingDevices ? 'fas fa-spinner fa-spin' : 'fas fa-search'" class="mr-2"></i>
+                                <span x-text="detectingDevices ? 'Detecting...' : 'Detect Available Cameras'"></span>
+                            </button>
+
+                            <!-- Device Selection -->
+                            <select id="camera_device" x-model="newCamera.device_id"
+                                    class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500">
+                                <option value="">Select a camera device</option>
+                                <template x-for="device in availableDevices" :key="device.deviceId">
+                                    <option :value="device.deviceId"
+                                            :disabled="isDeviceInUse(device.deviceId)"
+                                            x-text="(device.label || 'Unknown Camera') + (isDeviceInUse(device.deviceId) ? ' (In Use)' : '')"></option>
+                                </template>
+                            </select>
+
+                            <!-- Device Info -->
+                            <div x-show="newCamera.device_id" class="text-xs text-gray-500 space-y-1">
+                                <template x-for="device in availableDevices" :key="device.deviceId">
+                                    <div x-show="device.deviceId === newCamera.device_id">
+                                        <div>Device ID: <span x-text="device.deviceId.substring(0, 20) + '...'"></span></div>
+                                        <div x-show="isDeviceInUse(device.deviceId)" class="text-orange-600 font-medium">
+                                            ⚠️ <span x-text="getDeviceUsageInfo(device.deviceId)"></span>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+
+                            <!-- Test Camera Button -->
+                            <button type="button" x-show="newCamera.device_id && !isDeviceInUse(newCamera.device_id)"
+                                    @click="testSelectedDevice()" :disabled="testing"
+                                    class="w-full bg-green-100 hover:bg-green-200 text-green-700 px-3 py-2 rounded-md text-sm font-medium border border-green-300 disabled:opacity-50">
+                                <i :class="testing ? 'fas fa-spinner fa-spin' : 'fas fa-eye'" class="mr-2"></i>
+                                <span x-text="testing ? 'Testing...' : 'Test Camera Preview'"></span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div>
                         <label for="resolution" class="block text-sm font-medium text-gray-700 mb-2">Resolution</label>
                         <select id="resolution" x-model="newCamera.resolution"
                                 class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500">
@@ -389,6 +432,7 @@ function cameraManagement() {
         showDeviceModal: false,
         adding: false,
         detectingDevices: false,
+        testing: false,
 
         // Form data
         newCamera: {
@@ -470,6 +514,100 @@ function cameraManagement() {
             this.detectingDevices = false;
         },
 
+        async detectDevicesForForm() {
+            this.detectingDevices = true;
+            console.log('Starting device detection for form...');
+
+            try {
+                // Request camera permissions
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                stream.getTracks().forEach(track => track.stop()); // Stop the test stream
+
+                // Get list of devices
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+
+                console.log('Found video devices for form:', videoDevices);
+                this.availableDevices = videoDevices;
+
+                if (videoDevices.length === 0) {
+                    alert('No camera devices found. Please connect a camera and try again.');
+                } else {
+                    this.showNotification(`Found ${videoDevices.length} camera device(s)`, 'success');
+                }
+
+            } catch (error) {
+                console.error('Error detecting devices for form:', error);
+                alert('Could not access camera devices. Please ensure cameras are connected and permissions are granted.');
+            }
+            this.detectingDevices = false;
+        },
+
+        async testSelectedDevice() {
+            if (!this.newCamera.device_id) return;
+
+            this.testing = true;
+            let testTrack = null;
+
+            try {
+                // Create a test video track
+                testTrack = await AgoraRTC.createCameraVideoTrack({
+                    cameraId: this.newCamera.device_id,
+                    encoderConfig: this.getEncoderConfig(this.newCamera.resolution || '720p')
+                });
+
+                // Create a test preview window
+                const testWindow = window.open('', 'CameraTest', 'width=640,height=480,scrollbars=no,resizable=yes');
+                testWindow.document.write(`
+                    <html>
+                        <head>
+                            <title>Camera Test Preview</title>
+                            <style>
+                                body { margin: 0; padding: 20px; background: #000; color: white; font-family: Arial, sans-serif; }
+                                #preview { width: 100%; height: 360px; background: #222; border-radius: 8px; }
+                                .controls { text-align: center; margin-top: 15px; }
+                                button { background: #e53e3e; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; }
+                                button:hover { background: #c53030; }
+                            </style>
+                        </head>
+                        <body>
+                            <h3>Camera Test: ${this.newCamera.camera_name || 'Unnamed Camera'}</h3>
+                            <div id="preview"></div>
+                            <div class="controls">
+                                <button onclick="window.close()">Close Test</button>
+                            </div>
+                        </body>
+                    </html>
+                `);
+
+                // Play the test video in the popup
+                const previewElement = testWindow.document.getElementById('preview');
+                testTrack.play(previewElement);
+
+                // Clean up when window closes
+                testWindow.addEventListener('beforeunload', () => {
+                    if (testTrack) {
+                        testTrack.stop();
+                        testTrack.close();
+                    }
+                });
+
+                this.showNotification('Camera test opened in new window', 'success');
+
+            } catch (error) {
+                console.error('Error testing camera:', error);
+                this.showNotification('Failed to test camera: ' + error.message, 'error');
+
+                // Clean up on error
+                if (testTrack) {
+                    testTrack.stop();
+                    testTrack.close();
+                }
+            } finally {
+                this.testing = false;
+            }
+        },
+
         async addDeviceAsCamera(device) {
             try {
                 const cameraName = device.label || `Camera ${this.cameras.length + 1}`;
@@ -538,6 +676,15 @@ function cameraManagement() {
             if (lowerLabel.includes('usb') || lowerLabel.includes('webcam')) return 'camera';
             if (lowerLabel.includes('tablet')) return 'tablet';
             return 'other';
+        },
+
+        isDeviceInUse(deviceId) {
+            return this.cameras.some(camera => camera.device_id === deviceId);
+        },
+
+        getDeviceUsageInfo(deviceId) {
+            const camera = this.cameras.find(camera => camera.device_id === deviceId);
+            return camera ? `Used by: ${camera.camera_name}` : null;
         },
 
         getEncoderConfig(resolution) {
@@ -668,17 +815,43 @@ function cameraManagement() {
                     throw new Error('Camera name is required');
                 }
 
+                // Get device info if device_id is selected
+                let selectedDevice = null;
+                let deviceType = this.newCamera.device_type || 'other';
+
+                if (this.newCamera.device_id) {
+                    selectedDevice = this.availableDevices.find(d => d.deviceId === this.newCamera.device_id);
+                    if (selectedDevice) {
+                        // Auto-detect device type if not manually selected
+                        if (!this.newCamera.device_type) {
+                            deviceType = this.getDeviceType(selectedDevice.label);
+                        }
+                    }
+                }
+
                 // Create new camera entry
                 const camera = {
                     id: Date.now(), // Temporary ID for UI
                     camera_name: this.newCamera.camera_name,
-                    device_type: this.newCamera.device_type || 'other',
+                    device_type: deviceType,
                     resolution: this.newCamera.resolution || '720p',
                     device_id: this.newCamera.device_id,
                     is_active: false,
                     is_primary: this.cameras.length === 0, // First camera is primary
                     status: 'ready'
                 };
+
+                // If a device is selected, test it and create a preview
+                if (this.newCamera.device_id && selectedDevice) {
+                    console.log('Testing camera device:', selectedDevice.label);
+                    await this.testCameraDevice(this.newCamera.device_id, camera);
+                    camera.is_active = true; // Auto-activate if device test succeeds
+                    camera.status = 'connected';
+
+                    this.showNotification(`Camera "${camera.camera_name}" added and connected successfully`, 'success');
+                } else {
+                    this.showNotification(`Camera "${camera.camera_name}" added (not connected to device)`, 'success');
+                }
 
                 // Add to cameras list
                 this.cameras.push(camera);
@@ -693,8 +866,6 @@ function cameraManagement() {
 
                 // Close modal
                 this.showAddCameraModal = false;
-
-                this.showNotification(`Camera "${camera.camera_name}" added successfully`, 'success');
 
             } catch (error) {
                 console.error('Error adding camera:', error);
