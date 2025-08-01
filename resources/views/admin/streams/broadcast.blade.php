@@ -594,76 +594,92 @@ function liveBroadcast() {
                     }
                 });
 
-                // If streaming, replace the track smoothly
-                if (this.isStreaming && this.agoraClient) {
-                    try {
-                        console.log('Replacing video track for live stream...');
+                console.log('New video track created successfully');
 
-                        // Step 1: Unpublish old track first and wait for completion
+                // If streaming, use simple replacement approach
+                if (this.isStreaming && this.agoraClient) {
+                    console.log('Simple camera replacement for live stream...');
+
+                    try {
+                        // Stop old track first to free up resources
                         if (oldVideoTrack) {
-                            console.log('Unpublishing old video track...');
-                            await this.agoraClient.unpublish([oldVideoTrack]);
-                            console.log('Old video track unpublished successfully');
+                            oldVideoTrack.stop();
+                            console.log('Old track stopped');
                         }
 
-                        // Step 2: Update local reference
+                        // Update reference immediately
                         this.localVideoTrack = newVideoTrack;
 
-                        // Step 3: Play new video locally first
-                        console.log('Playing new video track locally...');
+                        // Play new track locally
                         this.localVideoTrack.play('localVideo');
+                        console.log('New track playing locally');
 
-                        // Step 4: Small delay to ensure local playback is stable
-                        await new Promise(resolve => setTimeout(resolve, 100));
+                        // For live streams, let's try a different approach
+                        // Instead of unpublish/publish, let's restart the stream
+                        console.log('Restarting stream with new camera...');
 
-                        // Step 5: Publish new track
-                        console.log('Publishing new video track...');
-                        await this.agoraClient.publish([this.localVideoTrack]);
-                        console.log('New video track published successfully');
+                        // Leave and rejoin with new track
+                        await this.agoraClient.unpublish();
+                        await new Promise(resolve => setTimeout(resolve, 500));
 
-                        // Step 6: Clean up old track after successful publish
+                        // Publish with new track
+                        await this.agoraClient.publish([this.localAudioTrack, this.localVideoTrack]);
+                        console.log('Stream restarted with new camera');
+
+                        // Clean up old track
                         if (oldVideoTrack) {
-                            console.log('Cleaning up old video track...');
-                            oldVideoTrack.stop();
-                            oldVideoTrack.close();
-                            console.log('Old video track cleaned up');
+                            try {
+                                oldVideoTrack.close();
+                                console.log('Old track cleaned up');
+                            } catch (cleanupError) {
+                                console.error('Error cleaning up old track:', cleanupError);
+                            }
                         }
 
-                    } catch (republishError) {
-                        console.error('Error switching camera during live stream:', republishError);
+                    } catch (streamError) {
+                        console.error('Error during stream camera switch:', streamError);
 
-                        // Cleanup the new track if it failed
-                        if (newVideoTrack && newVideoTrack !== this.localVideoTrack) {
-                            try {
+                        // Try to restore with a completely fresh start
+                        try {
+                            console.log('Attempting complete stream recovery...');
+
+                            // Stop everything
+                            await this.agoraClient.unpublish().catch(e => console.log('Unpublish error ignored:', e));
+
+                            // Clean up failed track
+                            if (newVideoTrack && newVideoTrack !== this.localVideoTrack) {
                                 newVideoTrack.stop();
                                 newVideoTrack.close();
-                            } catch (cleanupError) {
-                                console.error('Error cleaning up failed new track:', cleanupError);
                             }
-                        }
 
-                        // Fallback: try to restore old track if possible
-                        if (oldVideoTrack) {
-                            try {
-                                console.log('Attempting to restore old video track...');
-                                this.localVideoTrack = oldVideoTrack;
-                                this.localVideoTrack.play('localVideo');
+                            // Create a fresh video track (default camera)
+                            this.localVideoTrack = await AgoraRTC.createCameraVideoTrack({
+                                encoderConfig: {
+                                    width: 1280,
+                                    height: 720,
+                                    frameRate: 30,
+                                    bitrateMin: 1000,
+                                    bitrateMax: 3000,
+                                }
+                            });
 
-                                // Try to republish the old track
-                                await this.agoraClient.publish([this.localVideoTrack]);
-                                console.log('Successfully restored old video track');
+                            this.localVideoTrack.play('localVideo');
 
-                                throw new Error(`Camera switch failed: ${republishError.message}. Restored previous camera.`);
-                            } catch (revertError) {
-                                console.error('Failed to restore old camera:', revertError);
-                                throw new Error(`Camera switch failed: ${republishError.message}. Could not restore previous camera.`);
-                            }
-                        } else {
-                            throw republishError;
+                            // Restart stream
+                            await new Promise(resolve => setTimeout(resolve, 500));
+                            await this.agoraClient.publish([this.localAudioTrack, this.localVideoTrack]);
+
+                            console.log('Stream recovered with default camera');
+                            throw new Error(`Camera switch failed. Stream recovered with default camera. Consider using OBS Virtual Camera for smoother switching.`);
+
+                        } catch (recoveryError) {
+                            console.error('Recovery failed:', recoveryError);
+                            throw new Error(`Camera switch failed and recovery unsuccessful. Please restart the broadcast or use OBS/ManyCam virtual camera.`);
                         }
                     }
+
                 } else {
-                    // Not streaming, just replace locally
+                    // Not streaming, simple local replacement
                     console.log('Replacing video track locally (not streaming)...');
 
                     if (oldVideoTrack) {
@@ -679,13 +695,9 @@ function liveBroadcast() {
                 this.selectedCameraName = deviceName;
                 console.log(`Successfully switched to: ${deviceName}`);
 
-                // Optional: Show success message instead of alert
-                // You could show a toast notification here instead
-                console.log(`Camera switched to: ${deviceName}`);
-
             } catch (error) {
                 console.error('Error switching camera source:', error);
-                alert('Failed to switch camera: ' + error.message);
+                alert(error.message);
             } finally {
                 // Always release the lock
                 this.switchingCamera = false;
@@ -818,12 +830,12 @@ function liveBroadcast() {
                     if (this.isStreaming && this.agoraClient) {
                         console.log('Replacing camera with screen share...');
 
-                        // Unpublish camera track first
+                        // Unpublish camera track first and wait
                         await this.agoraClient.unpublish([this.localVideoTrack]);
                         console.log('Camera track unpublished');
 
-                        // Small delay for stability
-                        await new Promise(resolve => setTimeout(resolve, 100));
+                        // Longer delay for stability
+                        await new Promise(resolve => setTimeout(resolve, 200));
 
                         // Publish screen share track
                         await this.agoraClient.publish([this.localScreenTrack]);
@@ -841,12 +853,12 @@ function liveBroadcast() {
                     if (this.isStreaming && this.agoraClient) {
                         console.log('Replacing screen share with camera...');
 
-                        // Unpublish screen share track first
+                        // Unpublish screen share track first and wait
                         await this.agoraClient.unpublish([this.localScreenTrack]);
                         console.log('Screen share track unpublished');
 
-                        // Small delay for stability
-                        await new Promise(resolve => setTimeout(resolve, 100));
+                        // Longer delay for stability
+                        await new Promise(resolve => setTimeout(resolve, 200));
 
                         // Publish camera track
                         await this.agoraClient.publish([this.localVideoTrack]);
@@ -856,6 +868,7 @@ function liveBroadcast() {
                     // Clean up screen share track
                     this.localScreenTrack.stop();
                     this.localScreenTrack.close();
+                    this.localScreenTrack = null;
 
                     // Play camera locally
                     this.localVideoTrack.play('localVideo');
@@ -867,7 +880,22 @@ function liveBroadcast() {
                 alert('Failed to toggle screen share: ' + error.message);
 
                 // Try to restore previous state
-                this.screenSharing = !this.screenSharing;
+                if (this.screenSharing && this.localScreenTrack) {
+                    try {
+                        this.localScreenTrack.stop();
+                        this.localScreenTrack.close();
+                        this.localScreenTrack = null;
+                    } catch (cleanupError) {
+                        console.error('Error cleaning up screen share track:', cleanupError);
+                    }
+                }
+
+                this.screenSharing = false;
+
+                // Ensure camera is playing locally
+                if (this.localVideoTrack) {
+                    this.localVideoTrack.play('localVideo');
+                }
             }
         },
 

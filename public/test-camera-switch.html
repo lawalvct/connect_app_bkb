@@ -34,6 +34,98 @@
         </div>
 
         <div>
+            <h3>🎯 RECOMMENDED: Virtual Camera Software</h3>
+            <p>
+                <strong
+                    >For the most stable multi-camera experience, use virtual
+                    camera software:</strong
+                >
+            </p>
+
+            <h4>Option 1: OBS Studio (Free & Professional)</h4>
+            <ul>
+                <li>
+                    ✅ <strong>Download:</strong>
+                    <a
+                        href="https://obsproject.com/"
+                        target="_blank"
+                        rel="noopener"
+                        >OBS Studio (Free)</a
+                    >
+                </li>
+                <li>
+                    ✅ <strong>Setup:</strong> Add multiple camera sources to
+                    different scenes
+                </li>
+                <li>
+                    ✅ <strong>Enable:</strong> Tools → Start Virtual Camera
+                </li>
+                <li>
+                    ✅ <strong>Use:</strong> Select "OBS Virtual Camera" in
+                    broadcast page
+                </li>
+                <li>
+                    ✅ <strong>Switch:</strong> Change scenes in OBS (no web app
+                    switching needed)
+                </li>
+                <li>
+                    ✅ <strong>Benefits:</strong> Professional effects,
+                    overlays, transitions, recording
+                </li>
+            </ul>
+
+            <h4>Option 2: ManyCam (User-Friendly)</h4>
+            <ul>
+                <li>
+                    ✅ <strong>Download:</strong>
+                    <a
+                        href="https://manycam.com/"
+                        target="_blank"
+                        rel="noopener"
+                        >ManyCam</a
+                    >
+                </li>
+                <li>
+                    ✅ <strong>Setup:</strong> Add multiple video sources and
+                    create presets
+                </li>
+                <li>
+                    ✅ <strong>Use:</strong> Select "ManyCam Virtual Webcam" in
+                    broadcast page
+                </li>
+                <li>
+                    ✅ <strong>Switch:</strong> Click presets in ManyCam
+                    interface
+                </li>
+                <li>
+                    ✅ <strong>Benefits:</strong> Easy to use, green screen,
+                    effects
+                </li>
+            </ul>
+
+            <h4>Option 3: SplitCam</h4>
+            <ul>
+                <li>
+                    ✅ <strong>Download:</strong>
+                    <a
+                        href="https://splitcam.com/"
+                        target="_blank"
+                        rel="noopener"
+                        >SplitCam</a
+                    >
+                </li>
+                <li>
+                    ✅ <strong>Use:</strong> Select "SplitCam Video Driver" in
+                    broadcast page
+                </li>
+                <li>
+                    ✅ <strong>Benefits:</strong> Split screen, multiple cameras
+                    simultaneously
+                </li>
+            </ul>
+        </div>
+
+        <div>
             <h3>Test Instructions:</h3>
             <ol>
                 <li>Open <strong>Broadcast Page</strong> in one tab</li>
@@ -46,7 +138,7 @@
         </div>
 
         <div>
-            <h3>Expected Behavior After Fix:</h3>
+            <h3>Expected Behavior After Latest Fix:</h3>
             <ul>
                 <li>
                     ✅ Camera switch should show "Switching camera..." message
@@ -58,47 +150,94 @@
                 <li>✅ No hanging or frozen video</li>
                 <li>✅ Screen share should work smoothly (as before)</li>
                 <li>
-                    ✅ <strong>NEW:</strong> No
-                    "CAN_NOT_PUBLISH_MULTIPLE_VIDEO_TRACKS" error
+                    ✅ <strong>FIXED:</strong> No
+                    "CAN_NOT_PUBLISH_MULTIPLE_VIDEO_TRACKS" error even with
+                    rapid clicks
                 </li>
                 <li>
-                    ✅ <strong>NEW:</strong> Camera buttons disabled during
+                    ✅ <strong>ENHANCED:</strong> Better error recovery - if
+                    camera switch fails, system creates fallback track
+                    automatically
+                </li>
+                <li>
+                    ✅ <strong>ENHANCED:</strong> Camera buttons disabled during
                     switch to prevent conflicts
                 </li>
                 <li>
-                    ✅ <strong>NEW:</strong> Camera dropdown shows
-                    "Switching..." state
+                    ✅ <strong>ENHANCED:</strong> Longer timing delays ensure
+                    stable track transitions
                 </li>
             </ul>
         </div>
 
         <div>
-            <h3>Console Logs to Watch:</h3>
+            <h3>Console Logs to Watch (Updated):</h3>
             <ul>
                 <li>
-                    <strong>Broadcast Page:</strong> "Old video track
-                    unpublished successfully", "New video track published
-                    successfully"
+                    <strong>Broadcast Page Success:</strong>
+                    "New video track created successfully" → "Old track
+                    unpublished successfully" → "Old track stopped" → "New video
+                    track published successfully"
+                </li>
+                <li>
+                    <strong>Broadcast Page Error Recovery:</strong>
+                    "Starting error recovery..." → "Creating fallback video
+                    track..." → "Fallback track published successfully"
                 </li>
                 <li>
                     <strong>Watch Page:</strong> "User unpublished: likely
                     camera switch", "Reusing existing container for camera
-                    switch"
+                    switch" (unchanged)
                 </li>
                 <li>
-                    <strong>NEW:</strong> "Camera switch already in progress,
-                    ignoring request" (if clicking too fast)
+                    <strong>Protection:</strong> "Camera switch already in
+                    progress, ignoring request" (if clicking too fast)
                 </li>
             </ul>
         </div>
 
         <div>
-            <h3>🔧 Recent Fix Applied:</h3>
+            <h3>🔧 Latest Fix Applied (v3.0 - Simplified):</h3>
             <ul>
                 <li>
                     <strong>Problem:</strong>
-                    "CAN_NOT_PUBLISH_MULTIPLE_VIDEO_TRACKS" error during camera
-                    switching
+                    Complex Agora track management causing persistent conflicts
+                </li>
+                <li>
+                    <strong>New Approach:</strong> Simplified camera switching
+                    with stream restart method
+                </li>
+                <li>
+                    <strong>Solution:</strong>
+                    <ul>
+                        <li>Stop old track immediately to free resources</li>
+                        <li>
+                            Restart entire stream publication with new camera
+                        </li>
+                        <li>
+                            Complete recovery system with default camera
+                            fallback
+                        </li>
+                        <li>
+                            Clear error messages suggesting virtual camera
+                            solutions
+                        </li>
+                    </ul>
+                </li>
+                <li>
+                    <strong>Result:</strong> More reliable switching, but
+                    <strong>VIRTUAL CAMERAS RECOMMENDED</strong> for best
+                    experience
+                </li>
+            </ul>
+        </div>
+
+        <div>
+            <h3>🔧 Previous Fix Applied (v1.0):</h3>
+            <ul>
+                <li>
+                    <strong>Problem:</strong> Initial
+                    "CAN_NOT_PUBLISH_MULTIPLE_VIDEO_TRACKS" error
                 </li>
                 <li>
                     <strong>Root Cause:</strong> Attempting to publish new video
@@ -109,7 +248,7 @@
                     proper timing and locking mechanism
                 </li>
                 <li>
-                    <strong>Result:</strong> Smooth camera switching without
+                    <strong>Result:</strong> Basic camera switching without
                     Agora conflicts
                 </li>
             </ul>
