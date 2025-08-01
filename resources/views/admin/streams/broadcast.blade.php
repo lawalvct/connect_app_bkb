@@ -125,7 +125,38 @@
                                             </a>
                                         </div>
 
-                                      
+                                        <!-- RTMP Streaming Option -->
+                                        <div class="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                                            <div class="flex items-center justify-between mb-2">
+                                                <h5 class="text-sm font-semibold text-purple-800">
+                                                    <i class="fas fa-broadcast-tower mr-2"></i>
+                                                    Professional Streaming Software
+                                                </h5>
+                                                <button @click="showRtmpDetails = !showRtmpDetails"
+                                                        class="text-purple-600 hover:text-purple-800 text-sm">
+                                                    <span x-text="showRtmpDetails ? 'Hide' : 'Show'">Show</span>
+                                                </button>
+                                            </div>
+                                            <p class="text-xs text-purple-600 mb-2">
+                                                Use ManyCam, SplitCam, OBS, or XSplit for professional multi-camera control
+                                            </p>
+                                            <div x-show="showRtmpDetails" class="space-y-2">
+                                                <div class="text-xs">
+                                                    <div class="font-medium text-gray-700">RTMP Server:</div>
+                                                    <code x-text="rtmpDetails?.rtmp_url || 'Loading...'" class="text-xs bg-gray-100 px-2 py-1 rounded"></code>
+                                                </div>
+                                                <div class="text-xs">
+                                                    <div class="font-medium text-gray-700">Stream Key:</div>
+                                                    <code x-text="rtmpDetails?.stream_key || 'Loading...'" class="text-xs bg-gray-100 px-2 py-1 rounded"></code>
+                                                </div>
+                                                <button @click="loadRtmpDetails()"
+                                                        class="text-xs bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700">
+                                                    Get RTMP Details
+                                                </button>
+                                            </div>
+                                        </div>
+
+
 
                                         <div id="cameraSourcesList" class="space-y-2">
                                             <p class="text-sm text-gray-500">Loading camera sources...</p>
@@ -286,6 +317,8 @@ function liveBroadcast() {
         selectedCameraName: 'Default Camera',
         showCameras: false,
         switchingCamera: false, // Add lock for camera operations
+        showRtmpDetails: false,
+        rtmpDetails: null,
 
         // Agora client
         agoraClient: null,
@@ -1067,6 +1100,138 @@ function liveBroadcast() {
 
         updateViewerCount() {
             this.viewerCount = this.agoraClient.remoteUsers.length;
+        },
+
+        // RTMP Streaming Methods
+        async loadRtmpDetails() {
+            try {
+                console.log('Loading RTMP details for stream:', this.streamId);
+
+                const response = await fetch(`/admin/api/streams/${this.streamId}/rtmp-details`, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('RTMP details loaded:', data);
+
+                    if (data.success) {
+                        this.rtmpDetails = data.data;
+                        this.showRtmpDetails = true;
+
+                        // Show detailed RTMP setup modal
+                        this.showRtmpSetupModal(data.data);
+                    } else {
+                        alert('Failed to get RTMP details: ' + data.message);
+                    }
+                } else {
+                    const errorText = await response.text();
+                    console.error('RTMP details error:', errorText);
+                    alert('Failed to load RTMP details');
+                }
+            } catch (error) {
+                console.error('Error loading RTMP details:', error);
+                alert('Error loading RTMP details: ' + error.message);
+            }
+        },
+
+        showRtmpSetupModal(rtmpData) {
+            const modalContent = `
+                <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onclick="this.remove()">
+                    <div class="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-96 overflow-y-auto" onclick="event.stopPropagation()">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-bold">RTMP Streaming Setup</h3>
+                            <button onclick="this.closest('.fixed').remove()" class="text-gray-500 hover:text-gray-700">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+
+                        <div class="space-y-4">
+                            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                                <h4 class="font-semibold text-yellow-800 mb-2">
+                                    <i class="fas fa-exclamation-triangle mr-2"></i>
+                                    Connection Details
+                                </h4>
+                                <div class="space-y-2 text-sm">
+                                    <div>
+                                        <strong>RTMP Server:</strong>
+                                        <code class="bg-gray-100 px-2 py-1 rounded">${rtmpData.rtmp_url}</code>
+                                        <button onclick="navigator.clipboard.writeText('${rtmpData.rtmp_url}')" class="ml-2 text-blue-600 hover:text-blue-800">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    <div>
+                                        <strong>Stream Key:</strong>
+                                        <code class="bg-gray-100 px-2 py-1 rounded">${rtmpData.stream_key}</code>
+                                        <button onclick="navigator.clipboard.writeText('${rtmpData.stream_key}')" class="ml-2 text-blue-600 hover:text-blue-800">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="grid md:grid-cols-2 gap-4">
+                                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                    <h4 class="font-semibold text-blue-800 mb-2">
+                                        <i class="fas fa-video mr-2"></i>ManyCam Setup
+                                    </h4>
+                                    <ol class="text-xs space-y-1 text-blue-700">
+                                        ${rtmpData.software_guides?.manycam?.steps?.map(step => `<li>${step}</li>`).join('') || ''}
+                                    </ol>
+                                </div>
+
+                                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                                    <h4 class="font-semibold text-green-800 mb-2">
+                                        <i class="fas fa-cut mr-2"></i>SplitCam Setup
+                                    </h4>
+                                    <ol class="text-xs space-y-1 text-green-700">
+                                        ${rtmpData.software_guides?.splitcam?.steps?.map(step => `<li>${step}</li>`).join('') || ''}
+                                    </ol>
+                                </div>
+                            </div>
+
+                            <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                                <h4 class="font-semibold text-gray-800 mb-2">Recommended Settings</h4>
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                                    <div>
+                                        <strong>Resolution:</strong><br>
+                                        <span class="text-gray-600">${rtmpData.recommended_settings?.resolution || '1920x1080'}</span>
+                                    </div>
+                                    <div>
+                                        <strong>Bitrate:</strong><br>
+                                        <span class="text-gray-600">${rtmpData.recommended_settings?.bitrate || '3000 kbps'}</span>
+                                    </div>
+                                    <div>
+                                        <strong>FPS:</strong><br>
+                                        <span class="text-gray-600">${rtmpData.recommended_settings?.fps || '30'}</span>
+                                    </div>
+                                    <div>
+                                        <strong>Audio:</strong><br>
+                                        <span class="text-gray-600">${rtmpData.recommended_settings?.audio_bitrate || '128 kbps'}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="flex justify-end space-x-2">
+                                <button onclick="this.closest('.fixed').remove()"
+                                        class="px-4 py-2 text-gray-600 border border-gray-300 rounded hover:bg-gray-50">
+                                    Close
+                                </button>
+                                <a href="/admin/streams/${this.streamId}/cameras"
+                                   class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                                    Manage Cameras
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.body.insertAdjacentHTML('beforeend', modalContent);
         }
     };
 

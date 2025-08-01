@@ -10,6 +10,7 @@ use App\Http\Controllers\Admin\StoryManagementController;
 use App\Http\Controllers\Admin\AdManagementController;
 use App\Http\Controllers\Admin\SubscriptionManagementController;
 use App\Http\Controllers\Admin\StreamManagementController;
+use App\Http\Controllers\Admin\RtmpController;
 
 // Admin Authentication Routes
 Route::prefix('admin')->name('admin.')->group(function () {
@@ -84,6 +85,13 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('/streams/{id}/mixer-settings', [StreamManagementController::class, 'getMixerSettings']);
             Route::put('/streams/{id}/mixer-settings', [StreamManagementController::class, 'updateMixerSettings']);
             Route::get('/streams/{id}/camera-switches', [StreamManagementController::class, 'getCameraSwitchHistory']);
+
+            // RTMP Streaming API
+            Route::get('/streams/{id}/rtmp-details', [RtmpController::class, 'getStreamRtmpDetails']);
+            Route::put('/streams/{id}/rtmp-settings', [RtmpController::class, 'updateRtmpSettings']);
+            Route::get('/streams/{id}/rtmp-status', [RtmpController::class, 'checkRtmpStatus']);
+            Route::post('/streams/{id}/rtmp-stop', [RtmpController::class, 'stopRtmpStream']);
+            Route::post('/rtmp-heartbeat', [RtmpController::class, 'rtmpHeartbeat']); // Called by RTMP server
 
             // Debug route for Agora configuration
             Route::get('/test-agora', function () {

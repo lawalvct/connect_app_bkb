@@ -117,6 +117,11 @@ class Stream extends Model
         return $this->hasOne(StreamMixerSetting::class);
     }
 
+    public function rtmpStream(): HasOne
+    {
+        return $this->hasOne(RtmpStream::class);
+    }
+
     // Scopes
     public function scopeLive($query)
     {
@@ -329,5 +334,34 @@ class Stream extends Model
     public function getActiveCameraCount(): int
     {
         return $this->activeCameras()->count();
+    }
+
+    // RTMP Stream methods
+    public function createRtmpStream($softwareType = 'manycam'): RtmpStream
+    {
+        return $this->rtmpStream()->create([
+            'rtmp_url' => config('streaming.rtmp.server_url', 'rtmp://localhost/live'),
+            'stream_key' => $this->id . '_' . bin2hex(random_bytes(16)),
+            'software_type' => $softwareType,
+            'resolution' => config('streaming.streaming_software.default_resolution', '1920x1080'),
+            'bitrate' => config('streaming.streaming_software.default_bitrate', 3000),
+            'fps' => config('streaming.streaming_software.default_fps', 30),
+            'is_active' => false
+        ]);
+    }
+
+    public function getRtmpConnectionDetails(): array
+    {
+        $rtmpStream = $this->rtmpStream;
+
+        if (!$rtmpStream) {
+            $rtmpStream = $this->createRtmpStream();
+        }
+
+        return [
+            'rtmp_url' => $rtmpStream->rtmp_url,
+            'stream_key' => $rtmpStream->stream_key,
+            'full_url' => $rtmpStream->getFullRtmpUrl()
+        ];
     }
 }
