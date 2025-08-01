@@ -222,6 +222,20 @@
             width: 100%;
             height: 100%;
             position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .remote-video-container .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 10;
         }
     </style>
 </head>
@@ -297,6 +311,35 @@
             agoraClient.on("user-published", handleUserPublished);
             agoraClient.on("user-unpublished", handleUserUnpublished);
             agoraClient.on("user-left", handleUserLeft);
+
+            // Additional event listeners for better camera switch handling
+            agoraClient.on("user-joined", (user) => {
+                console.log('User joined:', user.uid);
+            });
+
+            agoraClient.on("connection-state-changed", (curState, revState, reason) => {
+                console.log('Connection state changed:', curState, 'Previous:', revState, 'Reason:', reason);
+
+                if (curState === "DISCONNECTED" || curState === "FAILED") {
+                    updateStatus('connecting', 'Reconnecting...');
+                } else if (curState === "CONNECTED") {
+                    updateStatus('live', 'Watching Live');
+                }
+            });
+
+            agoraClient.on("stream-type-changed", (uid, streamType) => {
+                console.log('Stream type changed for user:', uid, 'New type:', streamType);
+            });
+
+            agoraClient.on("exception", (evt) => {
+                console.log('Agora exception:', evt);
+                if (evt.code === 'FRAMERATE_INPUT_TOO_LOW' || evt.code === 'FRAMERATE_SENT_TOO_LOW') {
+                    // These are common during camera switches, don't show error
+                    console.log('Frame rate issue during camera switch - ignoring');
+                } else {
+                    showError('Connection issue: ' + evt.msg);
+                }
+            });
 
             // Find active stream for this user
             await findActiveStream();
@@ -466,6 +509,13 @@
 
         placeholder.innerHTML = '<div class="loading">Waiting for stream video...</div>';
 
+        // Set a timeout to show message if no video appears
+        setTimeout(() => {
+            if (Object.keys(remoteUsers).length === 0 && isJoined) {
+                placeholder.innerHTML = '<div class="icon">📺</div><div>Connected - Waiting for broadcaster...</div>';
+            }
+        }, 10000);
+
     } catch (error) {
         console.error('Error joining stream:', error);
         showError('Failed to join stream: ' + error.message);
@@ -508,50 +558,105 @@
         async function handleUserPublished(user, mediaType) {
             console.log('User published:', user.uid, mediaType);
 
-            // Subscribe to the remote user
-            await agoraClient.subscribe(user, mediaType);
+            try {
+                // Subscribe to the remote user
+                await agoraClient.subscribe(user, mediaType);
 
-            if (mediaType === 'video') {
-                // Create video container
-                const remoteVideoContainer = document.createElement('div');
-                remoteVideoContainer.id = `remote-${user.uid}`;
-                remoteVideoContainer.className = 'remote-video-container';
+                if (mediaType === 'video') {
+                    // Check if container already exists (camera switch scenario)
+                    let remoteVideoContainer = document.getElementById(`remote-${user.uid}`);
 
-                // Hide placeholder
-                if (placeholder.parentNode) {
-                    placeholder.remove();
+                    if (!remoteVideoContainer) {
+                        // Create new video container
+                        remoteVideoContainer = document.createElement('div');
+                        remoteVideoContainer.id = `remote-${user.uid}`;
+                        remoteVideoContainer.className = 'remote-video-container';
+
+                        // Hide placeholder
+                        if (placeholder.parentNode) {
+                            placeholder.remove();
+                        }
+
+                        // Add video container
+                        videoContainer.appendChild(remoteVideoContainer);
+                    } else {
+                        // Clear existing content for camera switch
+                        remoteVideoContainer.innerHTML = '';
+                        console.log('Reusing existing container for camera switch');
+                    }
+
+                    // Play the remote video
+                    user.videoTrack.play(remoteVideoContainer);
+
+                    remoteUsers[user.uid] = user;
+
+                    console.log('Video track playing successfully');
                 }
 
-                // Add video container
-                videoContainer.appendChild(remoteVideoContainer);
+                if (mediaType === 'audio') {
+                    // Play the remote audio
+                    user.audioTrack.play();
+                    console.log('Audio track playing successfully');
+                }
+            } catch (error) {
+                console.error('Error handling user published:', error);
+                // Show a temporary message instead of hanging
+                showError('Stream connection issue, reconnecting...');
 
-                // Play the remote video
-                user.videoTrack.play(remoteVideoContainer);
-
-                remoteUsers[user.uid] = user;
-            }
-
-            if (mediaType === 'audio') {
-                // Play the remote audio
-                user.audioTrack.play();
+                // Attempt to rejoin after a brief delay
+                setTimeout(async () => {
+                    try {
+                        await agoraClient.subscribe(user, mediaType);
+                        if (mediaType === 'video') {
+                            const container = document.getElementById(`remote-${user.uid}`);
+                            if (container && user.videoTrack) {
+                                user.videoTrack.play(container);
+                            }
+                        }
+                    } catch (retryError) {
+                        console.error('Retry failed:', retryError);
+                    }
+                }, 1000);
             }
         }
 
         function handleUserUnpublished(user, mediaType) {
-            console.log('User unpublished:', user.uid, mediaType);
+            console.log('User unpublished:', user.uid, mediaType, 'Reason: likely camera switch or pause');
 
             if (mediaType === 'video') {
+                // Don't immediately remove the container, just show loading state
                 const container = document.getElementById(`remote-${user.uid}`);
                 if (container) {
-                    container.remove();
+                    // Show loading indicator instead of removing container
+                    container.innerHTML = '<div class="loading" style="color: white; padding: 20px;">Switching camera...</div>';
+                    console.log('Showing camera switch loading state');
                 }
-                delete remoteUsers[user.uid];
 
-                // Show placeholder if no more videos
-                if (Object.keys(remoteUsers).length === 0) {
-                    placeholder.innerHTML = '<div class="icon">📺</div><div>Stream ended or paused</div>';
-                    videoContainer.appendChild(placeholder);
-                }
+                // Don't immediately delete from remoteUsers - wait to see if it republishes
+                // Set a timeout to clean up if no republish happens
+                setTimeout(() => {
+                    // Only clean up if the user hasn't republished video
+                    if (remoteUsers[user.uid] && !remoteUsers[user.uid].videoTrack) {
+                        console.log('Cleaning up after timeout - no republish detected');
+                        const containerToRemove = document.getElementById(`remote-${user.uid}`);
+                        if (containerToRemove) {
+                            containerToRemove.remove();
+                        }
+                        delete remoteUsers[user.uid];
+
+                        // Show placeholder if no more videos
+                        if (Object.keys(remoteUsers).length === 0) {
+                            placeholder.innerHTML = '<div class="icon">📺</div><div>Stream ended or paused</div>';
+                            videoContainer.appendChild(placeholder);
+                        }
+                    }
+                }, 5000); // Wait 5 seconds before cleanup
+            }
+
+            if (mediaType === 'audio') {
+                console.log('Audio unpublished - likely temporary');
+                // Audio unpublish is usually temporary during camera switches
+                // Don't take any action, wait for republish
             }
         }
 
@@ -622,6 +727,46 @@
             setTimeout(() => {
                 errorMessageEl.style.display = 'none';
             }, 5000);
+        }
+
+        // Utility function to handle reconnection during stream issues
+        async function handleStreamReconnection() {
+            if (!isJoined || !currentStream) return;
+
+            try {
+                console.log('Attempting to refresh stream connection...');
+                updateStatus('connecting', 'Refreshing connection...');
+
+                // Get fresh token
+                const baseUrl = window.location.origin + window.location.pathname.replace(/\/watch\/.*$/, '');
+                const tokenUrl = baseUrl + '/api/streams/viewer-token';
+                const viewerUid = Math.floor(Math.random() * 100000) + 200000;
+
+                const tokenResponse = await fetch(tokenUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        channel_name: currentStream.channel_name,
+                        uid: viewerUid
+                    })
+                });
+
+                if (tokenResponse.ok) {
+                    const tokenData = await tokenResponse.json();
+                    if (tokenData.success) {
+                        // Refresh the connection
+                        await agoraClient.renewToken(tokenData.data.token);
+                        updateStatus('live', 'Connection Refreshed');
+                        console.log('Stream connection refreshed successfully');
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to refresh connection:', error);
+                showError('Connection refresh failed. Please try rejoining.');
+            }
         }
 
         // Initialize when page loads
