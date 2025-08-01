@@ -107,9 +107,12 @@
                             <!-- Multi-Camera Controls -->
                             <div class="relative">
                                 <button @click="showCameras = !showCameras"
-                                        class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
-                                    <i class="fas fa-video mr-2"></i>Cameras
-                                    <i class="fas fa-chevron-down ml-1"></i>
+                                        :disabled="switchingCamera"
+                                        :class="switchingCamera ? 'bg-purple-400 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700'"
+                                        class="text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                                    <i :class="switchingCamera ? 'fas fa-spinner fa-spin' : 'fas fa-video'" class="mr-2"></i>
+                                    <span x-text="switchingCamera ? 'Switching...' : 'Cameras'">Cameras</span>
+                                    <i class="fas fa-chevron-down ml-1" x-show="!switchingCamera"></i>
                                 </button>
                                 <div x-show="showCameras" @click.away="showCameras = false"
                                      class="absolute top-full left-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg p-4 min-w-64 z-50">
@@ -472,7 +475,9 @@ function liveBroadcast() {
                         backendCameras.forEach(camera => {
                             cameraOptions += `
                                 <button onclick="window.broadcastComponent.switchToBackendCamera('${camera.id}', '${camera.camera_name}', '${camera.device_id || ''}')"
-                                        class="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 rounded transition-colors">
+                                        class="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 rounded transition-colors"
+                                        :disabled="switchingCamera"
+                                        :class="switchingCamera ? 'opacity-50 cursor-not-allowed' : ''">
                                     <i class="fas fa-video mr-2 text-blue-500"></i>
                                     <span class="font-medium">${camera.camera_name}</span>
                                     ${camera.is_primary ? '<span class="ml-2 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">PRIMARY</span>' : ''}
@@ -496,7 +501,9 @@ function liveBroadcast() {
                             if (!isConfigured) {
                                 cameraOptions += `
                                     <button onclick="window.broadcastComponent.switchCameraSource('${device.deviceId}', '${device.label || 'Camera'}')"
-                                            class="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 rounded transition-colors">
+                                            class="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 rounded transition-colors"
+                                            :disabled="switchingCamera"
+                                            :class="switchingCamera ? 'opacity-50 cursor-not-allowed' : ''">
                                         <i class="fas fa-video mr-2 text-gray-400"></i>
                                         <span>${device.label || 'Camera ' + (index + 1)}</span>
                                         <div class="text-xs text-gray-500">Local device</div>
@@ -561,6 +568,14 @@ function liveBroadcast() {
         },
 
         async switchCameraSource(deviceId, deviceName) {
+            // Prevent multiple simultaneous camera operations
+            if (this.switchingCamera) {
+                console.log('Camera switch already in progress, ignoring request');
+                return;
+            }
+
+            this.switchingCamera = true;
+
             try {
                 console.log('Switching to camera:', deviceName, deviceId);
 
@@ -633,11 +648,11 @@ function liveBroadcast() {
                                 console.log('Attempting to restore old video track...');
                                 this.localVideoTrack = oldVideoTrack;
                                 this.localVideoTrack.play('localVideo');
-                                
+
                                 // Try to republish the old track
                                 await this.agoraClient.publish([this.localVideoTrack]);
                                 console.log('Successfully restored old video track');
-                                
+
                                 throw new Error(`Camera switch failed: ${republishError.message}. Restored previous camera.`);
                             } catch (revertError) {
                                 console.error('Failed to restore old camera:', revertError);
@@ -650,7 +665,7 @@ function liveBroadcast() {
                 } else {
                     // Not streaming, just replace locally
                     console.log('Replacing video track locally (not streaming)...');
-                    
+
                     if (oldVideoTrack) {
                         oldVideoTrack.stop();
                         oldVideoTrack.close();
@@ -671,6 +686,9 @@ function liveBroadcast() {
             } catch (error) {
                 console.error('Error switching camera source:', error);
                 alert('Failed to switch camera: ' + error.message);
+            } finally {
+                // Always release the lock
+                this.switchingCamera = false;
             }
         },
 
@@ -793,20 +811,20 @@ function liveBroadcast() {
             try {
                 if (!this.screenSharing) {
                     console.log('Starting screen sharing...');
-                    
+
                     // Create screen share track first
                     this.localScreenTrack = await AgoraRTC.createScreenVideoTrack();
 
                     if (this.isStreaming && this.agoraClient) {
                         console.log('Replacing camera with screen share...');
-                        
+
                         // Unpublish camera track first
                         await this.agoraClient.unpublish([this.localVideoTrack]);
                         console.log('Camera track unpublished');
-                        
+
                         // Small delay for stability
                         await new Promise(resolve => setTimeout(resolve, 100));
-                        
+
                         // Publish screen share track
                         await this.agoraClient.publish([this.localScreenTrack]);
                         console.log('Screen share track published');
@@ -819,17 +837,17 @@ function liveBroadcast() {
 
                 } else {
                     console.log('Stopping screen sharing...');
-                    
+
                     if (this.isStreaming && this.agoraClient) {
                         console.log('Replacing screen share with camera...');
-                        
+
                         // Unpublish screen share track first
                         await this.agoraClient.unpublish([this.localScreenTrack]);
                         console.log('Screen share track unpublished');
-                        
+
                         // Small delay for stability
                         await new Promise(resolve => setTimeout(resolve, 100));
-                        
+
                         // Publish camera track
                         await this.agoraClient.publish([this.localVideoTrack]);
                         console.log('Camera track republished');
@@ -838,7 +856,7 @@ function liveBroadcast() {
                     // Clean up screen share track
                     this.localScreenTrack.stop();
                     this.localScreenTrack.close();
-                    
+
                     // Play camera locally
                     this.localVideoTrack.play('localVideo');
                     this.screenSharing = false;
@@ -847,7 +865,7 @@ function liveBroadcast() {
             } catch (error) {
                 console.error('Error toggling screen share:', error);
                 alert('Failed to toggle screen share: ' + error.message);
-                
+
                 // Try to restore previous state
                 this.screenSharing = !this.screenSharing;
             }

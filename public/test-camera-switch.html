@@ -57,6 +57,18 @@
                 </li>
                 <li>✅ No hanging or frozen video</li>
                 <li>✅ Screen share should work smoothly (as before)</li>
+                <li>
+                    ✅ <strong>NEW:</strong> No
+                    "CAN_NOT_PUBLISH_MULTIPLE_VIDEO_TRACKS" error
+                </li>
+                <li>
+                    ✅ <strong>NEW:</strong> Camera buttons disabled during
+                    switch to prevent conflicts
+                </li>
+                <li>
+                    ✅ <strong>NEW:</strong> Camera dropdown shows
+                    "Switching..." state
+                </li>
             </ul>
         </div>
 
@@ -64,13 +76,41 @@
             <h3>Console Logs to Watch:</h3>
             <ul>
                 <li>
-                    <strong>Broadcast Page:</strong> "Unpublished old video
-                    track", "Published new video track"
+                    <strong>Broadcast Page:</strong> "Old video track
+                    unpublished successfully", "New video track published
+                    successfully"
                 </li>
                 <li>
                     <strong>Watch Page:</strong> "User unpublished: likely
                     camera switch", "Reusing existing container for camera
                     switch"
+                </li>
+                <li>
+                    <strong>NEW:</strong> "Camera switch already in progress,
+                    ignoring request" (if clicking too fast)
+                </li>
+            </ul>
+        </div>
+
+        <div>
+            <h3>🔧 Recent Fix Applied:</h3>
+            <ul>
+                <li>
+                    <strong>Problem:</strong>
+                    "CAN_NOT_PUBLISH_MULTIPLE_VIDEO_TRACKS" error during camera
+                    switching
+                </li>
+                <li>
+                    <strong>Root Cause:</strong> Attempting to publish new video
+                    track before old one was fully unpublished
+                </li>
+                <li>
+                    <strong>Solution:</strong> Sequential track management with
+                    proper timing and locking mechanism
+                </li>
+                <li>
+                    <strong>Result:</strong> Smooth camera switching without
+                    Agora conflicts
                 </li>
             </ul>
         </div>
