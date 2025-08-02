@@ -441,7 +441,12 @@
             uid: null,
             isLive: {{ $stream->status === 'live' ? 'true' : 'false' }},
             hasPaid: {{ isset($hasPaid) && $hasPaid ? 'true' : 'false' }},
-            canChat: {{ auth()->check() ? 'true' : 'false' }},
+            canChat: {{ isset($canChat) && $canChat ? 'true' : 'false' }},
+
+            // User info (for MVP flexibility)
+            userId: {{ isset($userId) && $userId ? $userId : 'null' }},
+            userName: '{{ isset($user) && $user ? $user->name : 'Guest' }}',
+            userAvatar: '{{ isset($user) && $user && $user->profile_picture ? $user->profile_picture : '/images/default-avatar.png' }}',
 
             // Connection state
             isConnected: false,
@@ -466,8 +471,16 @@
             newMessage: '',
             lastMessageId: 0,
 
+            // Request management flags
+            isUpdatingChat: false,
+            isUpdatingViewers: false,
+            requestController: null,
+
             async init() {
                 console.log('Initializing enhanced stream viewer...');
+
+                // Initialize request controller
+                this.requestController = new AbortController();
 
                 // Check if payment is required
                 @if($stream->price > 0 && !isset($hasPaid))
@@ -608,22 +621,46 @@
             },
 
             startPolling() {
-                // Update chat and viewer count every 3 seconds
-                setInterval(() => {
-                    this.updateChat();
-                    this.updateViewerCount();
-                }, 3000);
+                // Stagger the initial calls to avoid simultaneous requests
+                setTimeout(() => this.updateViewerCount(), 500);
+                setTimeout(() => this.updateChat(), 1000);
 
-                // Initial updates
-                this.updateViewerCount();
+                // Update viewer count every 5 seconds (reduced frequency)
+                setInterval(() => {
+                    if (!this.isUpdatingViewers) {
+                        this.updateViewerCount();
+                    }
+                }, 5000);
+
+                // Update chat every 3 seconds (but only if not already updating)
+                setInterval(() => {
+                    if (!this.isUpdatingChat) {
+                        this.updateChat();
+                    }
+                }, 3000);
             },
 
             async loadInitialChat() {
+                if (this.isUpdatingChat) return;
+
+                this.isUpdatingChat = true;
+
                 try {
-                    const response = await fetch(`/api/streams/${this.streamId}/chats?limit=20`);
+                    const response = await fetch(`/api/streams/${this.streamId}/chats?limit=20`, {
+                        signal: this.requestController.signal,
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+
                     const data = await response.json();
 
-                    if (data.success && data.data.length > 0) {
+                    if (data.success && data.data && data.data.length > 0) {
                         this.chatMessages = this.formatChatMessages(data.data).reverse();
                         this.lastMessageId = Math.max(...this.chatMessages.map(m => m.id));
                         this.$nextTick(() => {
@@ -631,21 +668,40 @@
                         });
                     }
                 } catch (error) {
-                    console.error('Error loading initial chat:', error);
+                    if (error.name !== 'AbortError') {
+                        console.error('Error loading initial chat:', error);
+                    }
+                } finally {
+                    this.isUpdatingChat = false;
                 }
             },
 
             async updateChat() {
+                if (this.isUpdatingChat) return; // Prevent multiple simultaneous requests
+
+                this.isUpdatingChat = true;
+
                 try {
                     const url = this.lastMessageId > 0
-                        ? `/api/streams/${this.streamId}/chats?after_id=${this.lastMessageId}&limit=10`
-                        : `/api/streams/${this.streamId}/chats?limit=20`;
+                        ? `/api/v1/streams/${this.streamId}/mvp-chats?after_id=${this.lastMessageId}&limit=10`
+                        : `/api/v1/streams/${this.streamId}/mvp-chats?limit=20`;
 
-                    const response = await fetch(url);
+                    const response = await fetch(url, {
+                        signal: this.requestController.signal,
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+
                     const data = await response.json();
 
-                    if (data.success && data.data.length > 0) {
-                        const newMessages = this.formatChatMessages(data.data);
+                    if (data.success && data.messages && data.messages.length > 0) {
+                        const newMessages = this.formatChatMessages(data.messages);
 
                         if (this.lastMessageId > 0) {
                             // Add new messages
@@ -675,7 +731,18 @@
                         }
                     }
                 } catch (error) {
-                    console.error('Error updating chat:', error);
+                    if (error.name !== 'AbortError') {
+                        console.error('Error updating chat:', error);
+                        // Exponential backoff on error
+                        setTimeout(() => {
+                            this.isUpdatingChat = false;
+                        }, 5000);
+                        return;
+                    }
+                } finally {
+                    setTimeout(() => {
+                        this.isUpdatingChat = false;
+                    }, 1000); // Minimum 1 second between requests
                 }
             },
 
@@ -691,17 +758,42 @@
             },
 
             async updateViewerCount() {
+                if (this.isUpdatingViewers) return; // Prevent multiple simultaneous requests
+
+                this.isUpdatingViewers = true;
+
                 try {
-                    const response = await fetch(`/api/streams/${this.streamId}/viewers`);
+                    const response = await fetch(`/api/streams/${this.streamId}/viewers`, {
+                        signal: this.requestController.signal,
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+
                     const data = await response.json();
 
                     if (data.success) {
-                        const activeViewers = data.viewers.filter(v => !v.left_at);
-                        this.viewerCount = activeViewers.length;
-                        this.onlineViewers = activeViewers.length;
+                        this.viewerCount = data.active_count || data.total_count || 0;
+                        this.onlineViewers = data.active_count || 0;
                     }
                 } catch (error) {
-                    console.error('Error updating viewer count:', error);
+                    if (error.name !== 'AbortError') {
+                        console.error('Error updating viewer count:', error);
+                        // Exponential backoff on error
+                        setTimeout(() => {
+                            this.isUpdatingViewers = false;
+                        }, 10000);
+                        return;
+                    }
+                } finally {
+                    setTimeout(() => {
+                        this.isUpdatingViewers = false;
+                    }, 2000); // Minimum 2 seconds between requests
                 }
             },
 
@@ -711,14 +803,16 @@
                 this.sending = true;
 
                 try {
-                    const response = await fetch(`/api/streams/${this.streamId}/chat`, {
+                    const response = await fetch(`/api/v1/streams/${this.streamId}/mvp-chat`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                         },
                         body: JSON.stringify({
-                            message: this.newMessage
+                            message: this.newMessage,
+                            user_id: this.userId,
+                            username: this.userName
                         })
                     });
 
@@ -728,7 +822,7 @@
                         // Force immediate chat update
                         setTimeout(() => this.updateChat(), 100);
                     } else {
-                        alert('Failed to send message');
+                        alert('Failed to send message: ' + (data.message || 'Unknown error'));
                     }
                 } catch (error) {
                     console.error('Error sending message:', error);

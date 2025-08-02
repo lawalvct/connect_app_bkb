@@ -159,18 +159,58 @@ Route::get('/watch/{userId}', function ($userId) {
     return view('watch-stream', compact('userId'));
 });
 
-// Watch live stream (enhanced mobile version)
+// Watch live stream (enhanced mobile version with user ID)
+Route::get('/stream/{streamId}/watch/{userId}', function ($streamId, $userId) {
+    $stream = \App\Models\Stream::with('user')->findOrFail($streamId);
+
+    // Get user from database for authentication simulation
+    $user = \App\Models\User::find($userId);
+
+    $hasPaid = false;
+    $canChat = false;
+
+    if ($user) {
+        $canChat = true; // User exists, can chat
+
+        if ($stream->price > 0) {
+            $hasPaid = $stream->hasUserPaid($user);
+        } else {
+            $hasPaid = true; // Free stream
+        }
+    } else {
+        // Guest user - can watch free streams but can't chat
+        $hasPaid = ($stream->price == 0);
+        $canChat = false;
+    }
+
+    return view('stream.watch-mobile', compact('stream', 'hasPaid', 'canChat', 'user', 'userId'));
+});
+
+// Watch live stream (enhanced mobile version - fallback without user ID)
 Route::get('/stream/{streamId}/watch', function ($streamId) {
     $stream = \App\Models\Stream::with('user')->findOrFail($streamId);
 
     $hasPaid = false;
-    if (auth()->check() && $stream->price > 0) {
-        $hasPaid = $stream->hasUserPaid(auth()->user());
-    } elseif ($stream->price == 0) {
-        $hasPaid = true;
+    $canChat = false;
+    $user = null;
+    $userId = null;
+
+    if (auth()->check()) {
+        $user = auth()->user();
+        $userId = $user->id;
+        $canChat = true;
+
+        if ($stream->price > 0) {
+            $hasPaid = $stream->hasUserPaid($user);
+        } else {
+            $hasPaid = true;
+        }
+    } else {
+        // Guest user - can only watch free streams
+        $hasPaid = ($stream->price == 0);
     }
 
-    return view('stream.watch-mobile', compact('stream', 'hasPaid'));
+    return view('stream.watch-mobile', compact('stream', 'hasPaid', 'canChat', 'user', 'userId'));
 });
 
 // Original watch page (desktop version)

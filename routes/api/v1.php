@@ -20,6 +20,111 @@ use App\Http\Controllers\API\V1\AdController;
 use App\Http\Controllers\API\V1\AdminAdController;
 use App\Http\Controllers\API\V1\StreamController;
 use App\Http\Controllers\API\V1\StreamPaymentController;
+use App\Http\Controllers\API\V1\StreamChatMvpController;
+
+// MVP Testing Routes (Unprotected for testing with rate limiting)
+Route::prefix('streams/{id}')->middleware('throttle:30,1')->group(function () {
+    // Get stream chats (unprotected)
+    Route::get('/chats', function ($id) {
+        try {
+            $stream = \App\Models\Stream::findOrFail($id);
+            $chats = \App\Models\StreamChat::where('stream_id', $id)
+                ->orderBy('created_at', 'desc')
+                ->limit(request('limit', 20))
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $chats->map(function ($chat) {
+                    return [
+                        'id' => $chat->id,
+                        'message' => $chat->message,
+                        'username' => $chat->username ?? 'Anonymous',
+                        'user_profile_url' => $chat->user_profile_url,
+                        'is_admin' => $chat->is_admin ?? false,
+                        'created_at' => $chat->created_at->toISOString(),
+                        'user' => [
+                            'id' => $chat->user_id,
+                            'name' => $chat->username
+                        ]
+                    ];
+                })
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    });
+
+    // Get stream viewers (unprotected with caching)
+    Route::get('/viewers', function ($id) {
+        try {
+            $stream = \App\Models\Stream::findOrFail($id);
+
+            // For MVP, simulate viewers with caching
+            $cacheKey = "stream_viewers_{$id}";
+            $viewers = cache()->remember($cacheKey, 30, function() {
+                $viewerCount = rand(50, 200);
+                $viewers = [];
+
+                for ($i = 0; $i < min($viewerCount, 50); $i++) {
+                    $viewers[] = [
+                        'id' => $i + 1,
+                        'user_id' => rand(100, 999),
+                        'username' => 'Viewer' . ($i + 1),
+                        'joined_at' => now()->subMinutes(rand(1, 60))->toISOString(),
+                        'left_at' => null
+                    ];
+                }
+
+                return [
+                    'viewers' => $viewers,
+                    'total_count' => $viewerCount,
+                    'active_count' => $viewerCount
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'viewers' => $viewers['viewers'],
+                'total_count' => $viewers['total_count'],
+                'active_count' => $viewers['active_count']
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    });
+
+    // Get viewer token (unprotected)
+    Route::get('/viewer-token', function ($id) {
+        try {
+            $stream = \App\Models\Stream::findOrFail($id);
+
+            $uid = rand(100000, 999999);
+
+            // For MVP, return a mock token
+            $token = 'mock_token_' . time() . '_' . $uid;
+
+            return response()->json([
+                'success' => true,
+                'token' => $token,
+                'uid' => $uid,
+                'channel_name' => $stream->channel_name,
+                'app_id' => env('AGORA_APP_ID')
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    })->middleware('throttle:10,1');
+});
 
 Route::middleware('auth:api')->get('/user', function (Request $request) {
     return $request->user();
@@ -294,6 +399,10 @@ Route::prefix('discover')->group(function () {
         Route::get('/{id}/chat', [StreamController::class, 'getChat']);
         Route::get('/{id}/chats', [\App\Http\Controllers\API\V1\StreamChatController::class, 'getMessages']);
         Route::get('/{id}/chat-stats', [\App\Http\Controllers\API\V1\StreamChatController::class, 'getChatStats']);
+
+        // MVP Chat routes (no authentication required for testing)
+        Route::post('/{id}/mvp-chat', [\App\Http\Controllers\API\V1\StreamChatMvpController::class, 'store']);
+        Route::get('/{id}/mvp-chats', [\App\Http\Controllers\API\V1\StreamChatMvpController::class, 'index']);
 
         // Authenticated stream routes
         Route::middleware('auth:sanctum')->group(function () {

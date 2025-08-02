@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Mobile Stream Viewer MVP Test</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                max-width: 800px;
+                margin: 0 auto;
+                padding: 20px;
+                background: #f5f5f5;
+            }
+            .test-section {
+                background: white;
+                padding: 20px;
+                margin: 20px 0;
+                border-radius: 8px;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            }
+            .test-url {
+                background: #f8f9fa;
+                padding: 10px;
+                border-radius: 4px;
+                font-family: monospace;
+                font-size: 14px;
+                border-left: 4px solid #a20030;
+                margin: 10px 0;
+            }
+            .feature-list {
+                list-style-type: none;
+                padding: 0;
+            }
+            .feature-list li {
+                padding: 5px 0;
+            }
+            .feature-list li:before {
+                content: "✓ ";
+                color: #a20030;
+                font-weight: bold;
+            }
+            .brand-color {
+                color: #a20030;
+            }
+            .instructions {
+                background: #e8f4f8;
+                padding: 15px;
+                border-radius: 4px;
+                border-left: 4px solid #17a2b8;
+            }
+        </style>
+    </head>
+    <body>
+        <h1 class="brand-color">🎥 Mobile Stream Viewer MVP - Test Guide</h1>
+
+        <div class="test-section">
+            <h2>📱 URL Structure (Flexible User IDs)</h2>
+            <p>
+                The mobile viewer now supports flexible user ID parameters for
+                MVP testing:
+            </p>
+
+            <h3>Test URLs:</h3>
+            <div class="test-url">/stream/24/watch/452</div>
+            <p>
+                ▶️ <strong>User ID 452</strong> watching stream 24 (simulated
+                user authentication)
+            </p>
+
+            <div class="test-url">/stream/24/watch/789</div>
+            <p>
+                ▶️ <strong>User ID 789</strong> watching stream 24 (different
+                user simulation)
+            </p>
+
+            <div class="test-url">/stream/15/watch/123</div>
+            <p>
+                ▶️ <strong>User ID 123</strong> watching stream 15 (different
+                stream)
+            </p>
+        </div>
+
+        <div class="test-section">
+            <h2>🚀 MVP Features Implemented</h2>
+            <ul class="feature-list">
+                <li>
+                    <strong>Flexible URL Structure:</strong>
+                    /stream/{streamId}/watch/{userId}
+                </li>
+                <li>
+                    <strong>No Authentication Required:</strong> MVP bypasses
+                    complex auth for testing
+                </li>
+                <li>
+                    <strong>Brand Colors:</strong> #A20030 primary, #A200302B
+                    transparent, #FAFAFA background
+                </li>
+                <li>
+                    <strong>Mobile-Optimized UI:</strong> Full-screen video with
+                    floating chat panel
+                </li>
+                <li>
+                    <strong>Real-time Chat:</strong> Live messaging with
+                    pagination support
+                </li>
+                <li>
+                    <strong>Collapsible Chat:</strong> Transparent overlay that
+                    can be expanded/collapsed
+                </li>
+                <li>
+                    <strong>User Simulation:</strong> Auto-generates user names
+                    and avatars based on URL
+                </li>
+                <li>
+                    <strong>Payment Check:</strong> Simulated payment
+                    verification for MVP testing
+                </li>
+            </ul>
+        </div>
+
+        <div class="test-section">
+            <h2>🎯 Chat System Features</h2>
+            <ul class="feature-list">
+                <li>
+                    <strong>MVP Chat API:</strong> No authentication required
+                    (/api/v1/streams/{id}/chat)
+                </li>
+                <li>
+                    <strong>Real-time Updates:</strong> Chat refreshes every 3
+                    seconds automatically
+                </li>
+                <li>
+                    <strong>Message Pagination:</strong> Efficient loading with
+                    before_id/after_id
+                </li>
+                <li>
+                    <strong>User Identification:</strong> Username and avatar
+                    based on user ID from URL
+                </li>
+                <li>
+                    <strong>Error Handling:</strong> Graceful fallback for
+                    failed API requests
+                </li>
+                <li>
+                    <strong>Auto-scroll:</strong> Chat automatically scrolls to
+                    show new messages
+                </li>
+            </ul>
+        </div>
+
+        <div class="test-section">
+            <h2>💡 Technical Implementation</h2>
+            <ul class="feature-list">
+                <li>
+                    <strong>Route Handler:</strong> routes/web.php with flexible
+                    user parameter
+                </li>
+                <li>
+                    <strong>Mobile View:</strong>
+                    resources/views/stream/watch-mobile.blade.php
+                </li>
+                <li>
+                    <strong>MVP Chat Controller:</strong>
+                    StreamChatMvpController (no auth required)
+                </li>
+                <li>
+                    <strong>Frontend Framework:</strong> Alpine.js with Tailwind
+                    CSS styling
+                </li>
+                <li>
+                    <strong>Database:</strong> stream_chats table with user
+                    simulation support
+                </li>
+                <li>
+                    <strong>API Endpoints:</strong> RESTful chat API with
+                    pagination
+                </li>
+            </ul>
+        </div>
+
+        <div class="instructions">
+            <h3>🧪 Testing Instructions</h3>
+            <ol>
+                <li>
+                    <strong>Start your Laravel server:</strong>
+                    <code>php artisan serve</code>
+                </li>
+                <li>
+                    <strong>Create test streams:</strong> Ensure you have
+                    streams with IDs 24, 15, etc.
+                </li>
+                <li>
+                    <strong>Test URL access:</strong> Visit /stream/24/watch/452
+                    in mobile browser
+                </li>
+                <li>
+                    <strong>Test chat functionality:</strong> Send messages and
+                    verify real-time updates
+                </li>
+                <li>
+                    <strong>Test user simulation:</strong> Try different user
+                    IDs in URL
+                </li>
+                <li>
+                    <strong>Verify mobile responsiveness:</strong> Test on
+                    various screen sizes
+                </li>
+            </ol>
+        </div>
+
+        <div class="test-section">
+            <h2>🎨 Brand Color Scheme</h2>
+            <div
+                style="
+                    display: flex;
+                    gap: 20px;
+                    flex-wrap: wrap;
+                    margin-top: 15px;
+                "
+            >
+                <div
+                    style="
+                        background: #a20030;
+                        color: white;
+                        padding: 15px;
+                        border-radius: 4px;
+                        flex: 1;
+                        min-width: 150px;
+                    "
+                >
+                    <strong>#A20030</strong><br />Primary Brand Color
+                </div>
+                <div
+                    style="
+                        background: #a200302b;
+                        color: #333;
+                        padding: 15px;
+                        border-radius: 4px;
+                        flex: 1;
+                        min-width: 150px;
+                    "
+                >
+                    <strong>#A200302B</strong><br />Transparent Brand
+                </div>
+                <div
+                    style="
+                        background: #fafafa;
+                        color: #333;
+                        padding: 15px;
+                        border-radius: 4px;
+                        flex: 1;
+                        min-width: 150px;
+                        border: 1px solid #ddd;
+                    "
+                >
+                    <strong>#FAFAFA</strong><br />Background Color
+                </div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>📊 MVP Benefits</h2>
+            <p><strong>Why this approach works for MVP:</strong></p>
+            <ul class="feature-list">
+                <li>
+                    <strong>Fast Testing:</strong> No complex authentication
+                    setup required
+                </li>
+                <li>
+                    <strong>User Simulation:</strong> Easy to test different
+                    user scenarios via URL
+                </li>
+                <li>
+                    <strong>Mobile-First:</strong> Optimized for mobile webview
+                    integration
+                </li>
+                <li>
+                    <strong>Flexible Integration:</strong> Can be embedded in
+                    any mobile app webview
+                </li>
+                <li>
+                    <strong>Real-time Chat:</strong> Full chat functionality
+                    without complexity
+                </li>
+                <li>
+                    <strong>Brand Consistency:</strong> Uses your exact brand
+                    colors throughout
+                </li>
+            </ul>
+        </div>
+
+        <footer
+            style="
+                text-align: center;
+                margin-top: 40px;
+                color: #666;
+                font-size: 14px;
+            "
+        >
+            <p>
+                🎯 <strong>Mobile Stream Viewer MVP</strong> - Ready for testing
+                and integration
+            </p>
+            <p style="color: #a20030">
+                Built with flexible URL structure for maximum development
+                agility
+            </p>
+        </footer>
+    </body>
+</html>
