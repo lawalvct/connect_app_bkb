@@ -159,6 +159,34 @@ Route::get('/watch/{userId}', function ($userId) {
     return view('watch-stream', compact('userId'));
 });
 
+// Watch live stream (enhanced mobile version)
+Route::get('/stream/{streamId}/watch', function ($streamId) {
+    $stream = \App\Models\Stream::with('user')->findOrFail($streamId);
+
+    $hasPaid = false;
+    if (auth()->check() && $stream->price > 0) {
+        $hasPaid = $stream->hasUserPaid(auth()->user());
+    } elseif ($stream->price == 0) {
+        $hasPaid = true;
+    }
+
+    return view('stream.watch-mobile', compact('stream', 'hasPaid'));
+});
+
+// Original watch page (desktop version)
+Route::get('/stream/{streamId}/watch-desktop', function ($streamId) {
+    $stream = \App\Models\Stream::with('user')->findOrFail($streamId);
+
+    $hasPaid = false;
+    if (auth()->check() && $stream->price > 0) {
+        $hasPaid = $stream->hasUserPaid(auth()->user());
+    } elseif ($stream->price == 0) {
+        $hasPaid = true;
+    }
+
+    return view('stream.watch', compact('stream', 'hasPaid'));
+});
+
 Route::get('/test-mail', function () {
     try {
         Mail::raw('Test email from ConnectApp', function ($message) {

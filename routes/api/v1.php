@@ -292,6 +292,8 @@ Route::prefix('discover')->group(function () {
         Route::get('/{id}/status', [StreamController::class, 'status']);
         Route::get('/{id}/viewers', [StreamController::class, 'viewers']);
         Route::get('/{id}/chat', [StreamController::class, 'getChat']);
+        Route::get('/{id}/chats', [\App\Http\Controllers\API\V1\StreamChatController::class, 'getMessages']);
+        Route::get('/{id}/chat-stats', [\App\Http\Controllers\API\V1\StreamChatController::class, 'getChatStats']);
 
         // Authenticated stream routes
         Route::middleware('auth:sanctum')->group(function () {
@@ -306,7 +308,8 @@ Route::prefix('discover')->group(function () {
             // Stream participation (All users)
             Route::post('/{id}/join', [StreamController::class, 'join']);
             Route::post('/{id}/leave', [StreamController::class, 'leave']);
-            Route::post('/{id}/chat', [StreamController::class, 'sendChat']);
+            Route::post('/{id}/chat', [\App\Http\Controllers\API\V1\StreamChatController::class, 'sendMessage']);
+            Route::delete('/{streamId}/chats/{messageId}', [\App\Http\Controllers\API\V1\StreamChatController::class, 'deleteMessage']);
 
             // Stream payments
             Route::prefix('{id}/payment')->group(function () {
