@@ -2,28 +2,25 @@
 
 namespace App\Events;
 
-use App\Models\Message;
-use App\Http\Resources\V1\MessageResource;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
-use Illuminate\Broadcasting\PresenceChannel;
 use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class MessageSent implements ShouldBroadcastNow
+class TestPusherEvent implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public $message;
+    public $data;
 
     /**
      * Create a new event instance.
      */
-    public function __construct(Message $message)
+    public function __construct($data)
     {
-        $this->message = $message;
+        $this->data = $data;
     }
 
     /**
@@ -34,7 +31,7 @@ class MessageSent implements ShouldBroadcastNow
     public function broadcastOn(): array
     {
         return [
-            new PrivateChannel('conversation.' . $this->message->conversation_id),
+            new Channel('test-pusher'),
         ];
     }
 
@@ -45,9 +42,7 @@ class MessageSent implements ShouldBroadcastNow
      */
     public function broadcastWith(): array
     {
-        return [
-            'message' => new MessageResource($this->message->load(['user', 'replyToMessage.user']))
-        ];
+        return $this->data;
     }
 
     /**
@@ -57,6 +52,6 @@ class MessageSent implements ShouldBroadcastNow
      */
     public function broadcastAs(): string
     {
-        return 'message.sent';
+        return 'test.message';
     }
 }

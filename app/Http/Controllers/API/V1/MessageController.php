@@ -13,6 +13,7 @@ use App\Http\Resources\V1\ConversationResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
+use Pusher\Pusher;
 
 class MessageController extends BaseController
 {
@@ -213,8 +214,71 @@ class MessageController extends BaseController
             // Load relationships for response
             $message->load(['user', 'replyToMessage.user']);
 
-            // Broadcast the message
-            broadcast(new MessageSent($message))->toOthers();
+            // Broadcast the message to Pusher for real-time updates
+            try {
+                Log::info('Starting Pusher broadcast', [
+                    'conversation_id' => $conversationId,
+                    'message_id' => $message->id,
+                    'channel' => 'private-conversation.' . $conversationId
+                ]);
+
+                // Direct Pusher broadcast for debugging
+                $pusher = new \Pusher\Pusher(
+                    '0e0b5123273171ff212d',  // key
+                    '770b5206be41b096e258',  // secret
+                    '1471502',  // app_id
+                    [
+                        'cluster' => 'eu',
+                        'useTLS' => true
+                    ]
+                );
+
+                Log::info('Pusher instance created successfully');
+
+                // Create simplified broadcast data to avoid resource serialization issues
+                $broadcastData = [
+                    'message' => [
+                        'id' => $message->id,
+                        'conversation_id' => $message->conversation_id,
+                        'user_id' => $message->user_id,
+                        'message' => $message->message,
+                        'type' => $message->type,
+                        'metadata' => $message->metadata,
+                        'created_at' => $message->created_at->toISOString(),
+                        'user' => [
+                            'id' => $message->user->id,
+                            'name' => $message->user->name,
+                            'avatar' => $message->user->avatar ?? null
+                        ]
+                    ]
+                ];
+
+                Log::info('Broadcast data prepared', [
+                    'data_structure' => array_keys($broadcastData),
+                    'message_keys' => array_keys($broadcastData['message'])
+                ]);
+
+                $result = $pusher->trigger('private-conversation.' . $conversationId, 'message.sent', $broadcastData);
+
+                Log::info('Direct Pusher broadcast successful', [
+                    'message_id' => $message->id,
+                    'conversation_id' => $conversationId,
+                    'channel' => 'private-conversation.' . $conversationId,
+                    'pusher_result' => $result,
+                    'result_type' => gettype($result)
+                ]);
+            } catch (\Exception $broadcastException) {
+                Log::error('Failed to broadcast message via direct Pusher', [
+                    'message_id' => $message->id ?? 'not_available',
+                    'conversation_id' => $conversationId,
+                    'error_message' => $broadcastException->getMessage(),
+                    'error_code' => $broadcastException->getCode(),
+                    'error_file' => $broadcastException->getFile(),
+                    'error_line' => $broadcastException->getLine(),
+                    'trace' => $broadcastException->getTraceAsString()
+                ]);
+                // Don't fail the request if broadcast fails
+            }
 
             return $this->sendResponse('Message sent successfully', [
                 'message' => new MessageResource($message)
@@ -480,8 +544,71 @@ class MessageController extends BaseController
             // Load relationships for response
             $message->load(['user']);
 
-            // Broadcast the message
-            broadcast(new MessageSent($message))->toOthers();
+            // Broadcast the message to Pusher for real-time updates
+            try {
+                Log::info('Starting direct message Pusher broadcast', [
+                    'conversation_id' => $conversation->id,
+                    'message_id' => $message->id,
+                    'channel' => 'private-conversation.' . $conversation->id
+                ]);
+
+                // Direct Pusher broadcast for debugging
+                $pusher = new \Pusher\Pusher(
+                    '0e0b5123273171ff212d',  // key
+                    '770b5206be41b096e258',  // secret
+                    '1471502',  // app_id
+                    [
+                        'cluster' => 'eu',
+                        'useTLS' => true
+                    ]
+                );
+
+                Log::info('Direct message Pusher instance created successfully');
+
+                // Create simplified broadcast data to avoid resource serialization issues
+                $broadcastData = [
+                    'message' => [
+                        'id' => $message->id,
+                        'conversation_id' => $message->conversation_id,
+                        'user_id' => $message->user_id,
+                        'message' => $message->message,
+                        'type' => $message->type,
+                        'metadata' => $message->metadata,
+                        'created_at' => $message->created_at->toISOString(),
+                        'user' => [
+                            'id' => $message->user->id,
+                            'name' => $message->user->name,
+                            'avatar' => $message->user->avatar ?? null
+                        ]
+                    ]
+                ];
+
+                Log::info('Direct message broadcast data prepared', [
+                    'data_structure' => array_keys($broadcastData),
+                    'message_keys' => array_keys($broadcastData['message'])
+                ]);
+
+                $result = $pusher->trigger('private-conversation.' . $conversation->id, 'message.sent', $broadcastData);
+
+                Log::info('Direct message broadcasted successfully via direct Pusher', [
+                    'message_id' => $message->id,
+                    'conversation_id' => $conversation->id,
+                    'channel' => 'private-conversation.' . $conversation->id,
+                    'pusher_result' => $result,
+                    'result_type' => gettype($result)
+                ]);
+            } catch (\Exception $broadcastException) {
+                Log::error('Failed to broadcast direct message via direct Pusher', [
+                    'message_id' => $message->id ?? 'not_available',
+                    'conversation_id' => $conversation->id ?? 'not_available',
+                    'error_message' => $broadcastException->getMessage(),
+                    'error_code' => $broadcastException->getCode(),
+                    'error_file' => $broadcastException->getFile(),
+                    'error_line' => $broadcastException->getLine(),
+                    'trace' => $broadcastException->getTraceAsString()
+                ]);
+                // Don't fail the request if broadcast fails
+            }
 
             return $this->sendResponse('Message sent successfully', [
                 'message' => new MessageResource($message),

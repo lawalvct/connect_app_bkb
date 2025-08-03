@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Pusher Real-time Chat Test</title>
+        <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                max-width: 800px;
+                margin: 0 auto;
+                padding: 20px;
+            }
+            .chat-container {
+                border: 1px solid #ddd;
+                height: 400px;
+                overflow-y: scroll;
+                padding: 15px;
+                margin-bottom: 20px;
+                background-color: #f9f9f9;
+            }
+            .message {
+                margin-bottom: 10px;
+                padding: 8px;
+                background-color: white;
+                border-radius: 5px;
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            }
+            .message-user {
+                font-weight: bold;
+                color: #007bff;
+            }
+            .message-time {
+                font-size: 0.8em;
+                color: #666;
+            }
+            .input-container {
+                display: flex;
+                gap: 10px;
+            }
+            input[type="text"] {
+                flex: 1;
+                padding: 10px;
+                border: 1px solid #ddd;
+                border-radius: 5px;
+            }
+            button {
+                padding: 10px 20px;
+                background-color: #007bff;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                cursor: pointer;
+            }
+            button:hover {
+                background-color: #0056b3;
+            }
+            .status {
+                margin-bottom: 10px;
+                padding: 10px;
+                border-radius: 5px;
+            }
+            .status.connected {
+                background-color: #d4edda;
+                color: #155724;
+            }
+            .status.disconnected {
+                background-color: #f8d7da;
+                color: #721c24;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Pusher Real-time Chat Test</h1>
+
+        <div id="status" class="status disconnected">Status: Disconnected</div>
+
+        <div class="chat-container" id="chatContainer">
+            <div class="message">
+                <div class="message-user">System</div>
+                <div>Chat initialized. Waiting for messages...</div>
+                <div class="message-time">Just now</div>
+            </div>
+        </div>
+
+        <div class="input-container">
+            <input
+                type="text"
+                id="messageInput"
+                placeholder="Type your message here..."
+                onkeypress="handleKeyPress(event)"
+            />
+            <button onclick="sendTestMessage()">Send Test</button>
+            <button onclick="testPusherConnection()">Test Pusher</button>
+        </div>
+
+        <script>
+            // Pusher configuration - UPDATE THESE WITH YOUR ACTUAL VALUES
+            const pusherConfig = {
+                key: "0e0b5123273171ff212d", // Your PUSHER_APP_KEY from .env
+                cluster: "eu", // Your PUSHER_APP_CLUSTER from .env
+                encrypted: true,
+            };
+
+            // Initialize Pusher
+            const pusher = new Pusher(pusherConfig.key, {
+                cluster: pusherConfig.cluster,
+                encrypted: pusherConfig.encrypted,
+            });
+
+            // Status elements
+            const statusElement = document.getElementById("status");
+            const chatContainer = document.getElementById("chatContainer");
+            const messageInput = document.getElementById("messageInput");
+
+            // Connection event handlers
+            pusher.connection.bind("connected", function () {
+                console.log("Connected to Pusher");
+                statusElement.textContent = "Status: Connected to Pusher";
+                statusElement.className = "status connected";
+            });
+
+            pusher.connection.bind("disconnected", function () {
+                console.log("Disconnected from Pusher");
+                statusElement.textContent = "Status: Disconnected from Pusher";
+                statusElement.className = "status disconnected";
+            });
+
+            pusher.connection.bind("error", function (err) {
+                console.error("Pusher connection error:", err);
+                statusElement.textContent = "Status: Connection Error";
+                statusElement.className = "status disconnected";
+            });
+
+            // Subscribe to test channel
+            const testChannel = pusher.subscribe("test-pusher");
+            testChannel.bind("test.message", function (data) {
+                console.log("Test message received:", data);
+                addMessageToChat("Test Bot", data.message, data.timestamp);
+            });
+
+            // Subscribe to conversation channel (replace 1 with actual conversation ID)
+            const conversationId = 1; // Change this to test with actual conversation
+            const conversationChannel = pusher.subscribe(
+                `private-conversation.${conversationId}`
+            );
+
+            conversationChannel.bind("message.sent", function (data) {
+                console.log("New message received:", data);
+                const message = data.message;
+                addMessageToChat(
+                    message.user.name,
+                    message.message || "[File/Media]",
+                    message.created_at
+                );
+            });
+
+            // Helper function to add message to chat
+            function addMessageToChat(username, message, timestamp) {
+                const messageDiv = document.createElement("div");
+                messageDiv.className = "message";
+                messageDiv.innerHTML = `
+                <div class="message-user">${username}</div>
+                <div>${message}</div>
+                <div class="message-time">${new Date(
+                    timestamp
+                ).toLocaleString()}</div>
+            `;
+                chatContainer.appendChild(messageDiv);
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
+
+            // Send test message via API
+            function sendTestMessage() {
+                const message = messageInput.value.trim();
+                if (!message) {
+                    alert("Please enter a message");
+                    return;
+                }
+
+                // This would normally send to your Laravel API
+                // For now, just add to chat locally
+                addMessageToChat("You", message, new Date().toISOString());
+                messageInput.value = "";
+
+                alert(
+                    "In a real implementation, this would send to your Laravel message API endpoint"
+                );
+            }
+
+            // Test Pusher connection
+            function testPusherConnection() {
+                fetch("/api/test-pusher")
+                    .then((response) => response.json())
+                    .then((data) => {
+                        console.log("Pusher test response:", data);
+                        if (data.status === "success") {
+                            alert(
+                                "Pusher test sent! Check the chat for the test message."
+                            );
+                        } else {
+                            alert("Pusher test failed: " + data.message);
+                        }
+                    })
+                    .catch((error) => {
+                        console.error("Error:", error);
+                        alert("Error testing Pusher connection");
+                    });
+            }
+
+            // Handle Enter key press
+            function handleKeyPress(event) {
+                if (event.key === "Enter") {
+                    sendTestMessage();
+                }
+            }
+
+            // Initialize
+            console.log("Pusher initialized with config:", pusherConfig);
+            console.log(
+                "Subscribed to channels: test-pusher, private-conversation." +
+                    conversationId
+            );
+        </script>
+    </body>
+</html>

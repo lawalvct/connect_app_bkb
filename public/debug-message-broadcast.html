@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Debug Message Broadcasting</title>
+        <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                max-width: 800px;
+                margin: 0 auto;
+                padding: 20px;
+            }
+            .container {
+                border: 1px solid #ddd;
+                padding: 20px;
+                margin-bottom: 20px;
+                border-radius: 5px;
+            }
+            .messages {
+                height: 300px;
+                overflow-y: scroll;
+                border: 1px solid #ccc;
+                padding: 10px;
+                margin-bottom: 10px;
+                background-color: #f9f9f9;
+            }
+            .message {
+                margin-bottom: 10px;
+                padding: 8px;
+                background-color: white;
+                border-radius: 3px;
+                border-left: 3px solid #007bff;
+            }
+            button {
+                padding: 8px 15px;
+                margin: 5px;
+                background-color: #007bff;
+                color: white;
+                border: none;
+                border-radius: 3px;
+                cursor: pointer;
+            }
+            button:hover {
+                background-color: #0056b3;
+            }
+            .status {
+                padding: 10px;
+                margin-bottom: 10px;
+                border-radius: 5px;
+            }
+            .success {
+                background-color: #d4edda;
+                color: #155724;
+            }
+            .error {
+                background-color: #f8d7da;
+                color: #721c24;
+            }
+            .info {
+                background-color: #d1ecf1;
+                color: #0c5460;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Debug Message Broadcasting</h1>
+
+        <div class="container">
+            <h3>Pusher Connection Status</h3>
+            <div id="connectionStatus" class="status info">Connecting...</div>
+        </div>
+
+        <div class="container">
+            <h3>Test Controls</h3>
+            <button onclick="testStoreBroadcast()">Test Store Broadcast</button>
+            <button onclick="testDirectBroadcast()">
+                Test Direct Broadcast
+            </button>
+            <button onclick="clearMessages()">Clear Messages</button>
+        </div>
+
+        <div class="container">
+            <h3>Received Messages & Debug Info</h3>
+            <div id="messages" class="messages">
+                <div class="message">
+                    <strong>System:</strong> Waiting for messages...
+                    <div style="font-size: 0.8em; color: #666">Just now</div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            // Initialize Pusher with your credentials
+            const pusher = new Pusher("0e0b5123273171ff212d", {
+                cluster: "eu",
+                encrypted: true,
+            });
+
+            const statusElement = document.getElementById("connectionStatus");
+            const messagesElement = document.getElementById("messages");
+
+            // Connection events
+            pusher.connection.bind("connected", function () {
+                statusElement.innerHTML = "Connected to Pusher (EU Cluster)";
+                statusElement.className = "status success";
+                addMessage(
+                    "System",
+                    "Connected to Pusher successfully!",
+                    "success"
+                );
+            });
+
+            pusher.connection.bind("disconnected", function () {
+                statusElement.innerHTML = "Disconnected from Pusher";
+                statusElement.className = "status error";
+                addMessage("System", "Disconnected from Pusher", "error");
+            });
+
+            pusher.connection.bind("error", function (err) {
+                statusElement.innerHTML =
+                    "Connection Error: " + err.error.message;
+                statusElement.className = "status error";
+                addMessage(
+                    "System",
+                    "Connection Error: " + err.error.message,
+                    "error"
+                );
+            });
+
+            // Subscribe to conversation channel
+            const conversationChannel = pusher.subscribe(
+                "private-conversation.1"
+            );
+
+            conversationChannel.bind("message.sent", function (data) {
+                console.log("Message received:", data);
+                addMessage(
+                    "Real Message",
+                    JSON.stringify(data, null, 2),
+                    "success"
+                );
+            });
+
+            // Subscribe to test channel as well
+            const testChannel = pusher.subscribe("test-pusher");
+            testChannel.bind("test.message", function (data) {
+                console.log("Test message received:", data);
+                addMessage("Test Bot", data.message, "info");
+            });
+
+            function addMessage(source, content, type = "info") {
+                const messageDiv = document.createElement("div");
+                messageDiv.className = "message";
+                messageDiv.innerHTML = `
+                <strong>${source}:</strong><br>
+                <pre style="white-space: pre-wrap; font-size: 0.9em;">${content}</pre>
+                <div style="font-size: 0.8em; color: #666;">${new Date().toLocaleString()}</div>
+            `;
+                messagesElement.appendChild(messageDiv);
+                messagesElement.scrollTop = messagesElement.scrollHeight;
+            }
+
+            function testStoreBroadcast() {
+                addMessage("Debug", "Testing store broadcast...", "info");
+
+                fetch("/api/test-message-store-broadcast", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-Requested-With": "XMLHttpRequest",
+                    },
+                    body: JSON.stringify({
+                        conversation_id: 1,
+                    }),
+                })
+                    .then((response) => response.json())
+                    .then((data) => {
+                        console.log("Store broadcast response:", data);
+                        addMessage(
+                            "Store Test Response",
+                            JSON.stringify(data, null, 2),
+                            data.status === "success" ? "success" : "error"
+                        );
+                    })
+                    .catch((error) => {
+                        console.error("Store test error:", error);
+                        addMessage(
+                            "Store Test Error",
+                            error.toString(),
+                            "error"
+                        );
+                    });
+            }
+
+            function testDirectBroadcast() {
+                addMessage("Debug", "Testing direct broadcast...", "info");
+
+                fetch("/api/test-message-broadcast", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-Requested-With": "XMLHttpRequest",
+                    },
+                    body: JSON.stringify({
+                        message: "Hello from direct test!",
+                        conversation_id: 1,
+                    }),
+                })
+                    .then((response) => response.json())
+                    .then((data) => {
+                        console.log("Direct broadcast response:", data);
+                        addMessage(
+                            "Direct Test Response",
+                            JSON.stringify(data, null, 2),
+                            data.status === "success" ? "success" : "error"
+                        );
+                    })
+                    .catch((error) => {
+                        console.error("Direct test error:", error);
+                        addMessage(
+                            "Direct Test Error",
+                            error.toString(),
+                            "error"
+                        );
+                    });
+            }
+
+            function clearMessages() {
+                messagesElement.innerHTML = `
+                <div class="message">
+                    <strong>System:</strong> Messages cleared
+                    <div style="font-size: 0.8em; color: #666;">${new Date().toLocaleString()}</div>
+                </div>
+            `;
+            }
+
+            console.log(
+                "Debug page loaded. Subscribed to channels: private-conversation.1, test-pusher"
+            );
+            addMessage(
+                "System",
+                "Debug page loaded. Listening for messages...",
+                "info"
+            );
+        </script>
+    </body>
+</html>

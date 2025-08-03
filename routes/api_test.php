@@ -2,7 +2,6 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Log;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -61,52 +60,6 @@ Route::post('/test-message-broadcast', function (Request $request) {
             'status' => 'error',
             'message' => 'Failed to broadcast test message',
             'error' => $e->getMessage()
-        ], 500);
-    }
-});
-
-// Test message store broadcast debugging
-Route::post('/test-message-store-broadcast', function (Request $request) {
-    try {
-        Log::info('Testing message store broadcast');
-
-        // Test Pusher connection first
-        $pusher = new \Pusher\Pusher(
-            '0e0b5123273171ff212d',  // key
-            '770b5206be41b096e258',  // secret
-            '1471502',  // app_id
-            [
-                'cluster' => 'eu',
-                'useTLS' => true
-            ]
-        );
-
-        // Simple test data
-        $testData = [
-            'test_message' => 'Message from store function test',
-            'timestamp' => date('Y-m-d H:i:s'),
-            'conversation_id' => $request->input('conversation_id', 1)
-        ];
-
-        $result = $pusher->trigger('private-conversation.' . $request->input('conversation_id', 1), 'message.sent', $testData);
-
-        Log::info('Test broadcast result', ['result' => $result]);
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Test broadcast sent',
-            'result' => $result
-        ]);
-
-    } catch (\Exception $e) {
-        Log::error('Test broadcast failed', [
-            'error' => $e->getMessage(),
-            'trace' => $e->getTraceAsString()
-        ]);
-
-        return response()->json([
-            'status' => 'error',
-            'message' => $e->getMessage()
         ], 500);
     }
 });
