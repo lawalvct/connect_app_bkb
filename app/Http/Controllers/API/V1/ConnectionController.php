@@ -1144,7 +1144,7 @@ class ConnectionController extends Controller
     /**
      * @OA\Post(
      *     path="/api/v1/discover-by-post",
-     *     summary="Discover users based on posts and social circles",
+     *     summary="Discover posts with user details based on various criteria",
      *     tags={"Connections"},
      *     security={{"bearerAuth":{}}},
      *     @OA\RequestBody(
@@ -1152,11 +1152,12 @@ class ConnectionController extends Controller
      *         @OA\JsonContent(
      *             @OA\Property(property="post_id", type="integer", description="Optional post ID to find users from same social circle"),
      *             @OA\Property(property="social_circle_ids", type="array", @OA\Items(type="integer"), description="Optional social circle IDs to filter by"),
-     *             @OA\Property(property="limit", type="integer", default=20, description="Number of users to return"),
+     *             @OA\Property(property="page", type="integer", default=1, description="Page number for pagination"),
+     *             @OA\Property(property="per_page", type="integer", default=50, description="Number of posts to return per page"),
      *             @OA\Property(property="country_id", type="integer", description="Filter by country")
      *         )
      *     ),
-     *     @OA\Response(response=200, description="Users discovered successfully based on posts")
+     *     @OA\Response(response=200, description="Posts with user details retrieved successfully")
      * )
      */
     public function getUsersByPost(Request $request): JsonResponse
@@ -1175,7 +1176,8 @@ class ConnectionController extends Controller
                 'post_id' => 'nullable|integer|exists:posts,id',
                 'social_circle_ids' => 'nullable|array',
                 'social_circle_ids.*' => 'integer|exists:social_circles,id',
-                'limit' => 'nullable|integer|min:1|max:50',
+                'page' => 'nullable|integer|min:1',
+                'per_page' => 'nullable|integer|min:1|max:50',
                 'country_id' => 'nullable|integer|exists:countries,id'
             ]);
 
@@ -1189,16 +1191,26 @@ class ConnectionController extends Controller
 
             $postId = $request->input('post_id');
             $socialCircleIds = $request->input('social_circle_ids', []);
-            $limit = $request->input('limit', 20);
+            $page = $request->input('page', 1);
+            $perPage = $request->input('per_page', 50);
             $countryId = $request->input('country_id');
+            $offset = ($page - 1) * $perPage;
 
             Log::info('getUsersByPost called', [
                 'user_id' => $user->id,
                 'post_id' => $postId,
                 'social_circle_ids' => $socialCircleIds,
-                'limit' => $limit,
+                'page' => $page,
+                'per_page' => $perPage,
                 'country_id' => $countryId
             ]);
+
+            // Get auth user's social circles for relevance scoring
+            $authUserSocialCircles = DB::table('user_social_circles')
+                ->where('user_id', $user->id)
+                ->where('deleted_flag', 'N')
+                ->pluck('social_id')
+                ->toArray();
 
             // If post_id is provided, get the social circle from that post
             if ($postId) {
@@ -1215,7 +1227,7 @@ class ConnectionController extends Controller
                     ->whereNotNull('social_circle_id')
                     ->groupBy('social_circle_id')
                     ->orderByRaw('COUNT(*) DESC')
-                    ->limit(5)
+                    ->limit(10)
                     ->pluck('social_circle_id')
                     ->toArray();
 
@@ -1225,115 +1237,218 @@ class ConnectionController extends Controller
             // Remove duplicates
             $socialCircleIds = array_unique($socialCircleIds);
 
-            // Build query for users
-            $query = User::where('users.deleted_flag', 'N')
-                        ->where('users.id', '!=', $user->id)
-                        ->whereNull('users.deleted_at');
+            // Get excluded user IDs (swiped and blocked users)
+            $swipedUserIds = UserRequestsHelper::getSwipedUserIds($user->id);
+            $blockedUserIds = BlockUserHelper::blockUserList($user->id);
+            $excludedUserIds = array_merge($swipedUserIds, $blockedUserIds, [$user->id]);
+
+            // Build base query for posts with multiple criteria
+            $postsQuery = \App\Models\Post::with([
+                'user.profileImages',
+                'user.country',
+                'user.socialCircles',
+                'media',
+                'socialCircle',
+                'likes',
+                'comments'
+            ])
+            ->where('is_published', true)
+            ->whereNull('deleted_at')
+            ->whereHas('user', function ($q) use ($excludedUserIds, $countryId) {
+                $q->where('deleted_flag', 'N')
+                  ->whereNull('deleted_at')
+                  ->whereNotIn('id', $excludedUserIds);
+
+                if ($countryId) {
+                    $q->where('country_id', $countryId);
+                }
+            });
 
             // Filter by social circles if provided
             if (!empty($socialCircleIds)) {
-                $query->whereHas('socialCircles', function ($q) use ($socialCircleIds) {
-                    $q->whereIn('social_id', $socialCircleIds)
-                      ->where('user_social_circles.deleted_flag', 'N');
-                });
+                $postsQuery->whereIn('social_circle_id', $socialCircleIds);
             }
 
-            // Filter by country if provided
-            if ($countryId) {
-                $query->where('users.country_id', $countryId);
+            // Create multiple queries for different criteria
+            $queries = [];
+
+            // 1. Most recent posts (30%)
+            $recentPosts = clone $postsQuery;
+            $recentPosts->where('created_at', '>=', now()->subDays(7))
+                       ->orderBy('created_at', 'desc');
+            $queries['recent'] = $recentPosts;
+
+            // 2. Most liked posts (25%)
+            $mostLikedPosts = clone $postsQuery;
+            $mostLikedPosts->where('likes_count', '>', 0)
+                          ->orderBy('likes_count', 'desc');
+            $queries['liked'] = $mostLikedPosts;
+
+            // 3. Most commented posts (20%)
+            $mostCommentedPosts = clone $postsQuery;
+            $mostCommentedPosts->where('comments_count', '>', 0)
+                              ->orderBy('comments_count', 'desc');
+            $queries['commented'] = $mostCommentedPosts;
+
+            // 4. Most viewed posts (15%)
+            $mostViewedPosts = clone $postsQuery;
+            $mostViewedPosts->where('views_count', '>', 0)
+                           ->orderBy('views_count', 'desc');
+            $queries['viewed'] = $mostViewedPosts;
+
+            // 5. Posts from auth user's social circles (10% - highest priority)
+            $relevantPosts = null;
+            if (!empty($authUserSocialCircles)) {
+                $relevantPosts = clone $postsQuery;
+                $relevantPosts->whereIn('social_circle_id', $authUserSocialCircles)
+                             ->orderByRaw('(likes_count + comments_count + views_count) DESC');
+                $queries['relevant'] = $relevantPosts;
             }
 
-            // Exclude already swiped users
-            $swipedUserIds = UserRequestsHelper::getSwipedUserIds($user->id);
-            if (!empty($swipedUserIds)) {
-                $query->whereNotIn('users.id', $swipedUserIds);
+            // Calculate distribution of posts per category
+            $distributions = [
+                'relevant' => $relevantPosts ? (int)($perPage * 0.10) : 0, // 10%
+                'recent' => (int)($perPage * 0.30), // 30%
+                'liked' => (int)($perPage * 0.25),  // 25%
+                'commented' => (int)($perPage * 0.20), // 20%
+                'viewed' => (int)($perPage * 0.15)  // 15%
+            ];
+
+            // Collect posts from each category
+            $collectedPosts = collect();
+            $usedPostIds = [];
+
+            foreach ($distributions as $type => $count) {
+                if ($count > 0 && isset($queries[$type])) {
+                    $categoryPosts = $queries[$type]
+                        ->whereNotIn('id', $usedPostIds)
+                        ->limit($count * 2) // Get more to account for duplicates
+                        ->get();
+
+                    // Add type for tracking
+                    $categoryPosts = $categoryPosts->map(function ($post) use ($type) {
+                        $post->discovery_type = $type;
+                        return $post;
+                    });
+
+                    $collectedPosts = $collectedPosts->merge($categoryPosts->take($count));
+                    $usedPostIds = array_merge($usedPostIds, $categoryPosts->pluck('id')->toArray());
+                }
             }
 
-            // Exclude blocked users
-            $blockedUserIds = BlockUserHelper::blockUserList($user->id);
-            if (!empty($blockedUserIds)) {
-                $query->whereNotIn('users.id', $blockedUserIds);
-            }
-
-            // Prioritize users with recent posts
-            $usersWithRecentPosts = $query->whereHas('posts', function ($q) {
-                $q->where('posts.created_at', '>=', now()->subDays(3))
-                  ->where('posts.is_published', true);
-            })
-            ->with(['profileImages', 'country', 'socialCircles'])
-            ->inRandomOrder()
-            ->limit($limit)
-            ->get();
-
-            // If we don't have enough users with recent posts, fill with random users
-            if ($usersWithRecentPosts->count() < $limit) {
-                $remainingLimit = $limit - $usersWithRecentPosts->count();
-                $existingUserIds = $usersWithRecentPosts->pluck('id')->toArray();
-
-                $additionalUsers = User::where('users.deleted_flag', 'N')
-                    ->where('users.id', '!=', $user->id)
-                    ->whereNotIn('users.id', $existingUserIds)
-                    ->whereNotIn('users.id', $swipedUserIds)
-                    ->whereNotIn('users.id', $blockedUserIds)
-                    ->whereNull('users.deleted_at')
-                    ->with(['profileImages', 'country', 'socialCircles'])
+            // If we don't have enough posts, fill with random posts
+            if ($collectedPosts->count() < $perPage) {
+                $remainingCount = $perPage - $collectedPosts->count();
+                $randomPosts = (clone $postsQuery)
+                    ->whereNotIn('id', $usedPostIds)
                     ->inRandomOrder()
-                    ->limit($remainingLimit)
-                    ->get();
+                    ->limit($remainingCount)
+                    ->get()
+                    ->map(function ($post) {
+                        $post->discovery_type = 'random';
+                        return $post;
+                    });
 
-                $usersWithRecentPosts = $usersWithRecentPosts->merge($additionalUsers);
+                $collectedPosts = $collectedPosts->merge($randomPosts);
             }
+
+            // Shuffle the collection for random arrangement
+            $collectedPosts = $collectedPosts->shuffle();
+
+            // Apply pagination
+            $total = $collectedPosts->count();
+            $paginatedPosts = $collectedPosts->slice($offset, $perPage)->values();
 
             Log::info('getUsersByPost results', [
                 'user_id' => $user->id,
-                'found_users' => $usersWithRecentPosts->count(),
-                'social_circles_used' => $socialCircleIds
+                'total_posts' => $total,
+                'returned_posts' => $paginatedPosts->count(),
+                'social_circles_used' => $socialCircleIds,
+                'auth_user_circles' => $authUserSocialCircles,
+                'distributions' => $distributions
             ]);
 
-            if ($usersWithRecentPosts->isEmpty()) {
+            if ($paginatedPosts->isEmpty()) {
                 return response()->json([
                     'status' => 0,
-                    'message' => 'No users found for discovery',
-                    'data' => []
+                    'message' => 'No posts found for discovery',
+                    'data' => [],
+                    'pagination' => [
+                        'current_page' => $page,
+                        'per_page' => $perPage,
+                        'total' => 0,
+                        'last_page' => 0
+                    ]
                 ], $this->successStatus);
             }
 
-            // Add additional user data
-            $usersWithRecentPosts = $usersWithRecentPosts->map(function($discoveredUser) use ($user) {
-                // Get connection count
-                $connectionCount = UserRequestsHelper::getConnectionCount($discoveredUser->id);
-                $discoveredUser->total_connections = $connectionCount;
+            // Format posts with user details
+            $formattedPosts = $paginatedPosts->map(function ($post) use ($user) {
+                // Get user connection data
+                $connectionCount = UserRequestsHelper::getConnectionCount($post->user->id);
+                $isConnected = UserRequestsHelper::areUsersConnected($user->id, $post->user->id);
 
-                // Check if connected to current user
-                $isConnected = UserRequestsHelper::areUsersConnected($user->id, $discoveredUser->id);
-                $discoveredUser->is_connected_to_current_user = $isConnected;
+                // Format post media
+                $mediaItems = $post->media->map(function ($media) {
+                    return [
+                        'id' => $media->id,
+                        'type' => $media->type,
+                        'url' => $media->url,
+                        'thumbnail_url' => $media->thumbnail_url,
+                        'order' => $media->order
+                    ];
+                });
 
-                // Add country details
-                if ($discoveredUser->country) {
-                    $discoveredUser->country_details = new CountryResource($discoveredUser->country);
-                }
-
-                // Get recent posts count
-                $recentPostsCount = \App\Models\Post::where('user_id', $discoveredUser->id)
-                    ->where('created_at', '>=', now()->subDays(7))
-                    ->where('is_published', true)
-                    ->count();
-                $discoveredUser->recent_posts_count = $recentPostsCount;
-
-                return $discoveredUser;
+                return [
+                    'id' => $post->id,
+                    'content' => $post->content,
+                    'type' => $post->type,
+                    'location' => $post->location,
+                    'likes_count' => $post->likes_count,
+                    'comments_count' => $post->comments_count,
+                    'shares_count' => $post->shares_count,
+                    'views_count' => $post->views_count,
+                    'created_at' => $post->created_at->toISOString(),
+                    'time_since_created' => $post->created_at->diffForHumans(),
+                    'discovery_type' => $post->discovery_type ?? 'unknown',
+                    'media' => $mediaItems,
+                    'social_circle' => $post->socialCircle ? [
+                        'id' => $post->socialCircle->id,
+                        'name' => $post->socialCircle->name,
+                        'logo' => $post->socialCircle->logo,
+                        'color' => $post->socialCircle->color
+                    ] : null,
+                    'user' => new \App\Http\Resources\V1\UserResource($post->user),
+                    'user_additional_data' => [
+                        'total_connections' => $connectionCount,
+                        'is_connected_to_current_user' => $isConnected,
+                        'posts_count' => \App\Models\Post::where('user_id', $post->user->id)->count(),
+                        'recent_posts_count' => \App\Models\Post::where('user_id', $post->user->id)
+                            ->where('created_at', '>=', now()->subDays(7))
+                            ->count()
+                    ]
+                ];
             });
 
-            // Use UserResource collection to properly handle profile URLs with legacy user logic
-            $formattedUsers = \App\Http\Resources\V1\UserResource::collection($usersWithRecentPosts);
+            // Calculate pagination data
+            $lastPage = (int) ceil($total / $perPage);
 
             return response()->json([
                 'status' => 1,
-                'message' => 'Users discovered successfully based on posts',
-                'data' => $formattedUsers,
+                'message' => 'Posts with user details retrieved successfully',
+                'data' => $formattedPosts,
+                'pagination' => [
+                    'current_page' => $page,
+                    'per_page' => $perPage,
+                    'total' => $total,
+                    'last_page' => $lastPage,
+                    'has_more_pages' => $page < $lastPage
+                ],
                 'meta' => [
-                    'total_found' => $usersWithRecentPosts->count(),
                     'social_circles_used' => $socialCircleIds,
-                    'discovery_method' => 'post_based'
+                    'auth_user_circles' => $authUserSocialCircles,
+                    'discovery_method' => 'post_based_with_criteria',
+                    'criteria_distribution' => $distributions
                 ]
             ], $this->successStatus);
 
@@ -1346,7 +1461,7 @@ class ConnectionController extends Controller
 
             return response()->json([
                 'status' => 0,
-                'message' => 'Failed to discover users based on posts',
+                'message' => 'Failed to retrieve posts with user details',
                 'debug' => config('app.debug') ? $e->getMessage() : null
             ], 500);
         }
