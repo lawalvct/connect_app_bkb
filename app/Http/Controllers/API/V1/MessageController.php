@@ -222,13 +222,13 @@ class MessageController extends BaseController
                     'channel' => 'private-conversation.' . $conversationId
                 ]);
 
-                // Direct Pusher broadcast for debugging
+                // Direct Pusher broadcast using environment variables
                 $pusher = new \Pusher\Pusher(
-                    '0e0b5123273171ff212d',  // key
-                    '770b5206be41b096e258',  // secret
-                    '1471502',  // app_id
+                    env('PUSHER_APP_KEY'),
+                    env('PUSHER_APP_SECRET'),
+                    env('PUSHER_APP_ID'),
                     [
-                        'cluster' => 'eu',
+                        'cluster' => env('PUSHER_APP_CLUSTER'),
                         'useTLS' => true
                     ]
                 );
@@ -552,13 +552,13 @@ class MessageController extends BaseController
                     'channel' => 'private-conversation.' . $conversation->id
                 ]);
 
-                // Direct Pusher broadcast for debugging
+                // Direct Pusher broadcast using environment variables
                 $pusher = new \Pusher\Pusher(
-                    '0e0b5123273171ff212d',  // key
-                    '770b5206be41b096e258',  // secret
-                    '1471502',  // app_id
+                    env('PUSHER_APP_KEY'),
+                    env('PUSHER_APP_SECRET'),
+                    env('PUSHER_APP_ID'),
                     [
-                        'cluster' => 'eu',
+                        'cluster' => env('PUSHER_APP_CLUSTER'),
                         'useTLS' => true
                     ]
                 );
