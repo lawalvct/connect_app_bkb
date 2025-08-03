@@ -97,22 +97,24 @@ class ConnectionController extends Controller
         if (!$user) {
             return response()->json([
                 'message' => 'User not found',
-                'status' => 0,
                 'data' => []
             ], 404);
         }
 
         // Load relationships if not already loaded
         if (!$user->relationLoaded('profileImages')) {
-            $user->load(['profileImages', 'country']);
+            $user->load('profileImages');
+        }
+
+        // Load social circles relationship if not already loaded
+        if (!$user->relationLoaded('socialCircles')) {
+            $user->load('socialCircles');
         }
 
         // Use UserResource to properly handle profile URLs with legacy user logic
         $userData = new \App\Http\Resources\V1\UserResource($user);
 
         return response()->json([
-            'message' => 'Successfully!',
-            'status' => 1,
             'data' => [$userData]
         ], $this->successStatus);
     } catch (\Exception $e) {
@@ -123,8 +125,7 @@ class ConnectionController extends Controller
         ]);
 
         return response()->json([
-            'message' => 'An error occurred: ' . $e->getMessage(),
-            'status' => 0,
+            'message' => 'An error occurred while fetching user details',
             'data' => []
         ], $this->successStatus);
     }

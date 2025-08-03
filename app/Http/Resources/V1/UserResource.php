@@ -84,7 +84,7 @@ class UserResource extends JsonResource
             'social_circles' => $this->when(isset($this->social_circles_detailed), $this->social_circles_detailed),
 
             // Social Circles (from relationship)
-            'social_circles_relationship' => $this->when($this->relationLoaded('socialCircles'), function () {
+            'social_circles' => $this->when($this->relationLoaded('socialCircles'), function () {
                 // Add null check for socialCircles collection
                 if (!$this->socialCircles) {
                     return [];
