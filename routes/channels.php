@@ -18,7 +18,18 @@ Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
 });
 
 // Private conversation channel
-Broadcast::channel('conversation.{conversationId}', function ($user, $conversationId) {
+Broadcast::channel('private-conversation.{conversationId}', function ($user, $conversationId) {
+    $conversation = \App\Models\Conversation::find($conversationId);
+
+    if (!$conversation) {
+        return false;
+    }
+
+    return $conversation->hasParticipant($user->id);
+});
+
+// Private conversation channel (alternative pattern)
+Broadcast::channel('private-conversation.{conversationId}', function ($user, $conversationId) {
     $conversation = \App\Models\Conversation::find($conversationId);
 
     if (!$conversation) {

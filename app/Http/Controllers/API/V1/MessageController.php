@@ -248,7 +248,7 @@ class MessageController extends BaseController
                         'user' => [
                             'id' => $message->user->id,
                             'name' => $message->user->name,
-                            'avatar' => $message->user->avatar ?? null
+                            'profile_image' => $message->user->profile_image ?? null
                         ]
                     ]
                 ];
@@ -258,12 +258,12 @@ class MessageController extends BaseController
                     'message_keys' => array_keys($broadcastData['message'])
                 ]);
 
-                $result = $pusher->trigger('private-conversation.' . $conversationId, 'message.sent', $broadcastData);
+                $result = $pusher->trigger('conversation.' . $conversationId, 'message.sent', $broadcastData);
 
                 Log::info('Direct Pusher broadcast successful', [
                     'message_id' => $message->id,
                     'conversation_id' => $conversationId,
-                    'channel' => 'private-conversation.' . $conversationId,
+                    'channel' => 'conversation.' . $conversationId,
                     'pusher_result' => $result,
                     'result_type' => gettype($result)
                 ]);

@@ -22,6 +22,28 @@ Route::get('/test-streaming', function () {
     return view('test-streaming');
 });
 
+// Test route for conversation module
+Route::get('/test-conversation', function () {
+    return view('test-conversation');
+});
+
+// Broadcasting authentication route for Pusher
+Route::post('/broadcasting/auth', function (Request $request) {
+    // This will handle Pusher channel authentication
+    return \Illuminate\Support\Facades\Broadcast::auth($request);
+})->middleware(['auth:sanctum']);
+
+// Test route to show user credentials
+Route::get('/test-users', function () {
+    $users = \App\Models\User::take(5)->get(['id', 'name', 'email']);
+    $output = '<h2>Test User Credentials (Password: 12345678 for all)</h2><ul>';
+    foreach($users as $user) {
+        $output .= '<li>ID: ' . $user->id . ', Name: ' . $user->name . ', Email: ' . $user->email . '</li>';
+    }
+    $output .= '</ul><br><a href="/test-conversation">Go to Chat Test</a>';
+    return $output;
+});
+
 // Debug route for file upload testing
 Route::get('/test-upload', function () {
     return view('test-upload');

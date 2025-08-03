@@ -23,6 +23,14 @@
         <header class="w-full lg:max-w-4xl max-w-[335px] text-sm mb-6 not-has-[nav]:hidden">
             @if (Route::has('login'))
                 <nav class="flex items-center justify-end gap-4">
+                    <!-- Test Conversation Link -->
+                    <a
+                        href="{{ url('/test-conversation') }}"
+                        class="inline-block px-5 py-1.5 dark:text-[#FF4433] text-[#f53003] border border-[#f53003] dark:border-[#FF4433] hover:bg-[#f53003] hover:text-white dark:hover:bg-[#FF4433] dark:hover:text-black rounded-sm text-sm leading-normal font-medium"
+                    >
+                        Test Chat
+                    </a>
+
                     @auth
                         <a
                             href="{{ url('/dashboard') }}"
@@ -41,7 +49,7 @@
                         @if (Route::has('register'))
                             <a
                                 href="{{ route('register') }}"
-                                class="inline-block px-5 py-1.5 dark:text-[#EDEDEC] border-[#19140035] hover:border-[#1915014a] border text-[#1b1b18] dark:border-[#3E3E3A] dark:hover:border-[#62605b] rounded-sm text-sm leading-normal">
+                                class="inline-block px-5 py-1.5 dark:text-[#EDEDEC] border-[#19140035] hover:border-[#1915014a] border text-[#1b1b18] dark:border-[#3E3E3A] dark:hover:border-[#62605b] rounded-sm text-sm leading-normal"">
                                 Register
                             </a>
                         @endif

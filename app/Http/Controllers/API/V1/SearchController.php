@@ -32,14 +32,14 @@ class SearchController extends BaseController
     public function searchUsers(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'query' => 'required|string|min:2',
+            'q' => 'required|string|min:2',
         ]);
 
         if ($validator->fails()) {
             return $this->sendError('Validation error', $validator->errors(), 422);
         }
 
-        $query = $request->query('query');
+        $query = $request->query('q');
 
         $users = User::where(function($q) use ($query) {
             $q->where('name', 'like', "%{$query}%")
