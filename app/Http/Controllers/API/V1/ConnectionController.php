@@ -111,6 +111,11 @@ class ConnectionController extends Controller
             $user->load('socialCircles');
         }
 
+        // Load country relationship if not already loaded
+        if (!$user->relationLoaded('country')) {
+            $user->load('country');
+        }
+
         // Use UserResource to properly handle profile URLs with legacy user logic
         $userData = new \App\Http\Resources\V1\UserResource($user);
 

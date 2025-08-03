@@ -39,6 +39,7 @@ class UserResource extends JsonResource
                     'id' => $this->country->id,
                     'name' => $this->country->name,
                     'code' => $this->country->code,
+                    'flag' => 'https://flagcdn.com/w80/'.strtolower($this->country->code).'.png',
                     'timezone' => $this->country->timezone // This is country's timezone, not user's
                 ];
             }),
