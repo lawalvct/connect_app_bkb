@@ -56,15 +56,20 @@ class Story extends Model
     // Accessors
     public function getIsExpiredAttribute(): bool
     {
+        if (is_null($this->expires_at)) {
+            return false; // If no expiration date, consider it not expired
+        }
         return $this->expires_at->isPast();
     }
 
     public function getTimeLeftAttribute(): int
     {
-        if ($this->is_expired) {
+        if (is_null($this->expires_at) || $this->is_expired) {
             return 0;
         }
-        return $this->expires_at->diffInSeconds(now());
+        // Calculate seconds from now until expiration
+        $secondsLeft = now()->diffInSeconds($this->expires_at, false);
+        return max(0, $secondsLeft);
     }
 
     public function getFullFileUrlAttribute(): ?string
@@ -83,12 +88,14 @@ class Story extends Model
     // Scopes
     public function scopeActive($query)
     {
-        return $query->where('expires_at', '>', now());
+        return $query->where('expires_at', '>', now())
+                    ->orWhereNull('expires_at'); // Include stories with no expiration
     }
 
     public function scopeExpired($query)
     {
-        return $query->where('expires_at', '<=', now());
+        return $query->where('expires_at', '<=', now())
+                    ->whereNotNull('expires_at'); // Only include stories with actual expiration dates
     }
 
     public function scopeVisibleTo($query, $userId)
@@ -127,6 +134,7 @@ class Story extends Model
             return true; // Owner can always view
         }
 
+        // If story is expired, it can't be viewed (except by owner)
         if ($this->is_expired) {
             return false;
         }
