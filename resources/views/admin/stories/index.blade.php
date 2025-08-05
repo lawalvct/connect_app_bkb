@@ -29,7 +29,7 @@
         <!-- Filters and Search -->
         <div class="bg-white rounded-lg shadow-md mb-6">
             <div class="p-6">
-                <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
 
                     <!-- Search -->
                     <div>
@@ -80,7 +80,7 @@
                     </div>
 
                     <!-- Privacy Filter -->
-                    <div>
+                    <!-- <div>
                         <label for="privacy" class="block text-sm font-medium text-gray-700 mb-1">Privacy</label>
                         <select id="privacy"
                                 x-model="filters.privacy"
@@ -91,21 +91,63 @@
                             <option value="close_friends">Close Friends</option>
                             <option value="custom">Custom</option>
                         </select>
+                    </div> -->
+
+                </div>
+
+                <!-- Date Range Filter Row -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+                    <!-- Date From -->
+                    <div>
+                        <label for="date_from" class="block text-sm font-medium text-gray-700 mb-1">Date From</label>
+                        <input type="date"
+                               id="date_from"
+                               x-model="filters.date_from"
+                               @change="loadStories()"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary">
                     </div>
 
-                    <!-- Date Range Filter -->
+                    <!-- Date To -->
                     <div>
-                        <label for="date_range" class="block text-sm font-medium text-gray-700 mb-1">Date Range</label>
-                        <select id="date_range"
-                                x-model="filters.date_range"
-                                @change="loadStories()"
-                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary">
-                            <option value="">All Time</option>
-                            <option value="today">Today</option>
-                            <option value="yesterday">Yesterday</option>
-                            <option value="this_week">This Week</option>
-                            <option value="this_month">This Month</option>
-                        </select>
+                        <label for="date_to" class="block text-sm font-medium text-gray-700 mb-1">Date To</label>
+                        <input type="date"
+                               id="date_to"
+                               x-model="filters.date_to"
+                               @change="loadStories()"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary">
+                    </div>
+
+                    <!-- Quick Date Presets -->
+                    {{-- <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Quick Presets</label>
+                        <div class="flex flex-wrap gap-2">
+                         <button @click="setDateRange('today')"
+                                    class="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200">
+                                Today
+                            </button>
+                            <button @click="setDateRange('yesterday')"
+                                    class="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200">
+                                Yesterday
+                            </button>
+                            <button @click="setDateRange('this_week')"
+                                    class="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200">
+                                This Week
+                            </button>
+                            <button @click="setDateRange('this_month')"
+                                    class="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200">
+                                This Month
+                            </button>
+                        </div>
+                    </div> --}}
+
+                    <!-- Clear Filters -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Actions</label>
+                        <button @click="clearFilters()"
+                                class="w-full px-3 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+                            <i class="fas fa-times mr-1"></i>
+                            Clear All Filters
+                        </button>
                     </div>
 
                 </div>
@@ -449,8 +491,8 @@
                 search: '',
                 type: '',
                 status: '',
-                privacy: '',
-                date_range: ''
+                date_from: '',
+                date_to: ''
             },
             searchTimeout: null,
 
@@ -568,10 +610,47 @@
                     search: '',
                     type: '',
                     status: '',
-                    privacy: '',
-                    date_range: ''
+                    date_from: '',
+                    date_to: ''
                 };
                 this.loadStories();
+            },
+
+            setDateRange(preset) {
+                const today = new Date();
+                const yesterday = new Date(today);
+                yesterday.setDate(yesterday.getDate() - 1);
+
+                const startOfWeek = new Date(today);
+                const day = startOfWeek.getDay();
+                const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
+                startOfWeek.setDate(diff);
+
+                const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
+                switch (preset) {
+                    case 'today':
+                        this.filters.date_from = this.formatDateForInput(today);
+                        this.filters.date_to = this.formatDateForInput(today);
+                        break;
+                    case 'yesterday':
+                        this.filters.date_from = this.formatDateForInput(yesterday);
+                        this.filters.date_to = this.formatDateForInput(yesterday);
+                        break;
+                    case 'this_week':
+                        this.filters.date_from = this.formatDateForInput(startOfWeek);
+                        this.filters.date_to = this.formatDateForInput(today);
+                        break;
+                    case 'this_month':
+                        this.filters.date_from = this.formatDateForInput(startOfMonth);
+                        this.filters.date_to = this.formatDateForInput(today);
+                        break;
+                }
+                this.loadStories();
+            },
+
+            formatDateForInput(date) {
+                return date.toISOString().split('T')[0];
             },
 
             getStatusBadge(isExpired) {

@@ -119,10 +119,10 @@ class StoryManagementController extends Controller
             }
         }
 
-        // Filter by privacy
-        if ($request->has('privacy') && !empty($request->privacy)) {
-            $query->where('privacy', $request->privacy);
-        }
+        // Filter by privacy - COMMENTED OUT
+        // if ($request->has('privacy') && !empty($request->privacy)) {
+        //     $query->where('privacy', $request->privacy);
+        // }
 
         // Filter by date range
         if ($request->has('date_from') && !empty($request->date_from)) {
