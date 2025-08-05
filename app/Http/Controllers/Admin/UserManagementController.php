@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Exports\UsersExport;
 
 class UserManagementController extends Controller
 {
@@ -397,94 +399,64 @@ class UserManagementController extends Controller
     }
 
     /**
-     * Export users to CSV
+     * Export users to CSV or Excel
+     *
+     * Supports filtering by:
+     * - search: Filter by name or email
+     * - status: active, suspended, banned
+     * - verified: 1 (verified), 0 (unverified)
+     * - social_circles: has_circles, no_circles, or specific circle ID
+     *
+     * Formats supported:
+     * - csv: Comma-separated values
+     * - excel/xlsx: Microsoft Excel format
+     *
+     * @param Request $request
+     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse
      */
     public function export(Request $request)
     {
         try {
-            $query = User::query();
+            // Get the format parameter (default to csv)
+            $format = $request->get('format', 'csv');
 
-            // Apply same filters as getUsers
+            // Validate format
+            if (!in_array($format, ['csv', 'excel', 'xlsx'])) {
+                return redirect()->back()->with('error', 'Invalid export format');
+            }
+
+            // Prepare filters
+            $filters = [];
             if ($request->filled('search')) {
-                $search = $request->get('search');
-                $query->where(function ($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%")
-                      ->orWhere('email', 'like', "%{$search}%");
-                });
+                $filters['search'] = $request->get('search');
             }
-
             if ($request->filled('status')) {
-                $status = $request->get('status');
-                if ($status === 'active') {
-                    $query->where('is_active', true)->where('is_banned', false);
-                } elseif ($status === 'suspended') {
-                    $query->where('is_active', false);
-                } elseif ($status === 'banned') {
-                    $query->where('is_banned', true);
-                }
+                $filters['status'] = $request->get('status');
             }
-
             if ($request->filled('verified')) {
-                if ($request->get('verified') == '1') {
-                    $query->whereNotNull('email_verified_at');
-                } else {
-                    $query->whereNull('email_verified_at');
-                }
+                $filters['verified'] = $request->get('verified');
+            }
+            if ($request->filled('social_circles')) {
+                $filters['social_circles'] = $request->get('social_circles');
             }
 
-            $users = $query->get(['id', 'name', 'email', 'phone', 'is_active', 'is_banned', 'created_at', 'email_verified_at']);
+            // Generate filename with timestamp
+            $timestamp = now()->format('Y-m-d_H-i-s');
 
-            $filename = 'users_export_' . now()->format('Y-m-d_H-i-s') . '.csv';
-
-            $headers = [
-                'Content-Type' => 'text/csv',
-                'Content-Disposition' => "attachment; filename=\"{$filename}\"",
-            ];
-
-            $callback = function() use ($users) {
-                $file = fopen('php://output', 'w');
-
-                // Add CSV headers
-                fputcsv($file, [
-                    'ID',
-                    'Name',
-                    'Email',
-                    'Phone',
-                    'Status',
-                    'Email Verified',
-                    'Registration Date',
-                    'Posts Count'
-                ]);
-
-                // Add data rows
-                foreach ($users as $user) {
-                    $status = 'Active';
-                    if ($user->is_banned) {
-                        $status = 'Banned';
-                    } elseif (!$user->is_active) {
-                        $status = 'Suspended';
-                    }
-
-                    fputcsv($file, [
-                        $user->id,
-                        $user->name,
-                        $user->email,
-                        $user->phone ?? 'N/A',
-                        $status,
-                        $user->email_verified_at ? 'Yes' : 'No',
-                        $user->created_at->format('Y-m-d H:i:s'),
-                        $user->posts_count ?? 0
-                    ]);
-                }
-
-                fclose($file);
-            };
-
-            return response()->stream($callback, 200, $headers);
+            if ($format === 'csv') {
+                // CSV Export using Laravel Excel
+                $filename = "users_export_{$timestamp}.csv";
+                return Excel::download(new UsersExport($filters), $filename, \Maatwebsite\Excel\Excel::CSV);
+            } else {
+                // Excel Export
+                $filename = "users_export_{$timestamp}.xlsx";
+                return Excel::download(new UsersExport($filters), $filename, \Maatwebsite\Excel\Excel::XLSX);
+            }
 
         } catch (\Exception $e) {
             Log::error('Error exporting users: ' . $e->getMessage());
-            return redirect()->back()->with('error', 'Failed to export users');
+            Log::error('Stack trace: ' . $e->getTraceAsString());
+            return redirect()->back()->with('error', 'Failed to export users: ' . $e->getMessage());
         }
     }
 

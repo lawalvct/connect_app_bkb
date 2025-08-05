@@ -2,31 +2,53 @@
 
 @section('title', 'User Management')
 
-@section('header')
-    <div class="flex justify-between items-center">
-        <div>
-            <h1 class="text-2xl font-bold text-gray-900">User Management</h1>
-            <p class="text-gray-600">Manage all registered users</p>
-        </div>
-        <div class="flex space-x-3">
-            <button type="button"
-                    onclick="exportUsers()"
-                    class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
-                <i class="fas fa-download mr-2"></i>
-                Export
-            </button>
-            {{-- <button type="button"
-                    onclick="bulkAction()"
-                    class="bg-primary hover:bg-primary text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
-                <i class="fas fa-users-cog mr-2"></i>
-                Bulk Actions
-            </button> --}}
-        </div>
-    </div>
-@endsection
 
 @section('content')
     <div x-data="userManagement()" x-init="loadUsers(); loadSocialCircles()">
+
+        <!-- Header with Export -->
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <h2 class="text-xl font-semibold text-gray-900">User Management</h2>
+                <p class="text-gray-600">Manage all registered users</p>
+            </div>
+            <div class="flex space-x-3">
+                <!-- Export Dropdown -->
+                <div class="relative">
+                    <button @click="exportOpen = !exportOpen"
+                            type="button"
+                            class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center">
+                        <i class="fas fa-download mr-2"></i>
+                        Export
+                        <i class="fas fa-chevron-down ml-2"></i>
+                    </button>
+
+                    <!-- Dropdown Menu -->
+                    <div x-show="exportOpen"
+                         @click.away="exportOpen = false"
+                         x-transition:enter="transition ease-out duration-100"
+                         x-transition:enter-start="transform opacity-0 scale-95"
+                         x-transition:enter-end="transform opacity-100 scale-100"
+                         x-transition:leave="transition ease-in duration-75"
+                         x-transition:leave-start="transform opacity-100 scale-100"
+                         x-transition:leave-end="transform opacity-0 scale-95"
+                         class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200">
+                        <div class="py-1">
+                            <button @click="exportUsers('csv'); exportOpen = false"
+                                    class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
+                                <i class="fas fa-file-csv mr-2 text-green-600"></i>
+                                Export as CSV
+                            </button>
+                            <button @click="exportUsers('excel'); exportOpen = false"
+                                    class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
+                                <i class="fas fa-file-excel mr-2 text-green-600"></i>
+                                Export as Excel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- Filters and Search -->
         <div class="bg-white rounded-lg shadow-md mb-6">
@@ -422,6 +444,7 @@
             socialCircles: [],
             loading: false,
             selectedUsers: [],
+            exportOpen: false,
             filters: {
                 search: '',
                 status: '',
@@ -679,21 +702,95 @@
                 toast.textContent = message;
                 document.body.appendChild(toast);
                 setTimeout(() => toast.remove(), 3000);
+            },
+
+            exportUsers(format = 'csv') {
+                try {
+                    // Validate format
+                    if (!['csv', 'excel', 'xlsx'].includes(format)) {
+                        throw new Error('Invalid export format');
+                    }
+
+                    // Get current filters from this Alpine.js component
+                    const params = new URLSearchParams();
+
+                    if (this.filters.search) params.append('search', this.filters.search);
+                    if (this.filters.status) params.append('status', this.filters.status);
+                    if (this.filters.verified) params.append('verified', this.filters.verified);
+                    if (this.filters.social_circles) params.append('social_circles', this.filters.social_circles);
+
+                    // Add format parameter
+                    params.append('format', format);
+
+                    const exportUrl = `/admin/users/export?${params.toString()}`;
+
+                    // Show loading state with better styling
+                    const toast = document.createElement('div');
+                    toast.className = 'fixed top-4 right-4 bg-blue-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 border border-blue-600';
+                    toast.innerHTML = `
+                        <div class="flex items-center">
+                            <i class="fas fa-spinner fa-spin mr-2"></i>
+                            <span>Preparing ${format.toUpperCase()} export...</span>
+                        </div>
+                    `;
+                    document.body.appendChild(toast);
+
+                    // Create a hidden iframe for download to avoid page navigation
+                    const iframe = document.createElement('iframe');
+                    iframe.style.display = 'none';
+                    iframe.src = exportUrl;
+                    document.body.appendChild(iframe);
+
+                    // Remove loading toast and iframe after download starts
+                    setTimeout(() => {
+                        if (toast.parentNode) {
+                            toast.remove();
+                        }
+                        // Show success message
+                        const successToast = document.createElement('div');
+                        successToast.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 border border-green-600';
+                        successToast.innerHTML = `
+                            <div class="flex items-center">
+                                <i class="fas fa-check mr-2"></i>
+                                <span>${format.toUpperCase()} export started successfully!</span>
+                            </div>
+                        `;
+                        document.body.appendChild(successToast);
+
+                        setTimeout(() => {
+                            if (successToast.parentNode) {
+                                successToast.remove();
+                            }
+                        }, 3000);
+
+                        // Clean up iframe
+                        if (iframe.parentNode) {
+                            iframe.remove();
+                        }
+                    }, 2000);
+
+                } catch (error) {
+                    console.error('Export error:', error);
+
+                    // Show error message
+                    const errorToast = document.createElement('div');
+                    errorToast.className = 'fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 border border-red-600';
+                    errorToast.innerHTML = `
+                        <div class="flex items-center">
+                            <i class="fas fa-exclamation-triangle mr-2"></i>
+                            <span>Export failed: ${error.message}</span>
+                        </div>
+                    `;
+                    document.body.appendChild(errorToast);
+
+                    setTimeout(() => {
+                        if (errorToast.parentNode) {
+                            errorToast.remove();
+                        }
+                    }, 5000);
+                }
             }
         }
-    }
-
-    function exportUsers() {
-        // Get current filters
-        const params = new URLSearchParams();
-        const filters = document.querySelector('[x-data]').__x.$data.filters;
-
-        if (filters.search) params.append('search', filters.search);
-        if (filters.status) params.append('status', filters.status);
-        if (filters.verified) params.append('verified', filters.verified);
-
-        const exportUrl = `/admin/users/export?${params.toString()}`;
-        window.location.href = exportUrl;
     }
 
     function bulkAction() {
