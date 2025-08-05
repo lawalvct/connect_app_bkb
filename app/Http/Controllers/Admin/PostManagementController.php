@@ -87,22 +87,22 @@ class PostManagementController extends Controller
                 }
             }
 
-            if ($request->filled('date_range')) {
-                $dateRange = $request->get('date_range');
-                switch ($dateRange) {
-                    case 'today':
-                        $query->whereDate('created_at', today());
-                        break;
-                    case 'yesterday':
-                        $query->whereDate('created_at', Carbon::yesterday());
-                        break;
-                    case 'this_week':
-                        $query->whereBetween('created_at', [now()->startOfWeek(), now()->endOfWeek()]);
-                        break;
-                    case 'this_month':
-                        $query->whereMonth('created_at', now()->month)
-                              ->whereYear('created_at', now()->year);
-                        break;
+            // Add date range filtering with calendar dates
+            if ($request->filled('date_from')) {
+                $dateFrom = $request->get('date_from');
+                try {
+                    $query->whereDate('created_at', '>=', $dateFrom);
+                } catch (\Exception $e) {
+                    Log::warning('Invalid date_from format: ' . $dateFrom);
+                }
+            }
+
+            if ($request->filled('date_to')) {
+                $dateTo = $request->get('date_to');
+                try {
+                    $query->whereDate('created_at', '<=', $dateTo);
+                } catch (\Exception $e) {
+                    Log::warning('Invalid date_to format: ' . $dateTo);
                 }
             }
 
@@ -302,7 +302,66 @@ class PostManagementController extends Controller
     public function export(Request $request)
     {
         try {
-            $posts = Post::with(['user:id,name,email', 'socialCircle:id,name'])
+            // Start with query and apply same filters as getPosts
+            $query = Post::query();
+
+            // Apply filters
+            if ($request->filled('search')) {
+                $search = $request->get('search');
+                $query->where(function ($q) use ($search) {
+                    $q->where('content', 'like', "%{$search}%")
+                      ->orWhereHas('user', function($userQuery) use ($search) {
+                          $userQuery->where('name', 'like', "%{$search}%")
+                                   ->orWhere('email', 'like', "%{$search}%");
+                      });
+                });
+            }
+
+            if ($request->filled('social_circle')) {
+                $socialCircleId = $request->get('social_circle');
+                if (is_numeric($socialCircleId)) {
+                    $query->where('social_circle_id', $socialCircleId);
+                }
+            }
+
+            if ($request->filled('type')) {
+                $type = $request->get('type');
+                if (in_array($type, ['text', 'image', 'video', 'mixed'])) {
+                    $query->where('type', $type);
+                }
+            }
+
+            if ($request->filled('status')) {
+                $status = $request->get('status');
+                if ($status === 'published') {
+                    $query->where('is_published', true);
+                } elseif ($status === 'draft') {
+                    $query->where('is_published', false);
+                } elseif ($status === 'scheduled') {
+                    $query->where('scheduled_at', '>', now());
+                }
+            }
+
+            // Add date range filtering
+            if ($request->filled('date_from')) {
+                $dateFrom = $request->get('date_from');
+                try {
+                    $query->whereDate('created_at', '>=', $dateFrom);
+                } catch (\Exception $e) {
+                    Log::warning('Invalid date_from format in export: ' . $dateFrom);
+                }
+            }
+
+            if ($request->filled('date_to')) {
+                $dateTo = $request->get('date_to');
+                try {
+                    $query->whereDate('created_at', '<=', $dateTo);
+                } catch (\Exception $e) {
+                    Log::warning('Invalid date_to format in export: ' . $dateTo);
+                }
+            }
+
+            $posts = $query->with(['user:id,name,email', 'socialCircle:id,name'])
                 ->withCount(['likes', 'comments', 'reports'])
                 ->get();
 

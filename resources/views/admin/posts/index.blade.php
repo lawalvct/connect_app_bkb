@@ -31,7 +31,8 @@
         <!-- Filters and Search -->
         <div class="bg-white rounded-lg shadow-md mb-6">
             <div class="p-6">
-                <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <!-- First Row - Main Filters -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
 
                     <!-- Search -->
                     <div>
@@ -79,7 +80,7 @@
                             <option value="text">Text</option>
                             <option value="image">Image</option>
                             <option value="video">Video</option>
-                            <option value="mixed">Mixed</option>
+                            {{-- <option value="mixed">Mixed</option> --}}
                         </select>
                     </div>
 
@@ -93,23 +94,63 @@
                             <option value="">All Posts</option>
                             <option value="published">Published</option>
                             <option value="draft">Draft</option>
-                            <option value="scheduled">Scheduled</option>
+                            {{-- <option value="scheduled">Scheduled</option> --}}
                         </select>
                     </div>
 
+                </div>
+
+                <!-- Second Row - Date Range Filter -->
+                <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+
                     <!-- Date Range Filter -->
                     <div>
-                        <label for="date_range" class="block text-sm font-medium text-gray-700 mb-1">Date Range</label>
-                        <select id="date_range"
-                                x-model="filters.date_range"
-                                @change="loadPosts()"
-                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary">
-                            <option value="">All Time</option>
-                            <option value="today">Today</option>
-                            <option value="yesterday">Yesterday</option>
-                            <option value="this_week">This Week</option>
-                            <option value="this_month">This Month</option>
-                        </select>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Post Date Range</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <input type="date"
+                                       x-model="filters.date_from"
+                                       @change="loadPosts()"
+                                       placeholder="From"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary text-sm">
+                            </div>
+                            <div>
+                                <input type="date"
+                                       x-model="filters.date_to"
+                                       @change="loadPosts()"
+                                       placeholder="To"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary text-sm">
+                            </div>
+                        </div>
+                        <div x-show="filters.date_from || filters.date_to" class="mt-1">
+                            <button @click="filters.date_from = ''; filters.date_to = ''; loadPosts()"
+                                    class="text-xs text-gray-500 hover:text-gray-700">
+                                <i class="fas fa-times mr-1"></i>Clear dates
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Quick Date Range Presets -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Quick Filters</label>
+                        <div class="flex flex-wrap gap-2">
+                            <button @click="setDateRange('today')"
+                                    class="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition-colors">
+                                Today
+                            </button>
+                            <button @click="setDateRange('yesterday')"
+                                    class="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition-colors">
+                                Yesterday
+                            </button>
+                            <button @click="setDateRange('this_week')"
+                                    class="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition-colors">
+                                This Week
+                            </button>
+                            <button @click="setDateRange('this_month')"
+                                    class="px-3 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition-colors">
+                                This Month
+                            </button>
+                        </div>
                     </div>
 
                 </div>
@@ -407,7 +448,8 @@
                 social_circle: '',
                 type: '',
                 status: '',
-                date_range: ''
+                date_from: '',
+                date_to: ''
             },
             searchTimeout: null,
 
@@ -491,6 +533,42 @@
             changePage(page) {
                 if (page >= 1 && page <= this.pagination.last_page) {
                     this.loadPosts(page);
+                }
+            },
+
+            setDateRange(range) {
+                const now = new Date();
+                let fromDate = null;
+                let toDate = null;
+
+                switch (range) {
+                    case 'today':
+                        fromDate = now.toISOString().split('T')[0];
+                        toDate = now.toISOString().split('T')[0];
+                        break;
+                    case 'yesterday':
+                        const yesterday = new Date(now);
+                        yesterday.setDate(now.getDate() - 1);
+                        fromDate = yesterday.toISOString().split('T')[0];
+                        toDate = yesterday.toISOString().split('T')[0];
+                        break;
+                    case 'this_week':
+                        const startOfWeek = new Date(now);
+                        startOfWeek.setDate(now.getDate() - now.getDay());
+                        fromDate = startOfWeek.toISOString().split('T')[0];
+                        toDate = now.toISOString().split('T')[0];
+                        break;
+                    case 'this_month':
+                        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+                        fromDate = startOfMonth.toISOString().split('T')[0];
+                        toDate = now.toISOString().split('T')[0];
+                        break;
+                }
+
+                if (fromDate && toDate) {
+                    this.filters.date_from = fromDate;
+                    this.filters.date_to = toDate;
+                    this.loadPosts();
                 }
             },
 
