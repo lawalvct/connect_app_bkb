@@ -90,7 +90,8 @@
                         </select>
                     </div>
 
-                    <!-- Verification Filter -->
+                    <!-- Verification Filter - COMMENTED OUT -->
+                    <!--
                     <div>
                         <label for="verified" class="block text-sm font-medium text-gray-700 mb-1">Verification</label>
                         <select id="verified"
@@ -101,6 +102,34 @@
                             <option value="1">Verified</option>
                             <option value="0">Unverified</option>
                         </select>
+                    </div>
+                    -->
+
+                    <!-- Date Range Filter -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Registration Date</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <input type="date"
+                                       x-model="filters.date_from"
+                                       @change="loadUsers()"
+                                       placeholder="From"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary text-sm">
+                            </div>
+                            <div>
+                                <input type="date"
+                                       x-model="filters.date_to"
+                                       @change="loadUsers()"
+                                       placeholder="To"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary text-sm">
+                            </div>
+                        </div>
+                        <div x-show="filters.date_from || filters.date_to" class="mt-1">
+                            <button @click="filters.date_from = ''; filters.date_to = ''; loadUsers()"
+                                    class="text-xs text-gray-500 hover:text-gray-700">
+                                <i class="fas fa-times mr-1"></i>Clear dates
+                            </button>
+                        </div>
                     </div>
 
                     <!-- Social Circle Filter -->
@@ -448,8 +477,10 @@
             filters: {
                 search: '',
                 status: '',
-                verified: '',
-                social_circles: ''
+                // verified: '', // Commented out
+                social_circles: '',
+                date_from: '',
+                date_to: ''
             },
             searchTimeout: null,
 

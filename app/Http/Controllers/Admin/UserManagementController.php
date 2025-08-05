@@ -165,11 +165,33 @@ class UserManagementController extends Controller
                 }
             }
 
+            // Comment out verification filter
+            /*
             if ($request->filled('verified')) {
                 if ($request->get('verified') == '1') {
                     $query->whereNotNull('email_verified_at');
                 } else {
                     $query->whereNull('email_verified_at');
+                }
+            }
+            */
+
+            // Add date range filtering
+            if ($request->filled('date_from')) {
+                $dateFrom = $request->get('date_from');
+                try {
+                    $query->whereDate('created_at', '>=', $dateFrom);
+                } catch (\Exception $e) {
+                    Log::warning('Invalid date_from format: ' . $dateFrom);
+                }
+            }
+
+            if ($request->filled('date_to')) {
+                $dateTo = $request->get('date_to');
+                try {
+                    $query->whereDate('created_at', '<=', $dateTo);
+                } catch (\Exception $e) {
+                    Log::warning('Invalid date_to format: ' . $dateTo);
                 }
             }
 
@@ -438,11 +460,21 @@ class UserManagementController extends Controller
             if ($request->filled('status')) {
                 $filters['status'] = $request->get('status');
             }
+            // Comment out verified filter
+            /*
             if ($request->filled('verified')) {
                 $filters['verified'] = $request->get('verified');
             }
+            */
             if ($request->filled('social_circles')) {
                 $filters['social_circles'] = $request->get('social_circles');
+            }
+            // Add date range filters
+            if ($request->filled('date_from')) {
+                $filters['date_from'] = $request->get('date_from');
+            }
+            if ($request->filled('date_to')) {
+                $filters['date_to'] = $request->get('date_to');
             }
 
             // Generate filename with timestamp

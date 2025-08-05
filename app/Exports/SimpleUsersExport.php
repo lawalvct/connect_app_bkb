@@ -44,11 +44,46 @@ class SimpleUsersExport implements FromCollection, WithHeadings, WithMapping, Sh
             }
         }
 
+        // Comment out verified filter
+        /*
         if (!empty($this->filters['verified'])) {
             if ($this->filters['verified'] == '1') {
                 $query->whereNotNull('email_verified_at');
             } else {
                 $query->whereNull('email_verified_at');
+            }
+        }
+        */
+
+        // Add date range filtering
+        if (!empty($this->filters['date_from'])) {
+            try {
+                $query->whereDate('created_at', '>=', $this->filters['date_from']);
+            } catch (\Exception $e) {
+                // Log error but continue
+            }
+        }
+
+        if (!empty($this->filters['date_to'])) {
+            try {
+                $query->whereDate('created_at', '<=', $this->filters['date_to']);
+            } catch (\Exception $e) {
+                // Log error but continue
+            }
+        }
+
+        // Add social circles filter if it exists
+        if (!empty($this->filters['social_circles'])) {
+            $socialCircleFilter = $this->filters['social_circles'];
+            if ($socialCircleFilter === 'has_circles') {
+                $query->whereHas('socialCircles');
+            } elseif ($socialCircleFilter === 'no_circles') {
+                $query->whereDoesntHave('socialCircles');
+            } elseif (is_numeric($socialCircleFilter)) {
+                // Filter by specific social circle ID
+                $query->whereHas('socialCircles', function($q) use ($socialCircleFilter) {
+                    $q->where('social_circles.id', $socialCircleFilter);
+                });
             }
         }
 

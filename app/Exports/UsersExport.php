@@ -48,11 +48,31 @@ class UsersExport implements FromCollection, WithHeadings, WithMapping, WithStyl
             }
         }
 
+        // Comment out verified filter
+        /*
         if (!empty($this->filters['verified'])) {
             if ($this->filters['verified'] == '1') {
                 $query->whereNotNull('email_verified_at');
             } else {
                 $query->whereNull('email_verified_at');
+            }
+        }
+        */
+
+        // Add date range filtering
+        if (!empty($this->filters['date_from'])) {
+            try {
+                $query->whereDate('created_at', '>=', $this->filters['date_from']);
+            } catch (\Exception $e) {
+                // Log error but continue
+            }
+        }
+
+        if (!empty($this->filters['date_to'])) {
+            try {
+                $query->whereDate('created_at', '<=', $this->filters['date_to']);
+            } catch (\Exception $e) {
+                // Log error but continue
             }
         }
 
