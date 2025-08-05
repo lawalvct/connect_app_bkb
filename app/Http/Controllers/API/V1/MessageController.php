@@ -219,16 +219,37 @@ class MessageController extends BaseController
                 Log::info('Starting Pusher broadcast', [
                     'conversation_id' => $conversationId,
                     'message_id' => $message->id,
-                    'channel' => 'private-conversation.' . $conversationId
+                    'channel' => 'conversation.' . $conversationId
                 ]);
 
-                // Direct Pusher broadcast using environment variables
+                // Get Pusher configuration with fallbacks
+                $pusherKey = config('broadcasting.connections.pusher.key');
+                $pusherSecret = config('broadcasting.connections.pusher.secret');
+                $pusherAppId = config('broadcasting.connections.pusher.app_id');
+                $pusherCluster = config('broadcasting.connections.pusher.options.cluster');
+
+                // Validate Pusher configuration
+                if (empty($pusherKey) || empty($pusherSecret) || empty($pusherAppId)) {
+                    Log::warning('Pusher configuration missing, skipping broadcast', [
+                        'key_exists' => !empty($pusherKey),
+                        'secret_exists' => !empty($pusherSecret),
+                        'app_id_exists' => !empty($pusherAppId),
+                        'cluster' => $pusherCluster
+                    ]);
+
+                    // Skip broadcasting but don't fail the request
+                    return $this->sendResponse('Message sent successfully', [
+                        'message' => new MessageResource($message)
+                    ], 201);
+                }
+
+                // Direct Pusher broadcast using config values
                 $pusher = new \Pusher\Pusher(
-                    env('PUSHER_APP_KEY'),
-                    env('PUSHER_APP_SECRET'),
-                    env('PUSHER_APP_ID'),
+                    $pusherKey,
+                    $pusherSecret,
+                    $pusherAppId,
                     [
-                        'cluster' => env('PUSHER_APP_CLUSTER'),
+                        'cluster' => $pusherCluster ?: 'eu',
                         'useTLS' => true
                     ]
                 );
@@ -549,16 +570,38 @@ class MessageController extends BaseController
                 Log::info('Starting direct message Pusher broadcast', [
                     'conversation_id' => $conversation->id,
                     'message_id' => $message->id,
-                    'channel' => 'private-conversation.' . $conversation->id
+                    'channel' => 'conversation.' . $conversation->id
                 ]);
 
-                // Direct Pusher broadcast using environment variables
+                // Get Pusher configuration with fallbacks
+                $pusherKey = config('broadcasting.connections.pusher.key');
+                $pusherSecret = config('broadcasting.connections.pusher.secret');
+                $pusherAppId = config('broadcasting.connections.pusher.app_id');
+                $pusherCluster = config('broadcasting.connections.pusher.options.cluster');
+
+                // Validate Pusher configuration
+                if (empty($pusherKey) || empty($pusherSecret) || empty($pusherAppId)) {
+                    Log::warning('Pusher configuration missing for direct message, skipping broadcast', [
+                        'key_exists' => !empty($pusherKey),
+                        'secret_exists' => !empty($pusherSecret),
+                        'app_id_exists' => !empty($pusherAppId),
+                        'cluster' => $pusherCluster
+                    ]);
+
+                    // Skip broadcasting but don't fail the request
+                    return $this->sendResponse('Message sent successfully', [
+                        'message' => new MessageResource($message),
+                        'conversation' => new ConversationResource($conversation->load(['users']))
+                    ], 201);
+                }
+
+                // Direct Pusher broadcast using config values
                 $pusher = new \Pusher\Pusher(
-                    env('PUSHER_APP_KEY'),
-                    env('PUSHER_APP_SECRET'),
-                    env('PUSHER_APP_ID'),
+                    $pusherKey,
+                    $pusherSecret,
+                    $pusherAppId,
                     [
-                        'cluster' => env('PUSHER_APP_CLUSTER'),
+                        'cluster' => $pusherCluster ?: 'eu',
                         'useTLS' => true
                     ]
                 );
@@ -588,12 +631,12 @@ class MessageController extends BaseController
                     'message_keys' => array_keys($broadcastData['message'])
                 ]);
 
-                $result = $pusher->trigger('private-conversation.' . $conversation->id, 'message.sent', $broadcastData);
+                $result = $pusher->trigger('conversation.' . $conversation->id, 'message.sent', $broadcastData);
 
                 Log::info('Direct message broadcasted successfully via direct Pusher', [
                     'message_id' => $message->id,
                     'conversation_id' => $conversation->id,
-                    'channel' => 'private-conversation.' . $conversation->id,
+                    'channel' => 'conversation.' . $conversation->id,
                     'pusher_result' => $result,
                     'result_type' => gettype($result)
                 ]);
