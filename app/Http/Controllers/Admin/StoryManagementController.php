@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
 
@@ -300,25 +301,45 @@ class StoryManagementController extends Controller
     public function cleanupExpired(): JsonResponse
     {
         try {
+            Log::info('Starting cleanup of expired stories');
+
             $expiredStories = Story::expired()->get();
+            $deletedCount = 0;
+            $deletedFiles = 0;
+
+            Log::info('Found ' . $expiredStories->count() . ' expired stories to cleanup');
 
             foreach ($expiredStories as $story) {
                 // Delete associated files
                 if ($story->file_url) {
                     $filePath = str_replace('/storage/', 'public/', $story->file_url);
                     if (Storage::exists($filePath)) {
-                        Storage::delete($filePath);
+                        try {
+                            Storage::delete($filePath);
+                            $deletedFiles++;
+                            Log::info('Deleted file: ' . $filePath);
+                        } catch (\Exception $e) {
+                            Log::warning('Failed to delete file: ' . $filePath . ' - ' . $e->getMessage());
+                        }
                     }
                 }
             }
 
+            // Delete expired stories
             $deletedCount = Story::expired()->delete();
+
+            Log::info("Cleanup completed: {$deletedCount} stories and {$deletedFiles} files deleted");
 
             return response()->json([
                 'success' => true,
-                'message' => $deletedCount . ' expired stories cleaned up successfully'
+                'message' => "{$deletedCount} expired stories and {$deletedFiles} associated files cleaned up successfully",
+                'deleted_stories' => $deletedCount,
+                'deleted_files' => $deletedFiles
             ]);
         } catch (\Exception $e) {
+            Log::error('Failed to cleanup expired stories: ' . $e->getMessage());
+            Log::error('Stack trace: ' . $e->getTraceAsString());
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to cleanup expired stories: ' . $e->getMessage()

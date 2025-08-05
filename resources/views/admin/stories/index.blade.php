@@ -2,29 +2,29 @@
 
 @section('title', 'Stories Management')
 
-@section('header')
-    <div class="flex justify-between items-center">
-        <div>
-            <h1 class="text-2xl font-bold text-gray-900">Stories Management</h1>
-            <p class="text-gray-600">Manage user stories and view analytics</p>
-        </div>
-        <div class="flex space-x-3">
-            <button @click="exportStories()"
-                    class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
-                <i class="fas fa-download mr-2"></i>
-                Export CSV
-            </button>
-            <button @click="showCleanupModal = true"
-                    class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
-                <i class="fas fa-trash-alt mr-2"></i>
-                Cleanup Expired
-            </button>
+@section('content')
+<div x-data="storyManagement()" x-init="loadStories(); loadStats()">
+    <!-- Page Header -->
+    <div class="mb-6">
+        <div class="flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">Stories Management</h1>
+                <p class="text-gray-600">Manage user stories and view analytics</p>
+            </div>
+            <div class="flex space-x-3">
+                <button @click="exportStories()"
+                        class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                    <i class="fas fa-download mr-2"></i>
+                    Export CSV
+                </button>
+                <button @click="showCleanupModal = true"
+                        class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                    <i class="fas fa-trash-alt mr-2"></i>
+                    Cleanup Expired
+                </button>
+            </div>
         </div>
     </div>
-@endsection
-
-@section('content')
-    <div x-data="storyManagement()" x-init="loadStories(); loadStats()">
 
         <!-- Filters and Search -->
         <div class="bg-white rounded-lg shadow-md mb-6">
@@ -399,7 +399,15 @@
         </div>
 
         <!-- Cleanup Expired Modal -->
-        <div x-show="showCleanupModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div x-show="showCleanupModal"
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="opacity-0"
+             x-transition:enter-end="opacity-100"
+             x-transition:leave="transition ease-in duration-200"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0"
+             class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50"
+             @click.self="showCleanupModal = false">
             <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
                 <div class="mt-3 text-center">
                     <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
@@ -658,26 +666,43 @@
                 this.showCleanupModal = false;
 
                 try {
+                    // Show loading state
+                    const loadingToast = this.showLoadingToast('Cleaning up expired stories...');
+
                     const response = await fetch('/admin/api/stories/cleanup-expired', {
                         method: 'POST',
                         headers: {
                             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                            'Content-Type': 'application/json'
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
                         }
                     });
 
+                    // Remove loading toast
+                    if (loadingToast) {
+                        loadingToast.remove();
+                    }
+
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        console.error('Server response:', response.status, errorText);
+                        throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+                    }
+
                     const data = await response.json();
+                    console.log('Cleanup response:', data);
 
                     if (data.success) {
-                        this.showSuccess(data.message);
-                        this.loadStories(this.pagination.current_page);
-                        this.loadStats();
+                        this.showSuccess(data.message || 'Expired stories cleaned up successfully');
+                        // Reload data to reflect changes
+                        await this.loadStories(this.pagination.current_page);
+                        await this.loadStats();
                     } else {
-                        this.showError(data.message);
+                        this.showError(data.message || 'Failed to cleanup expired stories');
                     }
                 } catch (error) {
                     console.error('Error cleaning up expired stories:', error);
-                    this.showError('Failed to cleanup expired stories');
+                    this.showError('Failed to cleanup expired stories: ' + error.message);
                 }
             },
 
@@ -717,14 +742,73 @@
                 });
             },
 
+            showLoadingToast(message) {
+                const toast = document.createElement('div');
+                toast.className = 'fixed top-4 right-4 bg-blue-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 border border-blue-600';
+                toast.innerHTML = `
+                    <div class="flex items-center">
+                        <i class="fas fa-spinner fa-spin mr-2"></i>
+                        ${message}
+                    </div>
+                `;
+                document.body.appendChild(toast);
+                return toast;
+            },
+
             showSuccess(message) {
-                // You can implement a toast notification here
-                alert(message);
+                const toast = document.createElement('div');
+                toast.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 border border-green-600';
+                toast.innerHTML = `
+                    <div class="flex items-center">
+                        <i class="fas fa-check-circle mr-2"></i>
+                        ${message}
+                    </div>
+                `;
+                document.body.appendChild(toast);
+                setTimeout(() => {
+                    if (toast.parentNode) {
+                        toast.remove();
+                    }
+                }, 5000);
             },
 
             showError(message) {
-                // You can implement a toast notification here
-                alert('Error: ' + message);
+                const toast = document.createElement('div');
+                toast.className = 'fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 border border-red-600';
+                toast.innerHTML = `
+                    <div class="flex items-center">
+                        <i class="fas fa-exclamation-circle mr-2"></i>
+                        ${message}
+                    </div>
+                `;
+                document.body.appendChild(toast);
+                setTimeout(() => {
+                    if (toast.parentNode) {
+                        toast.remove();
+                    }
+                }, 8000);
+            },
+
+            getStatusBadge(isExpired) {
+                return isExpired ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800';
+            },
+
+            getTypeBadge(type) {
+                const badges = {
+                    'text': 'bg-blue-100 text-blue-800',
+                    'image': 'bg-green-100 text-green-800',
+                    'video': 'bg-purple-100 text-purple-800'
+                };
+                return badges[type] || 'bg-gray-100 text-gray-800';
+            },
+
+            getPrivacyBadge(privacy) {
+                const badges = {
+                    'all_connections': 'bg-blue-100 text-blue-800',
+                    'close_friends': 'bg-yellow-100 text-yellow-800',
+                    'custom': 'bg-purple-100 text-purple-800'
+                };
+                return badges[privacy] || 'bg-gray-100 text-gray-800';
             }
         }
     }

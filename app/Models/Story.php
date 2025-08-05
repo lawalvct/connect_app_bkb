@@ -149,8 +149,10 @@ class Story extends Model
         parent::boot();
 
         static::creating(function ($story) {
-            // Set expiration to 24 hours from now
-            $story->expires_at = now()->addHours(24);
+            // Set expiration to 24 hours from now if not already set
+            if (empty($story->expires_at)) {
+                $story->expires_at = now()->addHours(24);
+            }
         });
     }
 }
