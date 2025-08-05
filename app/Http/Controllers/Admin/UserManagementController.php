@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\UsersExport;
+use App\Exports\SimpleUsersExport;
 
 class UserManagementController extends Controller
 {
@@ -417,6 +418,10 @@ class UserManagementController extends Controller
     public function export(Request $request)
     {
         try {
+            // Increase memory limit for Excel exports
+            ini_set('memory_limit', '256M');
+            set_time_limit(300); // 5 minutes
+
             // Get the format parameter (default to csv)
             $format = $request->get('format', 'csv');
 
@@ -443,19 +448,41 @@ class UserManagementController extends Controller
             // Generate filename with timestamp
             $timestamp = now()->format('Y-m-d_H-i-s');
 
+            // Log export attempt
+            Log::info("Export attempt: format={$format}, filters=" . json_encode($filters));
+
             if ($format === 'csv') {
                 // CSV Export using Laravel Excel
                 $filename = "users_export_{$timestamp}.csv";
-                return Excel::download(new UsersExport($filters), $filename, \Maatwebsite\Excel\Excel::CSV);
+                Log::info("Exporting CSV: {$filename}");
+                return Excel::download(new UsersExport($filters), $filename, \Maatwebsite\Excel\Excel::CSV, [
+                    'Content-Type' => 'text/csv',
+                ]);
             } else {
-                // Excel Export
+                // Excel Export (handle both 'excel' and 'xlsx') - using simplified export for debugging
                 $filename = "users_export_{$timestamp}.xlsx";
-                return Excel::download(new UsersExport($filters), $filename, \Maatwebsite\Excel\Excel::XLSX);
+                Log::info("Exporting Excel: {$filename}");
+
+                $response = Excel::download(new SimpleUsersExport($filters), $filename, \Maatwebsite\Excel\Excel::XLSX, [
+                    'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                ]);
+
+                Log::info("Excel export response created successfully");
+                return $response;
             }
 
         } catch (\Exception $e) {
             Log::error('Error exporting users: ' . $e->getMessage());
             Log::error('Stack trace: ' . $e->getTraceAsString());
+
+            // For AJAX requests, return JSON response
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to export users: ' . $e->getMessage()
+                ], 500);
+            }
+
             return redirect()->back()->with('error', 'Failed to export users: ' . $e->getMessage());
         }
     }
