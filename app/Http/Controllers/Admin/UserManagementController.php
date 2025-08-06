@@ -595,4 +595,30 @@ class UserManagementController extends Controller
 
         return $cleanFileName;
     }
+
+    /**
+     * Search users for notifications
+     */
+    public function searchUsers(Request $request)
+    {
+        $query = $request->get('q', '');
+
+        if (strlen($query) < 2) {
+            return response()->json([
+                'success' => true,
+                'users' => []
+            ]);
+        }
+
+        $users = User::where('name', 'like', "%{$query}%")
+                    ->orWhere('email', 'like', "%{$query}%")
+                    ->select('id', 'name', 'email')
+                    ->limit(20)
+                    ->get();
+
+        return response()->json([
+            'success' => true,
+            'users' => $users
+        ]);
+    }
 }

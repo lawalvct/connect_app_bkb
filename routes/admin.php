@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\AdManagementController;
 use App\Http\Controllers\Admin\SubscriptionManagementController;
 use App\Http\Controllers\Admin\StreamManagementController;
 use App\Http\Controllers\Admin\RtmpController;
+use App\Http\Controllers\Admin\NotificationController;
 
 // Admin Authentication Routes
 Route::prefix('admin')->name('admin.')->group(function () {
@@ -94,6 +95,53 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('/streams/{id}/rtmp-status', [RtmpController::class, 'checkRtmpStatus']);
             Route::post('/streams/{id}/rtmp-stop', [RtmpController::class, 'stopRtmpStream']);
             Route::post('/rtmp-heartbeat', [RtmpController::class, 'rtmpHeartbeat']); // Called by RTMP server
+
+            // Notification Management API
+            Route::prefix('notifications')->group(function () {
+                // Admin notifications
+                Route::get('/', [NotificationController::class, 'getAdminNotifications']);
+                Route::post('/{id}/read', [NotificationController::class, 'markNotificationAsRead']);
+                Route::post('/mark-all-read', [NotificationController::class, 'markAllAsRead']);
+
+                // Push notifications
+                Route::prefix('push')->group(function () {
+                    Route::post('/send', [NotificationController::class, 'sendPushNotification']);
+                });
+
+                // Email templates
+                Route::prefix('email')->group(function () {
+                    Route::get('/templates', [NotificationController::class, 'getEmailTemplates']);
+                    Route::post('/templates', [NotificationController::class, 'storeEmailTemplate']);
+                    Route::put('/templates/{id}', [NotificationController::class, 'updateEmailTemplate']);
+                    Route::put('/templates/{id}/toggle', [NotificationController::class, 'toggleEmailTemplate']);
+                    Route::delete('/templates/{id}', [NotificationController::class, 'deleteEmailTemplate']);
+                    Route::get('/stats', [NotificationController::class, 'getEmailStats']);
+                });
+
+                // SMS settings
+                Route::prefix('sms')->group(function () {
+                    Route::get('/config', [NotificationController::class, 'getSmsConfig']);
+                    Route::post('/config', [NotificationController::class, 'updateSmsConfig']);
+                    Route::post('/test', [NotificationController::class, 'sendTestSms']);
+                    Route::get('/stats', [NotificationController::class, 'getSmsStats']);
+                });
+
+                // Notification logs
+                Route::prefix('logs')->group(function () {
+                    Route::get('/', [NotificationController::class, 'getLogs']);
+                    Route::get('/stats', [NotificationController::class, 'getLogStats']);
+                    Route::post('/{id}/retry', [NotificationController::class, 'retryNotification']);
+                    Route::delete('/{id}', [NotificationController::class, 'deleteLog']);
+                    Route::delete('/cleanup', [NotificationController::class, 'cleanupOldLogs']);
+                    Route::get('/export', [NotificationController::class, 'exportLogs']);
+                });
+
+                // Additional API endpoints
+                Route::get('/stats', [NotificationController::class, 'getNotificationStats']);
+            });
+
+            // User search for notifications
+            Route::get('/users/search', [UserManagementController::class, 'searchUsers']);
 
             // Debug route for Agora configuration
             Route::get('/test-agora', function () {
@@ -203,6 +251,14 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('/{stream}/cameras', [StreamManagementController::class, 'cameraManagement'])->name('cameras');
             Route::put('/{stream}', [StreamManagementController::class, 'update'])->name('update');
             Route::delete('/{stream}', [StreamManagementController::class, 'destroy'])->name('destroy');
+        });
+
+        // Notification Management
+        Route::prefix('notifications')->name('notifications.')->group(function () {
+            Route::get('/push', [NotificationController::class, 'pushIndex'])->name('push.index');
+            Route::get('/email', [NotificationController::class, 'emailTemplatesIndex'])->name('email.index');
+            Route::get('/sms', [NotificationController::class, 'smsIndex'])->name('sms.index');
+            Route::get('/logs', [NotificationController::class, 'logsIndex'])->name('logs.index');
         });
 
         // Logout

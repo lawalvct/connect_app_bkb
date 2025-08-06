@@ -156,20 +156,20 @@
                         <i class="fas fa-chevron-down transform transition-transform duration-200" :class="open ? 'rotate-180' : ''"></i>
                     </button>
                     <div x-show="open" x-collapse class="ml-6 mt-2 space-y-2">
-                        <a href="#"
-                           class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary">
+                        <a href="{{ route('admin.notifications.push.index') }}"
+                           class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.notifications.push*') ? 'bg-primary-light text-primary' : '' }}">
                             <span>Push Notifications</span>
                         </a>
-                        <a href="#"
-                           class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary">
+                        <a href="{{ route('admin.notifications.email.index') }}"
+                           class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.notifications.email*') ? 'bg-primary-light text-primary' : '' }}">
                             <span>Email Templates</span>
                         </a>
-                        <a href="#"
-                           class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary">
+                        <a href="{{ route('admin.notifications.sms.index') }}"
+                           class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.notifications.sms*') ? 'bg-primary-light text-primary' : '' }}">
                             <span>SMS Settings</span>
                         </a>
-                        <a href="#"
-                           class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary">
+                        <a href="{{ route('admin.notifications.logs.index') }}"
+                           class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.notifications.logs*') ? 'bg-primary-light text-primary' : '' }}">
                             <span>Notification Logs</span>
                         </a>
                     </div>
