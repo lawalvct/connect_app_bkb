@@ -63,32 +63,35 @@ class AdManagementController extends Controller
                 });
             }
 
-            if ($request->filled('date_range')) {
-                $dateRange = $request->date_range;
-                switch ($dateRange) {
-                    case 'today':
-                        $query->whereDate('created_at', today());
-                        break;
-                    case 'yesterday':
-                        $query->whereDate('created_at', Carbon::yesterday());
-                        break;
-                    case 'this_week':
-                        $query->whereBetween('created_at', [now()->startOfWeek(), now()->endOfWeek()]);
-                        break;
-                    case 'this_month':
-                        $query->whereMonth('created_at', now()->month)
-                              ->whereYear('created_at', now()->year);
-                        break;
-                    case 'pending_review':
-                        $query->where('admin_status', 'pending');
-                        break;
-                    case 'needs_payment':
-                        $query->where('status', 'draft')
-                              ->whereDoesntHave('payments', function($q) {
-                                  $q->where('status', 'completed');
-                              });
-                        break;
+            // Add date range filtering with calendar dates
+            if ($request->filled('date_from')) {
+                $dateFrom = $request->get('date_from');
+                try {
+                    $query->whereDate('created_at', '>=', $dateFrom);
+                } catch (\Exception $e) {
+                    Log::warning('Invalid date_from format: ' . $dateFrom);
                 }
+            }
+
+            if ($request->filled('date_to')) {
+                $dateTo = $request->get('date_to');
+                try {
+                    $query->whereDate('created_at', '<=', $dateTo);
+                } catch (\Exception $e) {
+                    Log::warning('Invalid date_to format: ' . $dateTo);
+                }
+            }
+
+            // Filter by target country
+            if ($request->filled('country')) {
+                $countryId = $request->get('country');
+                $query->whereJsonContains('target_countries', (int) $countryId);
+            }
+
+            // Filter by target social circle
+            if ($request->filled('social_circle')) {
+                $socialCircleId = $request->get('social_circle');
+                $query->whereJsonContains('target_social_circles', (int) $socialCircleId);
             }
 
             // Sort by creation date (newest first) or by priority for review
@@ -103,6 +106,12 @@ class AdManagementController extends Controller
             }
 
             $ads = $query->paginate(20);
+
+            // Append the target countries and social circles data
+            $ads->getCollection()->transform(function ($ad) {
+                $ad->append(['target_countries_data', 'placement_social_circles']);
+                return $ad;
+            });
 
             return response()->json([
                 'success' => true,
@@ -478,6 +487,38 @@ class AdManagementController extends Controller
                 'success' => false,
                 'message' => 'Failed to stop ad'
             ], 500);
+        }
+    }
+
+    /**
+     * Get all countries for filter dropdown
+     */
+    public function getCountries()
+    {
+        try {
+            $countries = \App\Models\Country::select('id', 'name')
+                ->orderBy('name')
+                ->get();
+
+            return response()->json($countries);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Failed to load countries'], 500);
+        }
+    }
+
+    /**
+     * Get all social circles for filter dropdown
+     */
+    public function getSocialCircles()
+    {
+        try {
+            $socialCircles = \App\Models\SocialCircle::select('id', 'name')
+                ->orderBy('name')
+                ->get();
+
+            return response()->json($socialCircles);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Failed to load social circles'], 500);
         }
     }
 }

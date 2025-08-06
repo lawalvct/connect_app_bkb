@@ -58,6 +58,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('/ads/stats', [AdManagementController::class, 'getStats']);
             Route::post('/ads/bulk-approve', [AdManagementController::class, 'bulkApprove']);
             Route::post('/ads/bulk-reject', [AdManagementController::class, 'bulkReject']);
+            Route::get('/countries', [AdManagementController::class, 'getCountries']);
+            Route::get('/social-circles', [AdManagementController::class, 'getSocialCircles']);
 
             // Subscription Management API
             Route::get('/subscriptions', [SubscriptionManagementController::class, 'getSubscriptions']);

@@ -25,12 +25,12 @@
 @endsection
 
 @section('content')
-    <div x-data="adManagement()" x-init="loadAds(); loadStats()">
+    <div x-data="adManagement()" x-init="loadAds(); loadStats(); loadCountries(); loadSocialCircles()">
 
         <!-- Filters and Search -->
         <div class="bg-white rounded-lg shadow-md mb-6">
             <div class="p-6">
-                <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-7 gap-4">
 
                     <!-- Search -->
                     <div>
@@ -61,11 +61,11 @@
                                 @change="loadAds()"
                                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary">
                             <option value="">All Types</option>
-                            <option value="banner">Banner</option>
+                            <option value="banner">Image</option>
                             <option value="video">Video</option>
-                            <option value="carousel">Carousel</option>
+                            {{-- <option value="carousel">Carousel</option>
                             <option value="story">Story</option>
-                            <option value="feed">Feed</option>
+                            <option value="feed">Feed</option> --}}
                         </select>
                     </div>
 
@@ -114,32 +114,95 @@
                         </select>
                     </div>
 
-                    <!-- Date Range Filter -->
+                    <!-- Country Filter -->
                     <div>
-                        <label for="date_range" class="block text-sm font-medium text-gray-700 mb-1">Date Range</label>
-                        <select id="date_range"
-                                x-model="filters.date_range"
+                        <label for="country" class="block text-sm font-medium text-gray-700 mb-1">Target Country</label>
+                        <select id="country"
+                                x-model="filters.country"
                                 @change="loadAds()"
                                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary">
-                            <option value="">All Time</option>
-                            <option value="today">Today</option>
-                            <option value="yesterday">Yesterday</option>
-                            <option value="this_week">This Week</option>
-                            <option value="this_month">This Month</option>
-                            <option value="pending_review">Needs Review</option>
-                            <option value="needs_payment">Needs Payment</option>
+                            <option value="">All Countries</option>
+                            <template x-for="country in countries" :key="country.id">
+                                <option :value="country.id" x-text="country.name"></option>
+                            </template>
+                        </select>
+                    </div>
+
+                    <!-- Social Circle Filter -->
+                    <div>
+                        <label for="social_circle" class="block text-sm font-medium text-gray-700 mb-1">Target Social Circle</label>
+                        <select id="social_circle"
+                                x-model="filters.social_circle"
+                                @change="loadAds()"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary">
+                            <option value="">All Social Circles</option>
+                            <template x-for="circle in socialCircles" :key="circle.id">
+                                <option :value="circle.id" x-text="circle.name"></option>
+                            </template>
                         </select>
                     </div>
 
                 </div>
 
+                <!-- Date Range Filter Row -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+                    <!-- Date From -->
+                    <div>
+                        <label for="date_from" class="block text-sm font-medium text-gray-700 mb-1">Date From</label>
+                        <input type="date"
+                               id="date_from"
+                               x-model="filters.date_from"
+                               @change="loadAds()"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary">
+                    </div>
+
+                    <!-- Date To -->
+                    <div>
+                        <label for="date_to" class="block text-sm font-medium text-gray-700 mb-1">Date To</label>
+                        <input type="date"
+                               id="date_to"
+                               x-model="filters.date_to"
+                               @change="loadAds()"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary">
+                    </div>
+
+                    <!-- Quick Date Presets -->
+                    {{-- <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Quick Presets</label>
+                        <div class="flex flex-wrap gap-2">
+                            <button @click="setDateRange('today')"
+                                    class="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200">
+                                Today
+                            </button>
+                            <button @click="setDateRange('yesterday')"
+                                    class="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200">
+                                Yesterday
+                            </button>
+                            <button @click="setDateRange('this_week')"
+                                    class="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200">
+                                This Week
+                            </button>
+                            <button @click="setDateRange('this_month')"
+                                    class="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200">
+                                This Month
+                            </button>
+                        </div>
+                    </div> --}}
+
+                    <!-- Clear Filters -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Actions</label>
+                        <button @click="clearFilters()"
+                                class="w-full px-3 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
+                            <i class="fas fa-times mr-1"></i>
+                            Clear All Filters
+                        </button>
+                    </div>
+
+                </div>
+
                 <!-- Quick Actions -->
-                <div class="mt-4 flex justify-between items-center">
-                    <button @click="clearFilters()"
-                            class="text-sm text-gray-500 hover:text-gray-700">
-                        <i class="fas fa-times mr-1"></i>
-                        Clear Filters
-                    </button>
+                <div class="mt-4 flex justify-end items-center">
                     <div class="text-sm text-gray-500">
                         <span x-text="ads.total || '0'">0</span> ads found
                     </div>
@@ -265,6 +328,12 @@
                                     Review Status
                                 </th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Target Countries
+                                </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Target Social Circles
+                                </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Actions
                                 </th>
                             </tr>
@@ -345,6 +414,40 @@
                                         </template>
                                         <template x-if="ad.admin_comments">
                                             <div class="text-xs text-gray-500 mt-1 truncate max-w-xs" x-text="ad.admin_comments"></div>
+                                        </template>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <template x-if="ad.target_countries_data && ad.target_countries_data.length > 0">
+                                            <div class="space-y-1">
+                                                <template x-for="country in ad.target_countries_data.slice(0, 3)" :key="country.id">
+                                                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800"
+                                                          x-text="country.name"></span>
+                                                </template>
+                                                <template x-if="ad.target_countries_data.length > 3">
+                                                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600"
+                                                          x-text="`+${ad.target_countries_data.length - 3} more`"></span>
+                                                </template>
+                                            </div>
+                                        </template>
+                                        <template x-if="!ad.target_countries_data || ad.target_countries_data.length === 0">
+                                            <span class="text-xs text-gray-400">No targeting</span>
+                                        </template>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <template x-if="ad.placement_social_circles && ad.placement_social_circles.length > 0">
+                                            <div class="space-y-1">
+                                                <template x-for="circle in ad.placement_social_circles.slice(0, 3)" :key="circle.id">
+                                                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800"
+                                                          x-text="circle.name"></span>
+                                                </template>
+                                                <template x-if="ad.placement_social_circles.length > 3">
+                                                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600"
+                                                          x-text="`+${ad.placement_social_circles.length - 3} more`"></span>
+                                                </template>
+                                            </div>
+                                        </template>
+                                        <template x-if="!ad.placement_social_circles || ad.placement_social_circles.length === 0">
+                                            <span class="text-xs text-gray-400">No targeting</span>
                                         </template>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -540,13 +643,18 @@
             showBulkRejectModal: false,
             rejectAdId: null,
             rejectReason: '',
+            countries: [],
+            socialCircles: [],
             filters: {
                 search: '',
                 type: '',
                 status: '',
                 admin_status: '',
                 payment_status: '',
-                date_range: ''
+                country: '',
+                social_circle: '',
+                date_from: '',
+                date_to: ''
             },
             searchTimeout: null,
 
@@ -666,9 +774,87 @@
                     status: '',
                     admin_status: '',
                     payment_status: '',
-                    date_range: ''
+                    country: '',
+                    social_circle: '',
+                    date_from: '',
+                    date_to: ''
                 };
                 this.loadAds();
+            },
+
+            setDateRange(preset) {
+                const today = new Date();
+                const yesterday = new Date(today);
+                yesterday.setDate(yesterday.getDate() - 1);
+
+                const startOfWeek = new Date(today);
+                const day = startOfWeek.getDay();
+                const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1);
+                startOfWeek.setDate(diff);
+
+                const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
+                switch (preset) {
+                    case 'today':
+                        this.filters.date_from = this.formatDateForInput(today);
+                        this.filters.date_to = this.formatDateForInput(today);
+                        break;
+                    case 'yesterday':
+                        this.filters.date_from = this.formatDateForInput(yesterday);
+                        this.filters.date_to = this.formatDateForInput(yesterday);
+                        break;
+                    case 'this_week':
+                        this.filters.date_from = this.formatDateForInput(startOfWeek);
+                        this.filters.date_to = this.formatDateForInput(today);
+                        break;
+                    case 'this_month':
+                        this.filters.date_from = this.formatDateForInput(startOfMonth);
+                        this.filters.date_to = this.formatDateForInput(today);
+                        break;
+                }
+                this.loadAds();
+            },
+
+            formatDateForInput(date) {
+                return date.toISOString().split('T')[0];
+            },
+
+            async loadCountries() {
+                try {
+                    const response = await fetch('/admin/api/countries', {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                        }
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        this.countries = data.countries || [];
+                    }
+                } catch (error) {
+                    console.error('Failed to load countries:', error);
+                }
+            },
+
+            async loadSocialCircles() {
+                try {
+                    const response = await fetch('/admin/api/social-circles', {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                        }
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        this.socialCircles = data.social_circles || [];
+                    }
+                } catch (error) {
+                    console.error('Failed to load social circles:', error);
+                }
             },
 
             getTypeBadge(type) {

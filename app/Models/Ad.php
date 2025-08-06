@@ -114,6 +114,16 @@ class Ad extends Model
         return SocialCircle::whereIn('id', $this->target_social_circles)->get();
     }
 
+    // Get countries by IDs stored in target_countries JSON
+    public function getTargetCountriesDataAttribute()
+    {
+        if (empty($this->target_countries)) {
+            return collect();
+        }
+
+        return \App\Models\Country::whereIn('id', $this->target_countries)->get();
+    }
+
     // Scopes
     public function scopeActive($query)
     {
