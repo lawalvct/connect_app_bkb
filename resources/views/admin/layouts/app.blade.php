@@ -28,22 +28,49 @@
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
+    <!-- Custom Scrollbar Styles -->
+    <style>
+        /* Custom scrollbar for sidebar navigation */
+        .sidebar-scroll::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .sidebar-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .sidebar-scroll::-webkit-scrollbar-thumb {
+            background: #A200302B;
+            border-radius: 2px;
+        }
+
+        .sidebar-scroll::-webkit-scrollbar-thumb:hover {
+            background: #A20030;
+        }
+
+        /* Firefox scrollbar */
+        .sidebar-scroll {
+            scrollbar-width: thin;
+            scrollbar-color: #A200302B transparent;
+        }
+    </style>
+
     @stack('styles')
 </head>
 <body class="bg-background text-gray-900" x-data="{ sidebarOpen: false }">
 
     <!-- Sidebar -->
-    <div class="fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out"
+    <div class="fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out flex flex-col"
          :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'">
 
         <!-- Sidebar Header -->
-        <div class="flex items-center justify-center h-16 bg-primary">
+        <div class="flex items-center justify-center h-16 bg-primary flex-shrink-0">
             <img src="{{ asset('images/connect_logo.png') }}" alt="ConnectApp" class="h-10 w-auto">
             <span class="ml-2 text-white text-xl font-bold">Admin</span>
         </div>
 
-        <!-- Navigation -->
-        <nav class="mt-8">
+        <!-- Navigation - Scrollable -->
+        <nav class="flex-1 overflow-y-auto py-4 sidebar-scroll">
             <div class="px-4 space-y-2">
 
                 <!-- Dashboard -->
@@ -118,11 +145,41 @@
                     <span class="ml-3">Live Streams</span>
                 </a>
 
+                <!-- Notifications -->
+                <div x-data="{ open: {{ request()->routeIs('admin.notifications*') ? 'true' : 'false' }} }">
+                    <button @click="open = !open"
+                            class="w-full flex items-center justify-between px-4 py-3 text-gray-700 rounded-lg hover:bg-primary-light hover:text-primary transition-colors duration-200">
+                        <div class="flex items-center">
+                            <i class="fas fa-bell w-6"></i>
+                            <span class="ml-3">Notifications</span>
+                        </div>
+                        <i class="fas fa-chevron-down transform transition-transform duration-200" :class="open ? 'rotate-180' : ''"></i>
+                    </button>
+                    <div x-show="open" x-collapse class="ml-6 mt-2 space-y-2">
+                        <a href="#"
+                           class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary">
+                            <span>Push Notifications</span>
+                        </a>
+                        <a href="#"
+                           class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary">
+                            <span>Email Templates</span>
+                        </a>
+                        <a href="#"
+                           class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary">
+                            <span>SMS Settings</span>
+                        </a>
+                        <a href="#"
+                           class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary">
+                            <span>Notification Logs</span>
+                        </a>
+                    </div>
+                </div>
+
                 <!-- Analytics -->
                 <a href="#"
                    class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-primary-light hover:text-primary transition-colors duration-200">
                     <i class="fas fa-chart-bar w-6"></i>
-                    <span class="ml-3">Notifications</span>
+                    <span class="ml-3">Analytics</span>
                 </a>
 
                 <!-- Settings -->
@@ -148,8 +205,8 @@
             </div>
         </nav>
 
-        <!-- Admin Info -->
-        <div class="absolute bottom-0 w-full p-4 border-t border-gray-200">
+        <!-- Admin Info - Fixed at bottom -->
+        <div class="flex-shrink-0 p-4 border-t border-gray-200 bg-white">
             <div class="flex items-center">
                 <div class="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-bold">
                     {{ strtoupper(substr(auth('admin')->user()->name, 0, 1)) }}
