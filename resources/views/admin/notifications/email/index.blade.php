@@ -477,7 +477,8 @@
 </div>
 
 <script>
-function emailTemplateManager() {
+// Ensure the function is globally available
+window.emailTemplateManager = function() {
     return {
         // Data
         templates: [],
@@ -505,7 +506,15 @@ function emailTemplateManager() {
         isEditing: false,
 
         // Forms
-        form: this.getEmptyForm(),
+        form: {
+            id: null,
+            name: '',
+            subject: '',
+            content: '',
+            description: '',
+            is_active: true,
+            variables: []
+        },
         newVariable: '',
 
         // Preview
@@ -580,47 +589,6 @@ function emailTemplateManager() {
             } catch (error) {
                 console.error('Load stats error:', error);
             }
-        },
-
-        // Modal methods
-        openCreateModal() {
-            this.form = this.getEmptyForm();
-            this.isEditing = false;
-            this.showModal = true;
-        },
-
-        editTemplate(template) {
-            this.form = {
-                id: template.id,
-                name: template.name,
-                subject: template.subject,
-                content: template.content,
-                description: template.description || '',
-                is_active: template.is_active,
-                variables: template.variables || []
-            };
-            this.isEditing = true;
-            this.showModal = true;
-        },
-
-        closeModal() {
-            this.showModal = false;
-            this.form = this.getEmptyForm();
-            this.newVariable = '';
-            this.isEditing = false;
-        },
-
-        // Variable management
-        addVariable() {
-            const variable = this.newVariable.trim();
-            if (variable && !this.form.variables.includes(variable)) {
-                this.form.variables.push(variable);
-                this.newVariable = '';
-            }
-        },
-
-        removeVariable(index) {
-            this.form.variables.splice(index, 1);
         },
 
         // Template actions
@@ -709,6 +677,47 @@ function emailTemplateManager() {
                 console.error('Delete template error:', error);
                 this.showError('Failed to delete template');
             }
+        },
+
+        // Modal methods
+        openCreateModal() {
+            this.form = this.getEmptyForm();
+            this.isEditing = false;
+            this.showModal = true;
+        },
+
+        editTemplate(template) {
+            this.form = {
+                id: template.id,
+                name: template.name,
+                subject: template.subject,
+                content: template.content,
+                description: template.description || '',
+                is_active: template.is_active,
+                variables: template.variables || []
+            };
+            this.isEditing = true;
+            this.showModal = true;
+        },
+
+        closeModal() {
+            this.showModal = false;
+            this.form = this.getEmptyForm();
+            this.newVariable = '';
+            this.isEditing = false;
+        },
+
+        // Variable management
+        addVariable() {
+            const variable = this.newVariable.trim();
+            if (variable && !this.form.variables.includes(variable)) {
+                this.form.variables.push(variable);
+                this.newVariable = '';
+            }
+        },
+
+        removeVariable(index) {
+            this.form.variables.splice(index, 1);
         },
 
         // Preview

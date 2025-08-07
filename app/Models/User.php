@@ -293,6 +293,22 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
+     * Get the FCM tokens for the user.
+     */
+    public function fcmTokens()
+    {
+        return $this->hasMany(UserFcmToken::class);
+    }
+
+    /**
+     * Get only active FCM tokens for the user.
+     */
+    public function activeFcmTokens()
+    {
+        return $this->hasMany(UserFcmToken::class)->active();
+    }
+
+    /**
      * Get the full profile image URL.
      *
      * @return string|null

@@ -221,7 +221,8 @@
 </div>
 
 <script>
-function pushNotifications() {
+// Ensure the function is globally available
+window.pushNotifications = function() {
     return {
         form: {
             title: '',
