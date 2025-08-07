@@ -12,6 +12,8 @@ use App\Http\Controllers\Admin\SubscriptionManagementController;
 use App\Http\Controllers\Admin\StreamManagementController;
 use App\Http\Controllers\Admin\RtmpController;
 use App\Http\Controllers\Admin\NotificationController;
+use App\Http\Controllers\Admin\AdminManagementController;
+use App\Http\Controllers\Admin\AnalyticsController;
 
 // Admin Authentication Routes
 Route::prefix('admin')->name('admin.')->group(function () {
@@ -259,6 +261,36 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('/email', [NotificationController::class, 'emailTemplatesIndex'])->name('email.index');
             Route::get('/sms', [NotificationController::class, 'smsIndex'])->name('sms.index');
             Route::get('/logs', [NotificationController::class, 'logsIndex'])->name('logs.index');
+        });
+
+        // Analytics Routes
+        Route::prefix('analytics')->name('analytics.')->middleware('admin.permissions:manage_analytics')->group(function () {
+            Route::get('/', [AnalyticsController::class, 'index'])->name('index');
+            Route::get('/users', [AnalyticsController::class, 'users'])->name('users');
+            Route::get('/content', [AnalyticsController::class, 'content'])->name('content');
+            Route::get('/revenue', [AnalyticsController::class, 'revenue'])->name('revenue');
+            Route::get('/advertising', [AnalyticsController::class, 'advertising'])->name('advertising');
+            Route::get('/streaming', [AnalyticsController::class, 'streaming'])->name('streaming');
+            Route::get('/export', [AnalyticsController::class, 'exportData'])->name('export');
+        });
+
+        // Admin Management (Only Super Admin and Admin roles)
+        Route::prefix('admins')->name('admins.')->middleware('admin.permissions:manage_admins')->group(function () {
+            Route::get('/', [AdminManagementController::class, 'index'])->name('index');
+            Route::get('/create', [AdminManagementController::class, 'create'])->name('create');
+            Route::post('/', [AdminManagementController::class, 'store'])->name('store');
+            Route::get('/{admin}', [AdminManagementController::class, 'show'])->name('show');
+            Route::get('/{admin}/edit', [AdminManagementController::class, 'edit'])->name('edit');
+            Route::put('/{admin}', [AdminManagementController::class, 'update'])->name('update');
+            Route::patch('/{admin}/status', [AdminManagementController::class, 'updateStatus'])->name('update-status');
+            Route::patch('/{admin}/reset-password', [AdminManagementController::class, 'resetPassword'])->name('reset-password');
+            Route::delete('/{admin}', [AdminManagementController::class, 'destroy'])->name('destroy');
+
+            // AJAX API routes
+            Route::prefix('api')->name('api.')->group(function () {
+                Route::get('/admins', [AdminManagementController::class, 'getAdmins'])->name('admins');
+                Route::patch('/bulk-status', [AdminManagementController::class, 'bulkUpdateStatus'])->name('bulk-status');
+            });
         });
 
         // Logout

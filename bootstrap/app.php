@@ -31,6 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Register custom middleware aliases
         $middleware->alias([
             'swipe.limit' => SwipeRateLimit::class,
+            'admin.permissions' => \App\Http\Middleware\AdminPermissions::class,
         ]);
 
         // API middleware group configuration
