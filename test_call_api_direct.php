@@ -19,12 +19,12 @@ if (file_exists($tokenScript)) {
     ob_start();
     include $tokenScript;
     $output = ob_get_clean();
-    
+
     // Extract token from the output
     if (preg_match('/Token: (.+)/', $output, $matches)) {
         $token = trim($matches[1]);
         echo "✅ Got token: " . substr($token, 0, 20) . "...\n\n";
-        
+
         // Make the API call
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
@@ -36,15 +36,15 @@ if (file_exists($tokenScript)) {
             'Authorization: Bearer ' . $token,
             'Accept: application/json'
         ]);
-        
+
         echo "🚀 Making API call to: $url\n";
         echo "📊 Data: " . json_encode($data, JSON_PRETTY_PRINT) . "\n\n";
-        
+
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $error = curl_error($ch);
         curl_close($ch);
-        
+
         if ($error) {
             echo "❌ cURL Error: $error\n";
         } else {
@@ -52,7 +52,7 @@ if (file_exists($tokenScript)) {
             $responseData = json_decode($response, true);
             if ($responseData) {
                 echo json_encode($responseData, JSON_PRETTY_PRINT) . "\n\n";
-                
+
                 if ($httpCode === 200 || $httpCode === 201) {
                     echo "✅ SUCCESS: Call initiated successfully!\n";
                     if (isset($responseData['data']['call'])) {
@@ -69,7 +69,7 @@ if (file_exists($tokenScript)) {
                 echo "Raw response: $response\n";
             }
         }
-        
+
     } else {
         echo "❌ Could not extract token from test script\n";
     }

@@ -72,13 +72,13 @@ try {
 
     echo "   Broadcasting test CallInitiated event...\n";
     $result = $pusher->trigger('private-conversation.1', 'call.initiated', $testData);
-    
+
     if ($result) {
         echo "   ✅ SUCCESS: Test CallInitiated event sent to Pusher!\n";
         echo "   📺 Channel: private-conversation.1\n";
         echo "   📡 Event: call.initiated\n";
         echo "   📋 Data: " . json_encode($testData, JSON_PRETTY_PRINT) . "\n";
-        
+
         // Test CallAnswered event
         $answerData = [
             'call_id' => 999,
@@ -92,10 +92,10 @@ try {
             'status' => 'connected',
             'connected_at' => date('c')
         ];
-        
+
         echo "\n   Broadcasting test CallAnswered event...\n";
         $answerResult = $pusher->trigger('private-conversation.1', 'call.answered', $answerData);
-        
+
         if ($answerResult) {
             echo "   ✅ SUCCESS: Test CallAnswered event sent to Pusher!\n";
             echo "   📺 Channel: private-conversation.1\n";
@@ -117,16 +117,16 @@ try {
             'formatted_duration' => '02:00',
             'ended_at' => date('c')
         ];
-        
+
         echo "\n   Broadcasting test CallEnded event...\n";
         $endResult = $pusher->trigger('private-conversation.1', 'call.ended', $endData);
-        
+
         if ($endResult) {
             echo "   ✅ SUCCESS: Test CallEnded event sent to Pusher!\n";
             echo "   📺 Channel: private-conversation.1\n";
             echo "   📡 Event: call.ended\n";
         }
-        
+
     } else {
         echo "   ❌ FAILED: Could not send test event to Pusher\n";
         exit(1);

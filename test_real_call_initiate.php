@@ -54,11 +54,11 @@ try {
 
     // Simulate the CallController initiate method
     $callController = new App\Http\Controllers\API\V1\CallController();
-    
+
     // Create a mock request
     $request = new Illuminate\Http\Request();
     $request->replace($requestData);
-    
+
     // Set the authenticated user
     $request->setUserResolver(function () use ($user) {
         return $user;
@@ -66,27 +66,27 @@ try {
 
     echo "🚀 Calling CallController::initiate()...\n";
     $response = $callController->initiate($request);
-    
+
     echo "📱 Response received:\n";
     $responseData = json_decode($response->getContent(), true);
-    
+
     if ($response->getStatusCode() === 200 || $response->getStatusCode() === 201) {
         echo "✅ SUCCESS: Call initiated successfully!\n";
         echo "   Status Code: {$response->getStatusCode()}\n";
         echo "   Message: {$responseData['message']}\n";
-        
+
         if (isset($responseData['data']['call'])) {
             $callData = $responseData['data']['call'];
             echo "   Call ID: {$callData['id']}\n";
             echo "   Channel Name: {$callData['agora_channel_name']}\n";
             echo "   Status: {$callData['status']}\n";
         }
-        
+
         echo "\n📡 Check Pusher debug console for 'call.initiated' event on:\n";
         echo "   Channel: private-conversation.{$conversation->id}\n";
         echo "   Event: call.initiated\n";
         echo "   URL: https://dashboard.pusher.com/apps/1471502/console\n";
-        
+
     } else {
         echo "❌ FAILED: Call initiation failed\n";
         echo "   Status Code: {$response->getStatusCode()}\n";

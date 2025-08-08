@@ -5,6 +5,7 @@
 The `CallController` has been successfully updated to use **direct Pusher broadcasting** instead of Laravel's event broadcasting system, matching the approach used in `MessageController`.
 
 ### 1. Added Pusher Import
+
 ```php
 use Pusher\Pusher;
 ```
@@ -12,6 +13,7 @@ use Pusher\Pusher;
 ### 2. Updated All Broadcasting Calls
 
 **Before** (using Laravel events):
+
 ```php
 broadcast(new CallInitiated($call, $conversation, $user))->toOthers();
 broadcast(new CallAnswered($call, $user))->toOthers();
@@ -20,6 +22,7 @@ broadcast(new CallMissed($call))->toOthers();
 ```
 
 **After** (using direct Pusher):
+
 ```php
 // Direct Pusher instantiation with proper error handling
 $pusher = new \Pusher\Pusher($pusherKey, $pusherSecret, $pusherAppId, [
@@ -33,33 +36,36 @@ $pusher->trigger('private-conversation.' . $conversationId, 'call.initiated', $d
 
 ### 3. Events and Channels
 
-| Method | Channel | Event | Data Structure |
-|--------|---------|--------|----------------|
+| Method       | Channel                     | Event            | Data Structure                                                              |
+| ------------ | --------------------------- | ---------------- | --------------------------------------------------------------------------- |
 | `initiate()` | `private-conversation.{id}` | `call.initiated` | call_id, call_type, agora_channel_name, initiator, conversation, started_at |
-| `answer()` | `private-conversation.{id}` | `call.answered` | call_id, call_type, agora_channel_name, answerer, status, connected_at |
-| `end()` | `private-conversation.{id}` | `call.ended` | call_id, call_type, ended_by, status, end_reason, duration, ended_at |
-| `reject()` | `private-conversation.{id}` | `call.missed` | call_id, call_type, status, end_reason, ended_at |
+| `answer()`   | `private-conversation.{id}` | `call.answered`  | call_id, call_type, agora_channel_name, answerer, status, connected_at      |
+| `end()`      | `private-conversation.{id}` | `call.ended`     | call_id, call_type, ended_by, status, end_reason, duration, ended_at        |
+| `reject()`   | `private-conversation.{id}` | `call.missed`    | call_id, call_type, status, end_reason, ended_at                            |
 
 ### 4. Error Handling
-- Graceful fallback when Pusher configuration is missing
-- Comprehensive logging for debugging
-- Non-blocking: API calls succeed even if broadcasting fails
+
+-   Graceful fallback when Pusher configuration is missing
+-   Comprehensive logging for debugging
+-   Non-blocking: API calls succeed even if broadcasting fails
 
 ## 🧪 Testing Results
 
 ✅ **Syntax Check**: No errors in CallController.php
-✅ **Pusher Connectivity**: Direct broadcasting working  
+✅ **Pusher Connectivity**: Direct broadcasting working
 ✅ **Event Structure**: Proper data format for all call events
 ✅ **Channel Format**: `private-conversation.{conversation_id}`
 
 ## 🔍 Verification Steps
 
 ### 1. Monitor Pusher Debug Console
-- URL: https://dashboard.pusher.com/apps/1471502/console
-- Look for events on channels: `private-conversation.{conversation_id}`
-- Expected events: `call.initiated`, `call.answered`, `call.ended`, `call.missed`
+
+-   URL: https://dashboard.pusher.com/apps/1471502/console
+-   Look for events on channels: `private-conversation.{conversation_id}`
+-   Expected events: `call.initiated`, `call.answered`, `call.ended`, `call.missed`
 
 ### 2. Test API Endpoints
+
 ```bash
 # Initiate a call
 POST /api/v1/calls/initiate
@@ -68,7 +74,7 @@ POST /api/v1/calls/initiate
     "call_type": "audio"
 }
 
-# Answer a call  
+# Answer a call
 POST /api/v1/calls/{call_id}/answer
 
 # End a call
@@ -79,6 +85,7 @@ POST /api/v1/calls/{call_id}/reject
 ```
 
 ### 3. Check Laravel Logs
+
 ```bash
 tail -f storage/logs/laravel.log | grep -E "(CallInitiated|CallAnswered|CallEnded|CallMissed|Pusher)"
 ```
@@ -94,6 +101,7 @@ tail -f storage/logs/laravel.log | grep -E "(CallInitiated|CallAnswered|CallEnde
 ## 🎯 Expected Behavior
 
 When you initiate a call, you should now see:
+
 1. ✅ Event appears in Pusher debug console immediately
 2. ✅ Detailed logs in Laravel log file
 3. ✅ Proper channel and event structure

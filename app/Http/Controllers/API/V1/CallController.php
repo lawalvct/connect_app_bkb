@@ -329,7 +329,7 @@ class CallController extends BaseController
      */
     public function end(Request $request, Call $call)
     {
-       
+
         try {
             $user = $request->user();
             $call->load(['participants.user', 'conversation']);
