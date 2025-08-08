@@ -25,7 +25,7 @@ class AnalyticsController extends Controller
         // Get date range (default last 30 days)
         $startDate = $request->get('start_date', Carbon::now()->subDays(30)->format('Y-m-d'));
         $endDate = $request->get('end_date', Carbon::now()->format('Y-m-d'));
-        
+
         // Dashboard Overview Stats
         $stats = [
             'total_users' => User::where('deleted_flag', 'N')->count(),
@@ -123,7 +123,7 @@ class AnalyticsController extends Controller
         $ageStats = User::where('deleted_flag', 'N')
             ->whereNotNull('date_of_birth')
             ->selectRaw('
-                CASE 
+                CASE
                     WHEN TIMESTAMPDIFF(YEAR, date_of_birth, CURDATE()) BETWEEN 13 AND 17 THEN "13-17"
                     WHEN TIMESTAMPDIFF(YEAR, date_of_birth, CURDATE()) BETWEEN 18 AND 24 THEN "18-24"
                     WHEN TIMESTAMPDIFF(YEAR, date_of_birth, CURDATE()) BETWEEN 25 AND 34 THEN "25-34"
@@ -207,7 +207,7 @@ class AnalyticsController extends Controller
         // Content Type Distribution
         $contentTypes = Post::where('deleted_flag', 'N')
             ->selectRaw('
-                CASE 
+                CASE
                     WHEN file_url IS NOT NULL AND file_url LIKE "%.mp4%" THEN "Video"
                     WHEN file_url IS NOT NULL THEN "Image"
                     ELSE "Text"
@@ -463,12 +463,12 @@ class AnalyticsController extends Controller
         $callback = function() use ($startDate, $endDate) {
             $file = fopen('php://output', 'w');
             fputcsv($file, ['Metric', 'Value']);
-            
+
             fputcsv($file, ['Total Users', User::where('deleted_flag', 'N')->count()]);
             fputcsv($file, ['Total Posts', Post::where('deleted_flag', 'N')->count()]);
             fputcsv($file, ['Total Revenue', UserSubscription::where('payment_status', 'completed')->sum('amount')]);
             fputcsv($file, ['Active Subscriptions', UserSubscription::active()->count()]);
-            
+
             fclose($file);
         };
 

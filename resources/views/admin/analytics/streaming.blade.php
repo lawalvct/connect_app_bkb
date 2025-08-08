@@ -20,9 +20,9 @@
                     <div class="mt-4 flex md:mt-0 md:ml-4">
                         <!-- Date Range Picker -->
                         <form method="GET" class="flex space-x-3">
-                            <input type="date" name="start_date" value="{{ $startDate }}" 
+                            <input type="date" name="start_date" value="{{ $startDate }}"
                                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
-                            <input type="date" name="end_date" value="{{ $endDate }}" 
+                            <input type="date" name="end_date" value="{{ $endDate }}"
                                    class="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                             <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
                                 Apply
@@ -37,27 +37,27 @@
     <!-- Analytics Navigation -->
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <nav class="flex space-x-8 mb-8" aria-label="Analytics Navigation">
-            <a href="{{ route('admin.analytics.index') }}" 
+            <a href="{{ route('admin.analytics.index') }}"
                class="border-b-2 {{ request()->routeIs('admin.analytics.index') ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} whitespace-nowrap py-2 px-1 text-sm font-medium">
                 Overview
             </a>
-            <a href="{{ route('admin.analytics.users') }}" 
+            <a href="{{ route('admin.analytics.users') }}"
                class="border-b-2 {{ request()->routeIs('admin.analytics.users') ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} whitespace-nowrap py-2 px-1 text-sm font-medium">
                 Users
             </a>
-            <a href="{{ route('admin.analytics.content') }}" 
+            <a href="{{ route('admin.analytics.content') }}"
                class="border-b-2 {{ request()->routeIs('admin.analytics.content') ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} whitespace-nowrap py-2 px-1 text-sm font-medium">
                 Content
             </a>
-            <a href="{{ route('admin.analytics.revenue') }}" 
+            <a href="{{ route('admin.analytics.revenue') }}"
                class="border-b-2 {{ request()->routeIs('admin.analytics.revenue') ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} whitespace-nowrap py-2 px-1 text-sm font-medium">
                 Revenue
             </a>
-            <a href="{{ route('admin.analytics.advertising') }}" 
+            <a href="{{ route('admin.analytics.advertising') }}"
                class="border-b-2 {{ request()->routeIs('admin.analytics.advertising') ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} whitespace-nowrap py-2 px-1 text-sm font-medium">
                 Advertising
             </a>
-            <a href="{{ route('admin.analytics.streaming') }}" 
+            <a href="{{ route('admin.analytics.streaming') }}"
                class="border-b-2 {{ request()->routeIs('admin.analytics.streaming') ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} whitespace-nowrap py-2 px-1 text-sm font-medium">
                 Streaming
             </a>

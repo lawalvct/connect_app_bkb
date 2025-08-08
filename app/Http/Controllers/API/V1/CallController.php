@@ -16,6 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use Pusher\Pusher;
 
 class CallController extends BaseController
 {
@@ -100,8 +101,83 @@ class CallController extends BaseController
 
             DB::commit();
 
-            // Broadcast call initiated event
-            broadcast(new CallInitiated($call, $conversation, $user))->toOthers();
+            // Broadcast call initiated event using direct Pusher
+            try {
+                Log::info('Starting CallInitiated Pusher broadcast', [
+                    'conversation_id' => $conversation->id,
+                    'call_id' => $call->id,
+                    'channel' => 'private-conversation.' . $conversation->id
+                ]);
+
+                // Get Pusher configuration
+                $pusherKey = config('broadcasting.connections.pusher.key');
+                $pusherSecret = config('broadcasting.connections.pusher.secret');
+                $pusherAppId = config('broadcasting.connections.pusher.app_id');
+                $pusherCluster = config('broadcasting.connections.pusher.options.cluster');
+
+                // Validate Pusher configuration
+                if (empty($pusherKey) || empty($pusherSecret) || empty($pusherAppId)) {
+                    Log::warning('Pusher configuration missing for CallInitiated, skipping broadcast', [
+                        'key_exists' => !empty($pusherKey),
+                        'secret_exists' => !empty($pusherSecret),
+                        'app_id_exists' => !empty($pusherAppId),
+                        'cluster' => $pusherCluster
+                    ]);
+                } else {
+                    // Create direct Pusher instance
+                    $pusher = new \Pusher\Pusher(
+                        $pusherKey,
+                        $pusherSecret,
+                        $pusherAppId,
+                        [
+                            'cluster' => $pusherCluster ?: 'eu',
+                            'useTLS' => true
+                        ]
+                    );
+
+                    Log::info('CallInitiated Pusher instance created successfully');
+
+                    // Create broadcast data
+                    $broadcastData = [
+                        'call_id' => $call->id,
+                        'call_type' => $call->call_type,
+                        'agora_channel_name' => $call->agora_channel_name,
+                        'initiator' => [
+                            'id' => $user->id,
+                            'name' => $user->name,
+                            'profile_image' => $user->profile_image ?? null
+                        ],
+                        'conversation' => [
+                            'id' => $conversation->id,
+                            'type' => $conversation->type
+                        ],
+                        'started_at' => $call->started_at->toISOString()
+                    ];
+
+                    Log::info('CallInitiated broadcast data prepared', [
+                        'data_structure' => array_keys($broadcastData)
+                    ]);
+
+                    $result = $pusher->trigger('private-conversation.' . $conversation->id, 'call.initiated', $broadcastData);
+
+                    Log::info('CallInitiated broadcast successful', [
+                        'call_id' => $call->id,
+                        'conversation_id' => $conversation->id,
+                        'channel' => 'private-conversation.' . $conversation->id,
+                        'pusher_result' => $result
+                    ]);
+                }
+            } catch (\Exception $broadcastException) {
+                Log::error('Failed to broadcast CallInitiated via direct Pusher', [
+                    'call_id' => $call->id ?? 'not_available',
+                    'conversation_id' => $conversation->id ?? 'not_available',
+                    'error_message' => $broadcastException->getMessage(),
+                    'error_code' => $broadcastException->getCode(),
+                    'error_file' => $broadcastException->getFile(),
+                    'error_line' => $broadcastException->getLine()
+                ]);
+                // Don't fail the request if broadcast fails
+            }
 
             return $this->sendResponse('Call initiated successfully', [
                 'call' => $this->formatCallData($call->fresh(['participants.user', 'initiator'])),
@@ -122,11 +198,11 @@ class CallController extends BaseController
     /**
      * Answer a call
      */
-    public function answer(Request $request, $callId)
+    public function answer(Request $request, Call $call)
     {
         try {
             $user = $request->user();
-            $call = Call::with(['participants.user', 'conversation'])->findOrFail($callId);
+            $call->load(['participants.user', 'conversation']);
 
             // Check if user is a participant
             $participant = $call->participants->where('user_id', $user->id)->first();
@@ -157,8 +233,80 @@ class CallController extends BaseController
 
             DB::commit();
 
-            // Broadcast call answered event
-            broadcast(new CallAnswered($call, $user))->toOthers();
+            // Broadcast call answered event using direct Pusher
+            try {
+                Log::info('Starting CallAnswered Pusher broadcast', [
+                    'conversation_id' => $call->conversation_id,
+                    'call_id' => $call->id,
+                    'channel' => 'private-conversation.' . $call->conversation_id
+                ]);
+
+                // Get Pusher configuration
+                $pusherKey = config('broadcasting.connections.pusher.key');
+                $pusherSecret = config('broadcasting.connections.pusher.secret');
+                $pusherAppId = config('broadcasting.connections.pusher.app_id');
+                $pusherCluster = config('broadcasting.connections.pusher.options.cluster');
+
+                // Validate Pusher configuration
+                if (empty($pusherKey) || empty($pusherSecret) || empty($pusherAppId)) {
+                    Log::warning('Pusher configuration missing for CallAnswered, skipping broadcast', [
+                        'key_exists' => !empty($pusherKey),
+                        'secret_exists' => !empty($pusherSecret),
+                        'app_id_exists' => !empty($pusherAppId),
+                        'cluster' => $pusherCluster
+                    ]);
+                } else {
+                    // Create direct Pusher instance
+                    $pusher = new \Pusher\Pusher(
+                        $pusherKey,
+                        $pusherSecret,
+                        $pusherAppId,
+                        [
+                            'cluster' => $pusherCluster ?: 'eu',
+                            'useTLS' => true
+                        ]
+                    );
+
+                    Log::info('CallAnswered Pusher instance created successfully');
+
+                    // Create broadcast data
+                    $broadcastData = [
+                        'call_id' => $call->id,
+                        'call_type' => $call->call_type,
+                        'agora_channel_name' => $call->agora_channel_name,
+                        'answerer' => [
+                            'id' => $user->id,
+                            'name' => $user->name,
+                            'profile_image' => $user->profile_image ?? null
+                        ],
+                        'status' => $call->status,
+                        'connected_at' => $call->connected_at ? $call->connected_at->toISOString() : null
+                    ];
+
+                    Log::info('CallAnswered broadcast data prepared', [
+                        'data_structure' => array_keys($broadcastData)
+                    ]);
+
+                    $result = $pusher->trigger('private-conversation.' . $call->conversation_id, 'call.answered', $broadcastData);
+
+                    Log::info('CallAnswered broadcast successful', [
+                        'call_id' => $call->id,
+                        'conversation_id' => $call->conversation_id,
+                        'channel' => 'private-conversation.' . $call->conversation_id,
+                        'pusher_result' => $result
+                    ]);
+                }
+            } catch (\Exception $broadcastException) {
+                Log::error('Failed to broadcast CallAnswered via direct Pusher', [
+                    'call_id' => $call->id ?? 'not_available',
+                    'conversation_id' => $call->conversation_id ?? 'not_available',
+                    'error_message' => $broadcastException->getMessage(),
+                    'error_code' => $broadcastException->getCode(),
+                    'error_file' => $broadcastException->getFile(),
+                    'error_line' => $broadcastException->getLine()
+                ]);
+                // Don't fail the request if broadcast fails
+            }
 
             return $this->sendResponse('Call answered successfully', [
                 'call' => $this->formatCallData($call->fresh(['participants.user', 'initiator'])),
@@ -179,11 +327,12 @@ class CallController extends BaseController
     /**
      * End a call
      */
-    public function end(Request $request, $callId)
+    public function end(Request $request, Call $call)
     {
+       
         try {
             $user = $request->user();
-            $call = Call::with(['participants.user', 'conversation'])->findOrFail($callId);
+            $call->load(['participants.user', 'conversation']);
 
             // Check if user is a participant
             $participant = $call->participants->where('user_id', $user->id)->first();
@@ -239,8 +388,82 @@ class CallController extends BaseController
 
             DB::commit();
 
-            // Broadcast call ended event
-            broadcast(new CallEnded($call, $user))->toOthers();
+            // Broadcast call ended event using direct Pusher
+            try {
+                Log::info('Starting CallEnded Pusher broadcast', [
+                    'conversation_id' => $call->conversation_id,
+                    'call_id' => $call->id,
+                    'channel' => 'private-conversation.' . $call->conversation_id
+                ]);
+
+                // Get Pusher configuration
+                $pusherKey = config('broadcasting.connections.pusher.key');
+                $pusherSecret = config('broadcasting.connections.pusher.secret');
+                $pusherAppId = config('broadcasting.connections.pusher.app_id');
+                $pusherCluster = config('broadcasting.connections.pusher.options.cluster');
+
+                // Validate Pusher configuration
+                if (empty($pusherKey) || empty($pusherSecret) || empty($pusherAppId)) {
+                    Log::warning('Pusher configuration missing for CallEnded, skipping broadcast', [
+                        'key_exists' => !empty($pusherKey),
+                        'secret_exists' => !empty($pusherSecret),
+                        'app_id_exists' => !empty($pusherAppId),
+                        'cluster' => $pusherCluster
+                    ]);
+                } else {
+                    // Create direct Pusher instance
+                    $pusher = new \Pusher\Pusher(
+                        $pusherKey,
+                        $pusherSecret,
+                        $pusherAppId,
+                        [
+                            'cluster' => $pusherCluster ?: 'eu',
+                            'useTLS' => true
+                        ]
+                    );
+
+                    Log::info('CallEnded Pusher instance created successfully');
+
+                    // Create broadcast data
+                    $broadcastData = [
+                        'call_id' => $call->id,
+                        'call_type' => $call->call_type,
+                        'ended_by' => [
+                            'id' => $user->id,
+                            'name' => $user->name,
+                            'profile_image' => $user->profile_image ?? null
+                        ],
+                        'status' => $call->status,
+                        'end_reason' => $call->end_reason,
+                        'duration' => $call->duration,
+                        'formatted_duration' => $call->formatted_duration,
+                        'ended_at' => $call->ended_at ? $call->ended_at->toISOString() : null
+                    ];
+
+                    Log::info('CallEnded broadcast data prepared', [
+                        'data_structure' => array_keys($broadcastData)
+                    ]);
+
+                    $result = $pusher->trigger('private-conversation.' . $call->conversation_id, 'call.ended', $broadcastData);
+
+                    Log::info('CallEnded broadcast successful', [
+                        'call_id' => $call->id,
+                        'conversation_id' => $call->conversation_id,
+                        'channel' => 'private-conversation.' . $call->conversation_id,
+                        'pusher_result' => $result
+                    ]);
+                }
+            } catch (\Exception $broadcastException) {
+                Log::error('Failed to broadcast CallEnded via direct Pusher', [
+                    'call_id' => $call->id ?? 'not_available',
+                    'conversation_id' => $call->conversation_id ?? 'not_available',
+                    'error_message' => $broadcastException->getMessage(),
+                    'error_code' => $broadcastException->getCode(),
+                    'error_file' => $broadcastException->getFile(),
+                    'error_line' => $broadcastException->getLine()
+                ]);
+                // Don't fail the request if broadcast fails
+            }
 
             return $this->sendResponse('Call ended successfully', [
                 'call' => $this->formatCallData($call->fresh(['participants.user', 'initiator'])),
@@ -255,11 +478,11 @@ class CallController extends BaseController
     /**
      * Reject a call
      */
-    public function reject(Request $request, $callId)
+    public function reject(Request $request, Call $call)
     {
         try {
             $user = $request->user();
-            $call = Call::with(['participants.user', 'conversation'])->findOrFail($callId);
+            $call->load(['participants.user', 'conversation']);
 
             // Check if user is a participant
             $participant = $call->participants->where('user_id', $user->id)->first();
@@ -305,7 +528,75 @@ class CallController extends BaseController
                     ],
                 ]);
 
-                broadcast(new CallMissed($call))->toOthers();
+                // Broadcast call missed event using direct Pusher
+                try {
+                    Log::info('Starting CallMissed Pusher broadcast', [
+                        'conversation_id' => $call->conversation_id,
+                        'call_id' => $call->id,
+                        'channel' => 'private-conversation.' . $call->conversation_id
+                    ]);
+
+                    // Get Pusher configuration
+                    $pusherKey = config('broadcasting.connections.pusher.key');
+                    $pusherSecret = config('broadcasting.connections.pusher.secret');
+                    $pusherAppId = config('broadcasting.connections.pusher.app_id');
+                    $pusherCluster = config('broadcasting.connections.pusher.options.cluster');
+
+                    // Validate Pusher configuration
+                    if (empty($pusherKey) || empty($pusherSecret) || empty($pusherAppId)) {
+                        Log::warning('Pusher configuration missing for CallMissed, skipping broadcast', [
+                            'key_exists' => !empty($pusherKey),
+                            'secret_exists' => !empty($pusherSecret),
+                            'app_id_exists' => !empty($pusherAppId),
+                            'cluster' => $pusherCluster
+                        ]);
+                    } else {
+                        // Create direct Pusher instance
+                        $pusher = new \Pusher\Pusher(
+                            $pusherKey,
+                            $pusherSecret,
+                            $pusherAppId,
+                            [
+                                'cluster' => $pusherCluster ?: 'eu',
+                                'useTLS' => true
+                            ]
+                        );
+
+                        Log::info('CallMissed Pusher instance created successfully');
+
+                        // Create broadcast data
+                        $broadcastData = [
+                            'call_id' => $call->id,
+                            'call_type' => $call->call_type,
+                            'status' => $call->status,
+                            'end_reason' => $call->end_reason,
+                            'ended_at' => $call->ended_at ? $call->ended_at->toISOString() : null
+                        ];
+
+                        Log::info('CallMissed broadcast data prepared', [
+                            'data_structure' => array_keys($broadcastData)
+                        ]);
+
+                        $result = $pusher->trigger('private-conversation.' . $call->conversation_id, 'call.missed', $broadcastData);
+
+                        Log::info('CallMissed broadcast successful', [
+                            'call_id' => $call->id,
+                            'conversation_id' => $call->conversation_id,
+                            'channel' => 'private-conversation.' . $call->conversation_id,
+                            'pusher_result' => $result
+                        ]);
+                    }
+                } catch (\Exception $broadcastException) {
+                    Log::error('Failed to broadcast CallMissed via direct Pusher', [
+                        'call_id' => $call->id ?? 'not_available',
+                        'conversation_id' => $call->conversation_id ?? 'not_available',
+                        'error_message' => $broadcastException->getMessage(),
+                        'error_code' => $broadcastException->getCode(),
+                        'error_file' => $broadcastException->getFile(),
+                        'error_line' => $broadcastException->getLine()
+                    ]);
+                    // Don't fail the request if broadcast fails
+                }
             }
 
             DB::commit();

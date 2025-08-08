@@ -62,6 +62,9 @@ return [
                     CURLOPT_SSL_VERIFYHOST => 0,
                     CURLOPT_SSL_VERIFYPEER => 0,
                     CURLOPT_TIMEOUT => 30,
+                    CURLOPT_CONNECTTIMEOUT => 10,
+                    CURLOPT_DNS_CACHE_TIMEOUT => 300,
+                    CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
                 ],
             ],
             'client_options' => [

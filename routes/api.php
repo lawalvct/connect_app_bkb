@@ -110,3 +110,83 @@ Route::post('/test-message-store-broadcast', function (Request $request) {
         ], 500);
     }
 });
+
+// Test call notification broadcasting
+Route::post('/test-call-notification', function (Request $request) {
+    try {
+        Log::info('Testing call notification broadcast');
+
+        $pusher = new \Pusher\Pusher(
+            '0e0b5123273171ff212d',  // key
+            '770b5206be41b096e258',  // secret
+            '1471502',  // app_id
+            [
+                'cluster' => 'eu',
+                'useTLS' => true
+            ]
+        );
+
+        $callData = [
+            'call_id' => 'test-call-' . time(),
+            'call_type' => $request->input('call_type', 'voice'),
+            'agora_channel_name' => 'test_channel_' . time(),
+            'initiator' => [
+                'id' => 1,
+                'name' => 'Test Caller',
+                'username' => 'testcaller',
+                'profile_url' => null,
+            ],
+            'started_at' => now()->toISOString(),
+        ];
+
+        $conversationId = $request->input('conversation_id', 1);
+        $channelName = 'private-conversation.' . $conversationId;
+
+        $result = $pusher->trigger($channelName, 'call.initiated', $callData);
+
+        Log::info('Test call notification result', ['result' => $result, 'channel' => $channelName]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Call notification test sent',
+            'channel' => $channelName,
+            'event' => 'call.initiated',
+            'data' => $callData,
+            'result' => $result
+        ]);
+
+    } catch (\Exception $e) {
+        Log::error('Call notification test error', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+
+        return response()->json([
+            'status' => 'error',
+            'message' => 'Call notification test failed: ' . $e->getMessage()
+        ], 500);
+    }
+});
+
+// Debug call finding
+Route::get('/debug-call/{id}', function ($id) {
+    try {
+        $call = \App\Models\Call::findOrFail($id);
+        return response()->json([
+            'success' => true,
+            'call' => [
+                'id' => $call->id,
+                'status' => $call->status,
+                'call_type' => $call->call_type,
+                'conversation_id' => $call->conversation_id,
+                'initiated_by' => $call->initiated_by,
+                'created_at' => $call->created_at->toISOString(),
+            ]
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Call not found: ' . $e->getMessage()
+        ], 404);
+    }
+});

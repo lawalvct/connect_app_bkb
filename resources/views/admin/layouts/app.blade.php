@@ -176,11 +176,42 @@
                 </div>
 
                 <!-- Analytics -->
-                <a href="#"
-                   class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-primary-light hover:text-primary transition-colors duration-200">
-                    <i class="fas fa-chart-bar w-6"></i>
-                    <span class="ml-3">Analytics</span>
-                </a>
+                <div x-data="{ open: {{ request()->routeIs('admin.analytics*') ? 'true' : 'false' }} }">
+                    <button @click="open = !open"
+                            class="w-full flex items-center justify-between px-4 py-3 text-gray-700 rounded-lg hover:bg-primary-light hover:text-primary transition-colors duration-200">
+                        <div class="flex items-center">
+                            <i class="fas fa-chart-bar w-6"></i>
+                            <span class="ml-3">Analytics</span>
+                        </div>
+                        <i class="fas fa-chevron-down transform transition-transform duration-200" :class="open ? 'rotate-180' : ''"></i>
+                    </button>
+                    <div x-show="open" x-collapse class="ml-6 mt-2 space-y-2">
+                        <a href="{{ route('admin.analytics.index') }}"
+                           class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.analytics.index') ? 'bg-primary-light text-primary' : '' }}">
+                            <span>Overview</span>
+                        </a>
+                        <a href="{{ route('admin.analytics.users') }}"
+                           class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.analytics.users') ? 'bg-primary-light text-primary' : '' }}">
+                            <span>Users</span>
+                        </a>
+                        <a href="{{ route('admin.analytics.content') }}"
+                           class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.analytics.content') ? 'bg-primary-light text-primary' : '' }}">
+                            <span>Content</span>
+                        </a>
+                        <a href="{{ route('admin.analytics.revenue') }}"
+                           class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.analytics.revenue') ? 'bg-primary-light text-primary' : '' }}">
+                            <span>Revenue</span>
+                        </a>
+                        <a href="{{ route('admin.analytics.advertising') }}"
+                           class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.analytics.advertising') ? 'bg-primary-light text-primary' : '' }}">
+                            <span>Advertising</span>
+                        </a>
+                        <a href="{{ route('admin.analytics.streaming') }}"
+                           class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.analytics.streaming') ? 'bg-primary-light text-primary' : '' }}">
+                            <span>Streaming</span>
+                        </a>
+                    </div>
+                </div>
 
                 <!-- Settings -->
                 <div x-data="{ open: {{ request()->routeIs('admin.admins*') ? 'true' : 'false' }} }">

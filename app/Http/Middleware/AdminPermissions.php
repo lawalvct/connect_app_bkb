@@ -47,6 +47,12 @@ class AdminPermissions
                     }
                     break;
 
+                case 'manage_analytics':
+                    if (!$admin->canViewAnalytics()) {
+                        abort(403, 'Insufficient permissions to access analytics');
+                    }
+                    break;
+
                 default:
                     if (!$admin->hasPermission($permission)) {
                         abort(403, "Insufficient permissions: {$permission}");
