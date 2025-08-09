@@ -422,12 +422,13 @@ class UserManagementController extends Controller
     }
 
     /**
-     * Export users to CSV or Excel
+     * Export users to CSV or Excel format.
+     * For large datasets (>1000 records), uses queue processing.
+     * For smaller datasets, returns immediate download.
      *
      * Supports filtering by:
      * - search: Filter by name or email
      * - status: active, suspended, banned
-     * - verified: 1 (verified), 0 (unverified)
      * - social_circles: has_circles, no_circles, or specific circle ID
      *
      * Formats supported:
@@ -435,20 +436,22 @@ class UserManagementController extends Controller
      * - excel/xlsx: Microsoft Excel format
      *
      * @param Request $request
-     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse
+     * @return \Symfony\Component\HttpFoundation\BinaryFileResponse|\Illuminate\Http\JsonResponse
      */
     public function export(Request $request)
     {
         try {
-            // Increase memory limit for Excel exports
-            ini_set('memory_limit', '256M');
-            set_time_limit(300); // 5 minutes
-
             // Get the format parameter (default to csv)
             $format = $request->get('format', 'csv');
 
             // Validate format
             if (!in_array($format, ['csv', 'excel', 'xlsx'])) {
+                if ($request->expectsJson()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Invalid export format. Supported formats: csv, excel, xlsx'
+                    ], 400);
+                }
                 return redirect()->back()->with('error', 'Invalid export format');
             }
 
@@ -460,16 +463,9 @@ class UserManagementController extends Controller
             if ($request->filled('status')) {
                 $filters['status'] = $request->get('status');
             }
-            // Comment out verified filter
-            /*
-            if ($request->filled('verified')) {
-                $filters['verified'] = $request->get('verified');
-            }
-            */
             if ($request->filled('social_circles')) {
                 $filters['social_circles'] = $request->get('social_circles');
             }
-            // Add date range filters
             if ($request->filled('date_from')) {
                 $filters['date_from'] = $request->get('date_from');
             }
@@ -477,30 +473,57 @@ class UserManagementController extends Controller
                 $filters['date_to'] = $request->get('date_to');
             }
 
+            // Count total records to determine if we should queue the export
+            $query = User::query();
+            $this->applyFilters($query, $filters);
+            $totalRecords = $query->count();
+
+            Log::info("Export request: format={$format}, totalRecords={$totalRecords}, filters=" . json_encode($filters));
+
+            // If dataset is large (>1000 records), use queue processing
+            if ($totalRecords > 1000) {
+                $user = auth()->user();
+
+                // Dispatch the export job
+                \App\Jobs\ExportUsersJob::dispatch($filters, $format, $user);
+
+                if ($request->expectsJson()) {
+                    return response()->json([
+                        'success' => true,
+                        'message' => "Export queued successfully! You will receive an email notification when your {$format} export ({$totalRecords} records) is ready for download.",
+                        'queued' => true,
+                        'total_records' => $totalRecords
+                    ]);
+                }
+
+                return redirect()->back()->with('success', "Export queued successfully! You will receive an email notification when your {$format} export ({$totalRecords} records) is ready for download.");
+            }
+
+            // For smaller datasets, process immediately
+            // Increase memory limit for Excel exports
+            ini_set('memory_limit', '256M');
+            set_time_limit(300); // 5 minutes
+
             // Generate filename with timestamp
             $timestamp = now()->format('Y-m-d_H-i-s');
-
-            // Log export attempt
-            Log::info("Export attempt: format={$format}, filters=" . json_encode($filters));
 
             if ($format === 'csv') {
                 // CSV Export using Laravel Excel
                 $filename = "users_export_{$timestamp}.csv";
-                Log::info("Exporting CSV: {$filename}");
-                return Excel::download(new UsersExport($filters), $filename, \Maatwebsite\Excel\Excel::CSV, [
+                Log::info("Exporting CSV immediately: {$filename}");
+                return Excel::download(new SimpleUsersExport($filters), $filename, \Maatwebsite\Excel\Excel::CSV, [
                     'Content-Type' => 'text/csv',
+                    'Content-Disposition' => "attachment; filename=\"{$filename}\"",
                 ]);
             } else {
-                // Excel Export (handle both 'excel' and 'xlsx') - using simplified export for debugging
+                // Excel Export (handle both 'excel' and 'xlsx')
                 $filename = "users_export_{$timestamp}.xlsx";
-                Log::info("Exporting Excel: {$filename}");
+                Log::info("Exporting Excel immediately: {$filename}");
 
-                $response = Excel::download(new SimpleUsersExport($filters), $filename, \Maatwebsite\Excel\Excel::XLSX, [
+                return Excel::download(new SimpleUsersExport($filters), $filename, \Maatwebsite\Excel\Excel::XLSX, [
                     'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    'Content-Disposition' => "attachment; filename=\"{$filename}\"",
                 ]);
-
-                Log::info("Excel export response created successfully");
-                return $response;
             }
 
         } catch (\Exception $e) {
@@ -517,6 +540,48 @@ class UserManagementController extends Controller
 
             return redirect()->back()->with('error', 'Failed to export users: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Apply filters to the user query (shared between export and regular queries)
+     */
+    private function applyFilters($query, $filters)
+    {
+        if (!empty($filters['search'])) {
+            $search = $filters['search'];
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
+        if (!empty($filters['status'])) {
+            $status = $filters['status'];
+            if ($status === 'active') {
+                $query->where('is_active', true)->where('is_banned', false);
+            } elseif ($status === 'suspended') {
+                $query->where('is_active', false);
+            } elseif ($status === 'banned') {
+                $query->where('is_banned', true);
+            }
+        }
+
+        if (!empty($filters['social_circles'])) {
+            $socialCircles = $filters['social_circles'];
+            $query->whereHas('socialCircles', function ($q) use ($socialCircles) {
+                $q->whereIn('social_circles.id', $socialCircles);
+            });
+        }
+
+        if (!empty($filters['date_from'])) {
+            $query->where('created_at', '>=', $filters['date_from']);
+        }
+
+        if (!empty($filters['date_to'])) {
+            $query->where('created_at', '<=', $filters['date_to'] . ' 23:59:59');
+        }
+
+        return $query;
     }
 
     /**

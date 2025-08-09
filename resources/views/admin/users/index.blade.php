@@ -32,7 +32,7 @@
                          x-transition:leave="transition ease-in duration-75"
                          x-transition:leave-start="transform opacity-100 scale-100"
                          x-transition:leave-end="transform opacity-0 scale-95"
-                         class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200">
+                         class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-50 border border-gray-200">
                         <div class="py-1">
                             <button @click="exportUsers('csv'); exportOpen = false"
                                     class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center">
@@ -53,7 +53,7 @@
         <!-- Filters and Search -->
         <div class="bg-white rounded-lg shadow-md mb-6">
             <div class="p-6">
-                                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
 
                     <!-- Search -->
                     <div>
@@ -747,58 +747,120 @@
 
                     if (this.filters.search) params.append('search', this.filters.search);
                     if (this.filters.status) params.append('status', this.filters.status);
-                    if (this.filters.verified) params.append('verified', this.filters.verified);
                     if (this.filters.social_circles) params.append('social_circles', this.filters.social_circles);
+                    if (this.filters.date_from) params.append('date_from', this.filters.date_from);
+                    if (this.filters.date_to) params.append('date_to', this.filters.date_to);
 
                     // Add format parameter
                     params.append('format', format);
 
                     const exportUrl = `/admin/users/export?${params.toString()}`;
 
-                    // Show loading state with better styling
+                    // Show loading state
                     const toast = document.createElement('div');
                     toast.className = 'fixed top-4 right-4 bg-blue-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 border border-blue-600';
                     toast.innerHTML = `
                         <div class="flex items-center">
                             <i class="fas fa-spinner fa-spin mr-2"></i>
-                            <span>Preparing ${format.toUpperCase()} export...</span>
+                            <span>Checking export size...</span>
                         </div>
                     `;
                     document.body.appendChild(toast);
 
-                    // Create a hidden iframe for download to avoid page navigation
-                    const iframe = document.createElement('iframe');
-                    iframe.style.display = 'none';
-                    iframe.src = exportUrl;
-                    document.body.appendChild(iframe);
+                    // Use fetch to check if export will be queued or immediate
+                    fetch(exportUrl, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                        }
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
 
-                    // Remove loading toast and iframe after download starts
-                    setTimeout(() => {
+                        // Check if response is JSON (queued) or file download (immediate)
+                        const contentType = response.headers.get('content-type');
+                        if (contentType && contentType.includes('application/json')) {
+                            return response.json();
+                        } else {
+                            // For immediate download, trigger download via window.location
+                            window.location.href = exportUrl;
+                            return { immediate: true };
+                        }
+                    })
+                    .then(data => {
+                        // Remove loading toast
                         if (toast.parentNode) {
                             toast.remove();
                         }
-                        // Show success message
-                        const successToast = document.createElement('div');
-                        successToast.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 border border-green-600';
-                        successToast.innerHTML = `
+
+                        if (data.immediate) {
+                            // Show immediate download success
+                            const successToast = document.createElement('div');
+                            successToast.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 border border-green-600';
+                            successToast.innerHTML = `
+                                <div class="flex items-center">
+                                    <i class="fas fa-download mr-2"></i>
+                                    <span>${format.toUpperCase()} export download started!</span>
+                                </div>
+                            `;
+                            document.body.appendChild(successToast);
+                            setTimeout(() => successToast.remove(), 3000);
+                        } else if (data.queued) {
+                            // Show queued export message
+                            const queueToast = document.createElement('div');
+                            queueToast.className = 'fixed top-4 right-4 bg-orange-500 text-white px-6 py-4 rounded-lg shadow-lg z-50 border border-orange-600 max-w-md';
+                            queueToast.innerHTML = `
+                                <div class="flex items-start">
+                                    <i class="fas fa-clock mr-3 mt-1"></i>
+                                    <div>
+                                        <div class="font-semibold mb-1">Export Queued</div>
+                                        <div class="text-sm">
+                                            ${data.total_records} records found. <br>
+                                            You'll receive an email when ready!
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                            document.body.appendChild(queueToast);
+                            setTimeout(() => queueToast.remove(), 8000);
+                        } else if (data.success) {
+                            // Regular success message
+                            const successToast = document.createElement('div');
+                            successToast.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 border border-green-600';
+                            successToast.innerHTML = `
+                                <div class="flex items-center">
+                                    <i class="fas fa-check mr-2"></i>
+                                    <span>${data.message}</span>
+                                </div>
+                            `;
+                            document.body.appendChild(successToast);
+                            setTimeout(() => successToast.remove(), 5000);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Export error:', error);
+
+                        // Remove loading toast
+                        if (toast.parentNode) {
+                            toast.remove();
+                        }
+
+                        // Show error message
+                        const errorToast = document.createElement('div');
+                        errorToast.className = 'fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 border border-red-600';
+                        errorToast.innerHTML = `
                             <div class="flex items-center">
-                                <i class="fas fa-check mr-2"></i>
-                                <span>${format.toUpperCase()} export started successfully!</span>
+                                <i class="fas fa-exclamation-triangle mr-2"></i>
+                                <span>Export failed: ${error.message}</span>
                             </div>
                         `;
-                        document.body.appendChild(successToast);
-
-                        setTimeout(() => {
-                            if (successToast.parentNode) {
-                                successToast.remove();
-                            }
-                        }, 3000);
-
-                        // Clean up iframe
-                        if (iframe.parentNode) {
-                            iframe.remove();
-                        }
-                    }, 2000);
+                        document.body.appendChild(errorToast);
+                        setTimeout(() => errorToast.remove(), 5000);
+                    });
 
                 } catch (error) {
                     console.error('Export error:', error);
@@ -813,12 +875,7 @@
                         </div>
                     `;
                     document.body.appendChild(errorToast);
-
-                    setTimeout(() => {
-                        if (errorToast.parentNode) {
-                            errorToast.remove();
-                        }
-                    }, 5000);
+                    setTimeout(() => errorToast.remove(), 5000);
                 }
             }
         }

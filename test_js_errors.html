@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="csrf-token" content="test-token" />
+        <title>JavaScript Error Test</title>
+        <script
+            defer
+            src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"
+        ></script>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link
+            rel="stylesheet"
+            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+        />
+        <style>
+            .console-log {
+                background: #1a1a1a;
+                color: #00ff00;
+                padding: 10px;
+                margin: 10px 0;
+                border-radius: 5px;
+                font-family: monospace;
+                white-space: pre-wrap;
+                max-height: 300px;
+                overflow-y: auto;
+            }
+            .error {
+                color: #ff6b6b;
+            }
+            .warning {
+                color: #ffd43b;
+            }
+            .info {
+                color: #74c0fc;
+            }
+        </style>
+    </head>
+    <body class="bg-gray-100">
+        <div class="container mx-auto p-8">
+            <h1 class="text-3xl font-bold mb-6">
+                JavaScript Error Test for Admin Users Index
+            </h1>
+
+            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                <h2 class="text-xl font-semibold mb-4">Console Output</h2>
+                <div id="console-output" class="console-log">
+                    Initializing test...
+                </div>
+                <button
+                    onclick="clearConsole()"
+                    class="mt-4 bg-blue-500 text-white px-4 py-2 rounded"
+                >
+                    Clear Console
+                </button>
+            </div>
+
+            <!-- Simplified test of the Alpine.js component -->
+            <div
+                x-data="userManagement()"
+                x-init="testInitialization()"
+                class="bg-white rounded-lg shadow-md p-6"
+            >
+                <h2 class="text-xl font-semibold mb-4">
+                    Alpine.js Component Test
+                </h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="bg-blue-50 p-4 rounded">
+                        <h3 class="font-semibold">Loading State</h3>
+                        <p>Loading: <span x-text="loading"></span></p>
+                    </div>
+                    <div class="bg-green-50 p-4 rounded">
+                        <h3 class="font-semibold">Users Count</h3>
+                        <p>Users: <span x-text="users.length"></span></p>
+                    </div>
+                    <div class="bg-yellow-50 p-4 rounded">
+                        <h3 class="font-semibold">Export State</h3>
+                        <p>Export Open: <span x-text="exportOpen"></span></p>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <h3 class="font-semibold mb-2">Test Buttons</h3>
+                    <div class="space-x-2">
+                        <button
+                            @click="testFunction('loadUsers')"
+                            class="bg-blue-500 text-white px-4 py-2 rounded"
+                        >
+                            Test Load Users
+                        </button>
+                        <button
+                            @click="testFunction('exportUsers')"
+                            class="bg-green-500 text-white px-4 py-2 rounded"
+                        >
+                            Test Export
+                        </button>
+                        <button
+                            @click="testFunction('showSuccess')"
+                            class="bg-yellow-500 text-white px-4 py-2 rounded"
+                        >
+                            Test Success Toast
+                        </button>
+                        <button
+                            @click="testFunction('showError')"
+                            class="bg-red-500 text-white px-4 py-2 rounded"
+                        >
+                            Test Error Toast
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <h3 class="font-semibold mb-2">Export Dropdown Test</h3>
+                    <div class="relative">
+                        <button
+                            @click="exportOpen = !exportOpen"
+                            type="button"
+                            class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center"
+                        >
+                            <i class="fas fa-download mr-2"></i>
+                            Export
+                            <i class="fas fa-chevron-down ml-2"></i>
+                        </button>
+
+                        <div
+                            x-show="exportOpen"
+                            @click.away="exportOpen = false"
+                            x-transition
+                            class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-50 border border-gray-200"
+                        >
+                            <div class="py-1">
+                                <button
+                                    @click="exportUsers('csv'); exportOpen = false"
+                                    class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                                >
+                                    <i
+                                        class="fas fa-file-csv mr-2 text-green-600"
+                                    ></i>
+                                    Export as CSV
+                                </button>
+                                <button
+                                    @click="exportUsers('excel'); exportOpen = false"
+                                    class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                                >
+                                    <i
+                                        class="fas fa-file-excel mr-2 text-green-600"
+                                    ></i>
+                                    Export as Excel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div x-show="loading" class="text-center py-4">
+                    <i
+                        class="fas fa-spinner fa-spin text-2xl text-blue-500"
+                    ></i>
+                    <p class="mt-2">Loading...</p>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            // Enhanced logging
+            const originalConsole = {
+                log: console.log,
+                error: console.error,
+                warn: console.warn,
+                info: console.info,
+            };
+
+            function logToDiv(type, ...args) {
+                const output = document.getElementById("console-output");
+                const timestamp = new Date().toLocaleTimeString();
+                const message = args
+                    .map((arg) =>
+                        typeof arg === "object"
+                            ? JSON.stringify(arg, null, 2)
+                            : String(arg)
+                    )
+                    .join(" ");
+
+                const div = document.createElement("div");
+                div.className = type;
+                div.textContent = `[${timestamp}] ${type.toUpperCase()}: ${message}`;
+                output.appendChild(div);
+                output.scrollTop = output.scrollHeight;
+
+                // Call original console method
+                originalConsole[type](...args);
+            }
+
+            console.log = (...args) => logToDiv("info", ...args);
+            console.error = (...args) => logToDiv("error", ...args);
+            console.warn = (...args) => logToDiv("warning", ...args);
+            console.info = (...args) => logToDiv("info", ...args);
+
+            function clearConsole() {
+                document.getElementById("console-output").innerHTML =
+                    "Console cleared...";
+            }
+
+            // Mock fetch for testing
+            window.fetch = function (url, options = {}) {
+                console.log("Mock fetch called:", url, options);
+
+                return Promise.resolve({
+                    ok: true,
+                    status: 200,
+                    json: () =>
+                        Promise.resolve({
+                            users: {
+                                data: [],
+                                current_page: 1,
+                                last_page: 1,
+                                from: 0,
+                                to: 0,
+                                total: 0,
+                            },
+                            stats: {
+                                total: 0,
+                                active: 0,
+                                suspended: 0,
+                                banned: 0,
+                            },
+                            social_circles: [],
+                        }),
+                    headers: {
+                        get: (name) => {
+                            if (name === "content-type")
+                                return "application/json";
+                            return null;
+                        },
+                    },
+                });
+            };
+
+            // Copy the userManagement function from your file
+            function userManagement() {
+                return {
+                    users: [],
+                    stats: {},
+                    pagination: {},
+                    socialCircles: [],
+                    loading: false,
+                    selectedUsers: [],
+                    exportOpen: false,
+                    filters: {
+                        search: "",
+                        status: "",
+                        social_circles: "",
+                        date_from: "",
+                        date_to: "",
+                    },
+                    searchTimeout: null,
+
+                    testInitialization() {
+                        console.log(
+                            "Alpine.js component initialized successfully!"
+                        );
+                        console.log("Initial state:", {
+                            users: this.users.length,
+                            loading: this.loading,
+                            exportOpen: this.exportOpen,
+                        });
+                    },
+
+                    testFunction(funcName) {
+                        console.log(`Testing function: ${funcName}`);
+                        try {
+                            switch (funcName) {
+                                case "loadUsers":
+                                    this.loadUsers();
+                                    break;
+                                case "exportUsers":
+                                    this.exportUsers("csv");
+                                    break;
+                                case "showSuccess":
+                                    this.showSuccess("Test success message");
+                                    break;
+                                case "showError":
+                                    this.showError("Test error message");
+                                    break;
+                                default:
+                                    console.warn("Unknown function:", funcName);
+                            }
+                        } catch (error) {
+                            console.error(`Error in ${funcName}:`, error);
+                        }
+                    },
+
+                    async loadUsers(page = 1) {
+                        console.log("loadUsers called with page:", page);
+                        this.loading = true;
+                        try {
+                            const params = new URLSearchParams({
+                                page: page,
+                                ...this.filters,
+                            });
+
+                            const response = await fetch(
+                                `/admin/api/users?${params}`,
+                                {
+                                    method: "GET",
+                                    headers: {
+                                        Accept: "application/json",
+                                        "X-CSRF-TOKEN": document
+                                            .querySelector(
+                                                'meta[name="csrf-token"]'
+                                            )
+                                            .getAttribute("content"),
+                                    },
+                                }
+                            );
+
+                            if (!response.ok) {
+                                if (response.status === 401) {
+                                    console.warn(
+                                        "Unauthorized - would redirect to login"
+                                    );
+                                    return;
+                                }
+                                throw new Error(
+                                    `HTTP ${response.status}: ${response.statusText}`
+                                );
+                            }
+
+                            const data = await response.json();
+
+                            if (data.error) {
+                                throw new Error(data.error);
+                            }
+
+                            this.users = data.users.data || [];
+                            this.pagination = {
+                                current_page: data.users.current_page || 1,
+                                last_page: data.users.last_page || 1,
+                                from: data.users.from || 0,
+                                to: data.users.to || 0,
+                                total: data.users.total || 0,
+                            };
+                            this.stats = data.stats || {
+                                total: 0,
+                                active: 0,
+                                suspended: 0,
+                                banned: 0,
+                            };
+                            this.selectedUsers = [];
+
+                            console.log(
+                                "Users loaded successfully:",
+                                this.users.length
+                            );
+                        } catch (error) {
+                            console.error("Failed to load users:", error);
+                            this.showError(
+                                "Failed to load users: " + error.message
+                            );
+                        } finally {
+                            this.loading = false;
+                        }
+                    },
+
+                    showSuccess(message) {
+                        console.log("showSuccess called with:", message);
+                        const toast = document.createElement("div");
+                        toast.className =
+                            "fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-md shadow-lg z-50";
+                        toast.textContent = message;
+                        document.body.appendChild(toast);
+                        setTimeout(() => toast.remove(), 3000);
+                    },
+
+                    showError(message) {
+                        console.log("showError called with:", message);
+                        const toast = document.createElement("div");
+                        toast.className =
+                            "fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-md shadow-lg z-50";
+                        toast.textContent = message;
+                        document.body.appendChild(toast);
+                        setTimeout(() => toast.remove(), 3000);
+                    },
+
+                    exportUsers(format = "csv") {
+                        console.log("exportUsers called with format:", format);
+                        try {
+                            // Validate format
+                            if (!["csv", "excel", "xlsx"].includes(format)) {
+                                throw new Error("Invalid export format");
+                            }
+
+                            // Get current filters from this Alpine.js component
+                            const params = new URLSearchParams();
+
+                            if (this.filters.search)
+                                params.append("search", this.filters.search);
+                            if (this.filters.status)
+                                params.append("status", this.filters.status);
+                            if (this.filters.social_circles)
+                                params.append(
+                                    "social_circles",
+                                    this.filters.social_circles
+                                );
+                            if (this.filters.date_from)
+                                params.append(
+                                    "date_from",
+                                    this.filters.date_from
+                                );
+                            if (this.filters.date_to)
+                                params.append("date_to", this.filters.date_to);
+
+                            // Add format parameter
+                            params.append("format", format);
+
+                            const exportUrl = `/admin/users/export?${params.toString()}`;
+                            console.log("Export URL:", exportUrl);
+
+                            // Show loading state
+                            const toast = document.createElement("div");
+                            toast.className =
+                                "fixed top-4 right-4 bg-blue-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 border border-blue-600";
+                            toast.innerHTML = `
+                            <div class="flex items-center">
+                                <i class="fas fa-spinner fa-spin mr-2"></i>
+                                <span>Checking export size...</span>
+                            </div>
+                        `;
+                            document.body.appendChild(toast);
+
+                            // Use fetch to check if export will be queued or immediate
+                            fetch(exportUrl, {
+                                method: "GET",
+                                headers: {
+                                    Accept: "application/json",
+                                    "X-Requested-With": "XMLHttpRequest",
+                                    "X-CSRF-TOKEN": document
+                                        .querySelector(
+                                            'meta[name="csrf-token"]'
+                                        )
+                                        .getAttribute("content"),
+                                },
+                            })
+                                .then((response) => {
+                                    console.log(
+                                        "Export response received:",
+                                        response.status
+                                    );
+                                    if (!response.ok) {
+                                        throw new Error(
+                                            `HTTP error! status: ${response.status}`
+                                        );
+                                    }
+
+                                    // Check if response is JSON (queued) or file download (immediate)
+                                    const contentType =
+                                        response.headers.get("content-type");
+                                    if (
+                                        contentType &&
+                                        contentType.includes("application/json")
+                                    ) {
+                                        return response.json();
+                                    } else {
+                                        // For immediate download, trigger download via window.location
+                                        console.log(
+                                            "Immediate download triggered"
+                                        );
+                                        return { immediate: true };
+                                    }
+                                })
+                                .then((data) => {
+                                    console.log("Export data received:", data);
+                                    // Remove loading toast
+                                    if (toast.parentNode) {
+                                        toast.remove();
+                                    }
+
+                                    if (data.immediate) {
+                                        this.showSuccess(
+                                            `${format.toUpperCase()} export download started!`
+                                        );
+                                    } else if (data.queued) {
+                                        this.showSuccess(
+                                            `Export queued! ${data.total_records} records will be processed.`
+                                        );
+                                    } else if (data.success) {
+                                        this.showSuccess(data.message);
+                                    }
+                                })
+                                .catch((error) => {
+                                    console.error("Export error:", error);
+
+                                    // Remove loading toast
+                                    if (toast.parentNode) {
+                                        toast.remove();
+                                    }
+
+                                    this.showError(
+                                        "Export failed: " + error.message
+                                    );
+                                });
+                        } catch (error) {
+                            console.error("Export error:", error);
+                            this.showError("Export failed: " + error.message);
+                        }
+                    },
+                };
+            }
+
+            // Test Alpine.js loading
+            document.addEventListener("alpine:init", () => {
+                console.log("Alpine.js initialized successfully!");
+            });
+
+            // Test when page loads
+            window.addEventListener("load", () => {
+                console.log("Page loaded successfully!");
+            });
+
+            // Catch unhandled errors
+            window.addEventListener("error", (event) => {
+                console.error("Unhandled error:", event.error);
+            });
+
+            window.addEventListener("unhandledrejection", (event) => {
+                console.error("Unhandled promise rejection:", event.reason);
+            });
+        </script>
+    </body>
+</html>
