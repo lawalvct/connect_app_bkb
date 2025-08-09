@@ -220,7 +220,11 @@ public function dashboard(Request $request)
      *     tags={"Advertising"},
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(name="status", in="query", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="active", in="query", @OA\Schema(type="boolean", description="Filter by active/inactive status")),
+     *     @OA\Parameter(name="ad_name", in="query", @OA\Schema(type="string", description="Search by ad name (partial match)")),
      *     @OA\Parameter(name="type", in="query", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="start_date", in="query", @OA\Schema(type="string", format="date", description="Filter ads starting from this date")),
+     *     @OA\Parameter(name="end_date", in="query", @OA\Schema(type="string", format="date", description="Filter ads ending before this date")),
      *     @OA\Parameter(name="page", in="query", @OA\Schema(type="integer")),
      *     @OA\Parameter(name="per_page", in="query", @OA\Schema(type="integer")),
      *     @OA\Response(response=200, description="Advertisements retrieved successfully")
@@ -230,7 +234,7 @@ public function dashboard(Request $request)
     {
         try {
             $user = $request->user();
-            $perPage = $request->input('per_page', 10);
+            $perPage = $request->input('per_page', 20);
 
             $query = Ad::where('user_id', $user->id)
                 ->where('deleted_flag', 'N');
@@ -238,6 +242,20 @@ public function dashboard(Request $request)
             // Apply filters
             if ($request->has('status')) {
                 $query->where('status', $request->status);
+            }
+
+            // Add support for active/inactive filter (maps to status)
+            if ($request->has('active')) {
+                if ($request->boolean('active')) {
+                    $query->where('status', 'active');
+                } else {
+                    $query->whereIn('status', ['paused', 'stopped', 'completed', 'draft', 'pending_review', 'rejected']);
+                }
+            }
+
+            // Add ad name search functionality
+            if ($request->has('ad_name') && !empty($request->ad_name)) {
+                $query->where('ad_name', 'LIKE', '%' . $request->ad_name . '%');
             }
 
             if ($request->has('type')) {
