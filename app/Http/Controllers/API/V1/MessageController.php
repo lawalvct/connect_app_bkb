@@ -326,7 +326,7 @@ class MessageController extends BaseController
         $allowedTypes = [
             'image' => 'jpg,jpeg,png,gif,webp',
             'video' => 'mp4,mov,avi,wmv,flv,webm',
-            'audio' => 'mp3,wav,aac,ogg,m4a',
+            'audio' => 'mp3,wav,aac,ogg,m4a,webm',
             'file' => 'pdf,doc,docx,xls,xlsx,ppt,pptx,txt,zip,rar',
         ];
 
