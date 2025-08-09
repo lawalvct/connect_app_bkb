@@ -7,6 +7,7 @@ use App\Http\Resources\V1\UserProfileUploadResource;
 use App\Models\ProfileMultiUpload;
 use App\Models\User;
 use App\Models\UserProfileUpload;
+use App\Models\UserVerification;
 use App\Helpers\FileUploadHelper;
 use App\Helpers\S3UploadHelper;
 use Illuminate\Http\Request;
@@ -1258,5 +1259,101 @@ class ProfileController extends BaseController
         return $this->sendError('Failed to update social links', $e->getMessage(), 500);
     }
 }
+
+//verifyMe function here
+public function verifyMe(Request $request)
+{
+   
+    //user will provide id card type and id card image for admin to verify
+    $validator = Validator::make($request->all(), [
+        'id_card_type' => 'required|string|in:national_id,passport,drivers_license,voters_card,international_passport',
+        'id_card_image' => 'required|image|mimes:jpeg,png,jpg,gif|max:10048',
+    ]);
+
+    if ($validator->fails()) {
+        return $this->sendError('Validation error', $validator->errors(), 422);
+    }
+
+    try {
+        $user = $request->user();
+        $idCardType = $request->id_card_type;
+        $idCardImage = $request->file('id_card_image');
+
+        // Process the ID card verification
+        $verification = $this->processIdCardVerification($user, $idCardType, $idCardImage);
+
+        return $this->sendResponse('ID card submitted successfully for verification', [
+            'verification' => [
+                'id' => $verification->id,
+                'id_card_type' => $verification->id_card_type,
+                'status' => $verification->admin_status,
+                'submitted_at' => $verification->submitted_at,
+                'image_url' => $verification->id_card_image_url
+            ],
+            'message' => 'Your ID card has been submitted for admin review. You will be notified once the verification is complete.'
+        ]);
+    } catch (\Exception $e) {
+        return $this->sendError('Failed to submit ID card for verification', $e->getMessage(), 500);
+    }
+}
+    protected function processIdCardVerification($user, $idCardType, $idCardImage)
+    {
+        try {
+            // Check if user already has a pending or approved verification
+            $existingVerification = UserVerification::where('user_id', $user->id)
+                ->whereIn('admin_status', ['pending', 'approved'])
+                ->first();
+
+            if ($existingVerification) {
+                if ($existingVerification->isApproved()) {
+                    throw new \Exception('User is already verified');
+                }
+                if ($existingVerification->isPending()) {
+                    throw new \Exception('User already has a pending verification request');
+                }
+            }
+
+            // Create the verifyme directory if it doesn't exist
+            $uploadPath = public_path('uploads/verifyme');
+            if (!file_exists($uploadPath)) {
+                mkdir($uploadPath, 0755, true);
+            }
+
+            // Generate unique filename
+            $filename = $user->id . '_' . time() . '_' . uniqid() . '.' . $idCardImage->getClientOriginalExtension();
+
+            // Move the uploaded file to the verifyme folder
+            $idCardImage->move($uploadPath, $filename);
+
+            // Create verification record
+            $verification = UserVerification::create([
+                'user_id' => $user->id,
+                'id_card_type' => $idCardType,
+                'id_card_image' => $filename,
+                'admin_status' => 'pending',
+                'submitted_at' => now(),
+            ]);
+
+            // Log the verification request
+            Log::info('ID card verification submitted', [
+                'user_id' => $user->id,
+                'verification_id' => $verification->id,
+                'id_card_type' => $idCardType,
+                'filename' => $filename
+            ]);
+
+            return $verification;
+
+        } catch (\Exception $e) {
+            Log::error('ID card verification failed', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            throw $e;
+        }
+    }
+
 
 }

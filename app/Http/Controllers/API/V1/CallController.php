@@ -137,6 +137,18 @@ class CallController extends BaseController
 
                     Log::info('CallInitiated Pusher instance created successfully');
 
+                    // Prepare participants data with full profile URLs
+                    $participantsData = $conversation->users->map(function ($participant) use ($user) {
+                        return [
+                            'id' => $participant->id,
+                            'name' => $participant->name,
+                            'username' => $participant->username,
+                            'profile_image' => $participant->profile ? $participant->profile_url : null,
+                            'avatar_url' => $participant->avatar_url,
+                            'status' => $participant->id === $user->id ? 'joined' : 'invited'
+                        ];
+                    })->toArray();
+
                     // Create broadcast data
                     $broadcastData = [
                         'call_id' => $call->id,
@@ -145,12 +157,15 @@ class CallController extends BaseController
                         'initiator' => [
                             'id' => $user->id,
                             'name' => $user->name,
-                            'profile_image' => $user->profile_image ?? null
+                            'username' => $user->username,
+                            'profile_image' => $user->profile ? $user->profile_url : null,
+                            'avatar_url' => $user->avatar_url
                         ],
                         'conversation' => [
                             'id' => $conversation->id,
                             'type' => $conversation->type
                         ],
+                        'participants' => $participantsData,
                         'started_at' => $call->started_at->toISOString()
                     ];
 
@@ -202,7 +217,7 @@ class CallController extends BaseController
     {
         try {
             $user = $request->user();
-            $call->load(['participants.user', 'conversation']);
+            $call->load(['participants.user', 'conversation.users']);
 
             // Check if user is a participant
             $participant = $call->participants->where('user_id', $user->id)->first();
@@ -269,6 +284,19 @@ class CallController extends BaseController
 
                     Log::info('CallAnswered Pusher instance created successfully');
 
+                    // Prepare participants data with full profile URLs
+                    $participantsData = $call->conversation->users->map(function ($participant) use ($call) {
+                        $callParticipant = $call->participants->where('user_id', $participant->id)->first();
+                        return [
+                            'id' => $participant->id,
+                            'name' => $participant->name,
+                            'username' => $participant->username,
+                            'profile_image' => $participant->profile ? $participant->profile_url : null,
+                            'avatar_url' => $participant->avatar_url,
+                            'status' => $callParticipant ? $callParticipant->status : 'invited'
+                        ];
+                    })->toArray();
+
                     // Create broadcast data
                     $broadcastData = [
                         'call_id' => $call->id,
@@ -277,8 +305,11 @@ class CallController extends BaseController
                         'answerer' => [
                             'id' => $user->id,
                             'name' => $user->name,
-                            'profile_image' => $user->profile_image ?? null
+                            'username' => $user->username,
+                            'profile_image' => $user->profile ? $user->profile_url : null,
+                            'avatar_url' => $user->avatar_url
                         ],
+                        'participants' => $participantsData,
                         'status' => $call->status,
                         'connected_at' => $call->connected_at ? $call->connected_at->toISOString() : null
                     ];
@@ -332,7 +363,7 @@ class CallController extends BaseController
 
         try {
             $user = $request->user();
-            $call->load(['participants.user', 'conversation']);
+            $call->load(['participants.user', 'conversation.users']);
 
             // Check if user is a participant
             $participant = $call->participants->where('user_id', $user->id)->first();
@@ -424,6 +455,19 @@ class CallController extends BaseController
 
                     Log::info('CallEnded Pusher instance created successfully');
 
+                    // Prepare participants data with full profile URLs
+                    $participantsData = $call->conversation->users->map(function ($participant) use ($call) {
+                        $callParticipant = $call->participants->where('user_id', $participant->id)->first();
+                        return [
+                            'id' => $participant->id,
+                            'name' => $participant->name,
+                            'username' => $participant->username,
+                            'profile_image' => $participant->profile ? $participant->profile_url : null,
+                            'avatar_url' => $participant->avatar_url,
+                            'status' => $callParticipant ? $callParticipant->status : 'left'
+                        ];
+                    })->toArray();
+
                     // Create broadcast data
                     $broadcastData = [
                         'call_id' => $call->id,
@@ -431,8 +475,11 @@ class CallController extends BaseController
                         'ended_by' => [
                             'id' => $user->id,
                             'name' => $user->name,
-                            'profile_image' => $user->profile_image ?? null
+                            'username' => $user->username,
+                            'profile_image' => $user->profile ? $user->profile_url : null,
+                            'avatar_url' => $user->avatar_url
                         ],
+                        'participants' => $participantsData,
                         'status' => $call->status,
                         'end_reason' => $call->end_reason,
                         'duration' => $call->duration,
@@ -482,7 +529,7 @@ class CallController extends BaseController
     {
         try {
             $user = $request->user();
-            $call->load(['participants.user', 'conversation']);
+            $call->load(['participants.user', 'conversation.users']);
 
             // Check if user is a participant
             $participant = $call->participants->where('user_id', $user->id)->first();
@@ -564,10 +611,24 @@ class CallController extends BaseController
 
                         Log::info('CallMissed Pusher instance created successfully');
 
+                        // Prepare participants data with full profile URLs
+                        $participantsData = $call->conversation->users->map(function ($participant) use ($call) {
+                            $callParticipant = $call->participants->where('user_id', $participant->id)->first();
+                            return [
+                                'id' => $participant->id,
+                                'name' => $participant->name,
+                                'username' => $participant->username,
+                                'profile_image' => $participant->profile ? $participant->profile_url : null,
+                                'avatar_url' => $participant->avatar_url,
+                                'status' => $callParticipant ? $callParticipant->status : 'missed'
+                            ];
+                        })->toArray();
+
                         // Create broadcast data
                         $broadcastData = [
                             'call_id' => $call->id,
                             'call_type' => $call->call_type,
+                            'participants' => $participantsData,
                             'status' => $call->status,
                             'end_reason' => $call->end_reason,
                             'ended_at' => $call->ended_at ? $call->ended_at->toISOString() : null

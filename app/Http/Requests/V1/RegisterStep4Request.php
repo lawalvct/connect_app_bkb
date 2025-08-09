@@ -18,6 +18,7 @@ class RegisterStep4Request extends FormRequest
         return [
             'email' => 'required|email|exists:users,email',
             'gender' => 'required|in:male,female,non_binary,other,prefer_not_to_say',
+            'country_id' => 'required|exists:countries,id',
         ];
     }
 

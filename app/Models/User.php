@@ -69,7 +69,8 @@ class User extends Authenticatable implements MustVerifyEmail
          'email_otp_expires_at',
          'deleted_at',
         'deleted_flag',
-        'registration_step'
+        'registration_step',
+        'phone'
     ];
 
     /**
@@ -306,6 +307,30 @@ class User extends Authenticatable implements MustVerifyEmail
     public function activeFcmTokens()
     {
         return $this->hasMany(UserFcmToken::class)->active();
+    }
+
+    /**
+     * Get the user verifications.
+     */
+    public function verifications()
+    {
+        return $this->hasMany(UserVerification::class);
+    }
+
+    /**
+     * Get the latest verification.
+     */
+    public function latestVerification()
+    {
+        return $this->hasOne(UserVerification::class)->latest();
+    }
+
+    /**
+     * Check if user is verified.
+     */
+    public function isVerified()
+    {
+        return $this->verifications()->approved()->exists();
     }
 
     /**

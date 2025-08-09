@@ -62,6 +62,8 @@ class AuthController extends BaseController
 public function register(RegisterRequest $request)
 {
     try {
+
+       // dd($request);
         // Verify reCAPTCHA
         // if (!$this->recaptchaService->verify($request->recaptcha_token)) {
         //     return $this->sendError('Bot verification failed. Please try again.', null, 400);
@@ -907,6 +909,7 @@ public function resendVerificationEmail(Request $request)
 
             $user->update([
                 'gender' => $data['gender'],
+                  'country_id' => $data['country_id'],
                 'registration_step' => 4
             ]);
 
