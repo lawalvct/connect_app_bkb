@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>CORS and API Test</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                margin: 20px;
+            }
+            .test-section {
+                margin: 20px 0;
+                padding: 15px;
+                border: 1px solid #ddd;
+                border-radius: 5px;
+            }
+            .success {
+                color: green;
+            }
+            .error {
+                color: red;
+            }
+            .info {
+                color: blue;
+            }
+            button {
+                padding: 10px 15px;
+                margin: 5px;
+                background: #007cba;
+                color: white;
+                border: none;
+                border-radius: 3px;
+                cursor: pointer;
+            }
+            button:hover {
+                background: #005a87;
+            }
+            .result {
+                background: #f5f5f5;
+                padding: 10px;
+                margin: 10px 0;
+                border-radius: 3px;
+                white-space: pre-wrap;
+                font-family: monospace;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Laravel API CORS and Route Testing</h1>
+
+        <div class="test-section">
+            <h2>🔧 Configuration Test</h2>
+            <p>
+                This page will test your Laravel API endpoints and CORS
+                configuration.
+            </p>
+            <p>
+                <strong>Backend URL:</strong>
+                <span id="backendUrl">http://localhost:8000</span>
+            </p>
+            <input
+                type="text"
+                id="urlInput"
+                placeholder="Enter your Laravel backend URL"
+                value="http://localhost:8000"
+                style="width: 300px; padding: 5px"
+            />
+            <button onclick="updateBackendUrl()">Update URL</button>
+        </div>
+
+        <div class="test-section">
+            <h2>🌐 CORS Preflight Test</h2>
+            <p>Testing if CORS OPTIONS requests work correctly...</p>
+            <button onclick="testCorsOptions()">Test CORS Preflight</button>
+            <div id="corsResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>📋 Route Existence Test</h2>
+            <p>Testing if registration endpoints are accessible...</p>
+            <button onclick="testRouteExists()">
+                Test /api/v1/register Route
+            </button>
+            <button onclick="testStep1Route()">
+                Test /api/v1/register/step-1 Route
+            </button>
+            <div id="routeResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>📝 Registration Test</h2>
+            <p>Testing actual registration with sample data...</p>
+            <button onclick="testRegistration()">
+                Test Simple Registration
+            </button>
+            <button onclick="testStep1Registration()">
+                Test Step-1 Registration
+            </button>
+            <div id="registerResult" class="result"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>📊 Full API Health Check</h2>
+            <p>Comprehensive API testing...</p>
+            <button onclick="runFullTest()">Run All Tests</button>
+            <div id="fullTestResult" class="result"></div>
+        </div>
+
+        <script>
+            let backendUrl = "http://localhost:8000";
+
+            function updateBackendUrl() {
+                backendUrl = document.getElementById("urlInput").value;
+                document.getElementById("backendUrl").textContent = backendUrl;
+                log("info", "Backend URL updated to: " + backendUrl);
+            }
+
+            function log(type, message, targetId = null) {
+                const timestamp = new Date().toLocaleTimeString();
+                const logMessage = `[${timestamp}] ${type.toUpperCase()}: ${message}\n`;
+
+                if (targetId) {
+                    const element = document.getElementById(targetId);
+                    element.textContent += logMessage;
+                    element.className = `result ${type}`;
+                }
+
+                console.log(logMessage);
+            }
+
+            async function testCorsOptions() {
+                const resultDiv = document.getElementById("corsResult");
+                resultDiv.textContent = "Testing CORS preflight...\n";
+
+                try {
+                    const response = await fetch(
+                        `${backendUrl}/api/v1/register`,
+                        {
+                            method: "OPTIONS",
+                            headers: {
+                                Origin: window.location.origin,
+                                "Access-Control-Request-Method": "POST",
+                                "Access-Control-Request-Headers":
+                                    "Content-Type, Authorization",
+                            },
+                        }
+                    );
+
+                    log(
+                        "info",
+                        `CORS OPTIONS Response Status: ${response.status}`,
+                        "corsResult"
+                    );
+                    log("info", `CORS Headers:`, "corsResult");
+
+                    response.headers.forEach((value, key) => {
+                        if (key.toLowerCase().includes("access-control")) {
+                            log("info", `  ${key}: ${value}`, "corsResult");
+                        }
+                    });
+
+                    if (response.status === 200) {
+                        log(
+                            "success",
+                            "✅ CORS preflight successful!",
+                            "corsResult"
+                        );
+                    } else {
+                        log("error", "❌ CORS preflight failed!", "corsResult");
+                    }
+                } catch (error) {
+                    log(
+                        "error",
+                        `❌ CORS test failed: ${error.message}`,
+                        "corsResult"
+                    );
+                }
+            }
+
+            async function testRouteExists() {
+                const resultDiv = document.getElementById("routeResult");
+                resultDiv.textContent = "Testing route existence...\n";
+
+                try {
+                    const response = await fetch(
+                        `${backendUrl}/api/v1/register`,
+                        {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                                Accept: "application/json",
+                                "X-Requested-With": "XMLHttpRequest",
+                            },
+                            body: JSON.stringify({}), // Empty body to trigger validation
+                        }
+                    );
+
+                    log(
+                        "info",
+                        `Route test response status: ${response.status}`,
+                        "routeResult"
+                    );
+
+                    if (response.status === 422) {
+                        log(
+                            "success",
+                            "✅ Route exists! (422 = validation error as expected)",
+                            "routeResult"
+                        );
+                    } else if (response.status === 405) {
+                        log(
+                            "error",
+                            "❌ Route not found (405 Method Not Allowed)",
+                            "routeResult"
+                        );
+                    } else {
+                        log(
+                            "info",
+                            `Route responded with status: ${response.status}`,
+                            "routeResult"
+                        );
+                    }
+
+                    const data = await response.json();
+                    log(
+                        "info",
+                        `Response: ${JSON.stringify(data, null, 2)}`,
+                        "routeResult"
+                    );
+                } catch (error) {
+                    log(
+                        "error",
+                        `❌ Route test failed: ${error.message}`,
+                        "routeResult"
+                    );
+                }
+            }
+
+            async function testStep1Route() {
+                const resultDiv = document.getElementById("routeResult");
+                resultDiv.textContent += "\nTesting step-1 route...\n";
+
+                try {
+                    const response = await fetch(
+                        `${backendUrl}/api/v1/register/step-1`,
+                        {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                                Accept: "application/json",
+                                "X-Requested-With": "XMLHttpRequest",
+                            },
+                            body: JSON.stringify({}), // Empty body to trigger validation
+                        }
+                    );
+
+                    log(
+                        "info",
+                        `Step-1 route test response status: ${response.status}`,
+                        "routeResult"
+                    );
+
+                    if (response.status === 422) {
+                        log(
+                            "success",
+                            "✅ Step-1 route exists! (422 = validation error as expected)",
+                            "routeResult"
+                        );
+                    } else if (response.status === 405) {
+                        log(
+                            "error",
+                            "❌ Step-1 route not found (405 Method Not Allowed)",
+                            "routeResult"
+                        );
+                    } else {
+                        log(
+                            "info",
+                            `Step-1 route responded with status: ${response.status}`,
+                            "routeResult"
+                        );
+                    }
+
+                    const data = await response.json();
+                    log(
+                        "info",
+                        `Step-1 Response: ${JSON.stringify(data, null, 2)}`,
+                        "routeResult"
+                    );
+                } catch (error) {
+                    log(
+                        "error",
+                        `❌ Step-1 route test failed: ${error.message}`,
+                        "routeResult"
+                    );
+                }
+            }
+
+            async function testRegistration() {
+                const resultDiv = document.getElementById("registerResult");
+                resultDiv.textContent =
+                    "Testing registration with sample data...\n";
+
+                const testData = {
+                    name: "Test User",
+                    email: "test@example.com",
+                    username: "testuser123",
+                    password: "password123",
+                    password_confirmation: "password123",
+                };
+
+                try {
+                    const response = await fetch(
+                        `${backendUrl}/api/v1/register`,
+                        {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                                Accept: "application/json",
+                                "X-Requested-With": "XMLHttpRequest",
+                            },
+                            body: JSON.stringify(testData),
+                        }
+                    );
+
+                    log(
+                        "info",
+                        `Registration response status: ${response.status}`,
+                        "registerResult"
+                    );
+
+                    const data = await response.json();
+                    log(
+                        "info",
+                        `Registration response: ${JSON.stringify(
+                            data,
+                            null,
+                            2
+                        )}`,
+                        "registerResult"
+                    );
+
+                    if (response.status === 201) {
+                        log(
+                            "success",
+                            "✅ Registration successful!",
+                            "registerResult"
+                        );
+                    } else if (response.status === 422) {
+                        log(
+                            "info",
+                            "ℹ️ Validation error (expected for test data)",
+                            "registerResult"
+                        );
+                    } else {
+                        log(
+                            "error",
+                            `❌ Registration failed with status: ${response.status}`,
+                            "registerResult"
+                        );
+                    }
+                } catch (error) {
+                    log(
+                        "error",
+                        `❌ Registration test failed: ${error.message}`,
+                        "registerResult"
+                    );
+                }
+            }
+
+            async function testStep1Registration() {
+                const resultDiv = document.getElementById("registerResult");
+                resultDiv.textContent += "\nTesting step-1 registration...\n";
+
+                const testData = {
+                    username: "testuser" + Date.now(),
+                    email: "test" + Date.now() + "@example.com",
+                    password: "password123",
+                    password_confirmation: "password123",
+                };
+
+                try {
+                    const response = await fetch(
+                        `${backendUrl}/api/v1/register/step-1`,
+                        {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                                Accept: "application/json",
+                                "X-Requested-With": "XMLHttpRequest",
+                            },
+                            body: JSON.stringify(testData),
+                        }
+                    );
+
+                    log(
+                        "info",
+                        `Step-1 registration response status: ${response.status}`,
+                        "registerResult"
+                    );
+
+                    const data = await response.json();
+                    log(
+                        "info",
+                        `Step-1 registration response: ${JSON.stringify(
+                            data,
+                            null,
+                            2
+                        )}`,
+                        "registerResult"
+                    );
+
+                    if (response.status === 200 || response.status === 201) {
+                        log(
+                            "success",
+                            "✅ Step-1 registration successful!",
+                            "registerResult"
+                        );
+                    } else if (response.status === 422) {
+                        log(
+                            "info",
+                            "ℹ️ Validation error in step-1",
+                            "registerResult"
+                        );
+                    } else {
+                        log(
+                            "error",
+                            `❌ Step-1 registration failed with status: ${response.status}`,
+                            "registerResult"
+                        );
+                    }
+                } catch (error) {
+                    log(
+                        "error",
+                        `❌ Step-1 registration test failed: ${error.message}`,
+                        "registerResult"
+                    );
+                }
+            }
+
+            async function runFullTest() {
+                const resultDiv = document.getElementById("fullTestResult");
+                resultDiv.textContent = "Running comprehensive API tests...\n";
+
+                log(
+                    "info",
+                    "🚀 Starting full API test suite...",
+                    "fullTestResult"
+                );
+
+                // Test 1: CORS
+                try {
+                    await testCorsOptions();
+                    log("success", "✅ CORS test completed", "fullTestResult");
+                } catch (error) {
+                    log(
+                        "error",
+                        "❌ CORS test failed: " + error.message,
+                        "fullTestResult"
+                    );
+                }
+
+                // Test 2: Routes
+                try {
+                    await testRouteExists();
+                    log(
+                        "success",
+                        "✅ Route existence test completed",
+                        "fullTestResult"
+                    );
+                } catch (error) {
+                    log(
+                        "error",
+                        "❌ Route test failed: " + error.message,
+                        "fullTestResult"
+                    );
+                }
+
+                // Test 3: Registration
+                try {
+                    await testRegistration();
+                    log(
+                        "success",
+                        "✅ Registration test completed",
+                        "fullTestResult"
+                    );
+                } catch (error) {
+                    log(
+                        "error",
+                        "❌ Registration test failed: " + error.message,
+                        "fullTestResult"
+                    );
+                }
+
+                log("info", "🏁 Full test suite completed!", "fullTestResult");
+            }
+
+            // Auto-test on page load
+            window.addEventListener("load", () => {
+                log(
+                    "info",
+                    "Page loaded. Click buttons to test your Laravel API."
+                );
+            });
+        </script>
+    </body>
+</html>
