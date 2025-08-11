@@ -34,6 +34,7 @@ return [
         'http://127.0.0.1:8080',       // Local IP Vue
         'https://stg.connectinc.app',  // Production frontend
         'https://dick-connect-app-1zqh.vercel.app',   // Staging frontend
+        '*',
         // For development, you can use '*' but it's not recommended for production
         // '*',
     ],

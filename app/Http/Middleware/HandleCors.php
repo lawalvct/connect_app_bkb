@@ -26,8 +26,9 @@ class HandleCors
             'http://localhost:8081',
             'http://127.0.0.1:3000',
             'http://127.0.0.1:8080',
-            'https://your-frontend-domain.com', // Replace with your actual domain
-            'https://your-staging-domain.com',  // Replace with your staging domain
+            'https://stg.connectinc.app',  // Production frontend
+        'https://dick-connect-app-1zqh.vercel.app',   // Staging frontend
+        '*',
         ];
 
         // For development, you can temporarily use '*' for any origin
