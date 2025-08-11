@@ -316,10 +316,10 @@ class MessageController extends BaseController
     {
         // Define max file sizes (in KB)
         $maxSizes = [
-            'image' => 5120,  // 5MB
+            'image' => 51200,  // 50MB
             'video' => 51200, // 50MB
-            'audio' => 10240, // 10MB
-            'file' => 20480,  // 20MB
+            'audio' => 51200, // 50MB
+            'file' => 51200,  // 50MB
         ];
 
         // Define allowed mime types
