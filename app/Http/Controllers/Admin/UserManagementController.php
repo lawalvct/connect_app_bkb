@@ -177,6 +177,30 @@ class UserManagementController extends Controller
             }
             */
 
+            // Add verification filtering
+            if ($request->filled('verification')) {
+                $verification = $request->get('verification');
+                if ($verification === 'verified') {
+                    // Users with approved verification
+                    $query->whereHas('verifications', function($q) {
+                        $q->where('admin_status', 'approved');
+                    });
+                } elseif ($verification === 'pending') {
+                    // Users with pending verification
+                    $query->whereHas('verifications', function($q) {
+                        $q->where('admin_status', 'pending');
+                    });
+                } elseif ($verification === 'rejected') {
+                    // Users with rejected verification
+                    $query->whereHas('verifications', function($q) {
+                        $q->where('admin_status', 'rejected');
+                    });
+                } elseif ($verification === 'none') {
+                    // Users without any verification submission
+                    $query->whereDoesntHave('verifications');
+                }
+            }
+
             // Add date range filtering
             if ($request->filled('date_from')) {
                 $dateFrom = $request->get('date_from');
@@ -252,6 +276,18 @@ class UserManagementController extends Controller
                     $user->status = 'suspended';
                 } else {
                     $user->status = 'active';
+                }
+
+                // Add verification status
+                $latestVerification = $user->latestVerification;
+                if ($latestVerification) {
+                    $user->verification_status = $latestVerification->admin_status;
+                    $user->verification_id = $latestVerification->id;
+                    $user->verification_date = $latestVerification->updated_at ? $latestVerification->updated_at->format('Y-m-d') : null;
+                } else {
+                    $user->verification_status = 'none';
+                    $user->verification_id = null;
+                    $user->verification_date = null;
                 }
 
                 // Format social circles data

@@ -4,7 +4,7 @@
 
 
 @section('content')
-    <div x-data="userManagement()" x-init="loadUsers(); loadSocialCircles(); loadCountries(); loadPendingVerificationsCount()">>>
+    <div x-data="userManagement()" x-init="loadUsers(); loadSocialCircles(); loadCountries(); loadPendingVerificationsCount()">
 
         <!-- Header with Export -->
         <div class="flex justify-between items-center mb-6">
@@ -63,9 +63,24 @@
 
         <!-- Filters and Search -->
         <div class="bg-white rounded-lg shadow-md mb-6">
-            <div class="p-6">
-                <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <!-- Filter Header with Toggle -->
+            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center cursor-pointer" @click="filtersVisible = !filtersVisible">
+                <div class="flex items-center space-x-2">
+                    <i class="fas fa-filter text-gray-500"></i>
+                    <h3 class="text-lg font-medium text-gray-700">Filters</h3>
+                    <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
+                          x-show="Object.values(filters).some(val => val !== '')">
+                        Filters Applied
+                    </span>
+                </div>
+                <div>
+                    <i class="fas" :class="filtersVisible ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                </div>
+            </div>
 
+            <!-- Filter Content -->
+            <div class="p-6" x-show="filtersVisible" x-transition>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <!-- Search -->
                     <div>
                         <label for="search" class="block text-sm font-medium text-gray-700 mb-1">Search Users</label>
@@ -101,6 +116,23 @@
                         </select>
                     </div>
 
+                    <!-- Verification Filter -->
+                    <div>
+                        <label for="verification" class="block text-sm font-medium text-gray-700 mb-1">Verification Status</label>
+                        <select id="verification"
+                                x-model="filters.verification"
+                                @change="loadUsers()"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary">
+                            <option value="">All Verification</option>
+                            <option value="verified">Verified</option>
+                            <option value="pending">Pending Verification</option>
+                            <option value="rejected">Rejected Verification</option>
+                            <option value="none">Not Submitted</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <!-- Country Filter -->
                     <div>
                         <label for="country" class="block text-sm font-medium text-gray-700 mb-1">Country</label>
@@ -157,15 +189,21 @@
                                 <option value="{{ $circle->id }}">{{ $circle->name }}</option>
                             @endforeach
                         </select>
-
-
-                        </select>
                     </div>
-
                 </div>
 
+                <!-- Clear Filters Button -->
+                <div class="mt-4 flex justify-end">
+                    <button @click="clearAllFilters()"
+                            class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center">
+                        <i class="fas fa-times mr-2"></i>
+                        Clear All Filters
+                    </button>
+                </div>
+
+
                 <!-- Quick Stats -->
-                <div class="mt-6 grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div class="mt-6 grid grid-cols-2 md:grid-cols-6 gap-4">
                     <div class="text-center p-3 bg-blue-50 rounded-md">
                         <p class="text-sm text-blue-600">Total Users</p>
                         <p class="text-xl font-bold text-blue-900" x-text="formatNumber(stats.total)">0</p>
@@ -186,7 +224,10 @@
                         <p class="text-sm text-purple-600">In Circles</p>
                         <p class="text-xl font-bold text-purple-900" x-text="formatNumber(stats.with_social_circles)">0</p>
                     </div>
-
+                    <div class="text-center p-3 bg-orange-50 rounded-md">
+                        <p class="text-sm text-orange-600">Verified</p>
+                        <p class="text-xl font-bold text-orange-900" x-text="formatNumber(stats.verified_users)">0</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -338,25 +379,25 @@
 
                                 <!-- Verification Status -->
                                 <td class="px-6 py-4 whitespace-nowrap">
-                                    <template x-if="user.is_verified">
+                                    <template x-if="user.verification_status === 'approved'">
                                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                             <i class="fas fa-check-circle mr-1"></i>
                                             Verified
                                         </span>
                                     </template>
-                                    <template x-if="user.latest_verification && user.latest_verification.admin_status === 'pending'">
+                                    <template x-if="user.verification_status === 'pending'">
                                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
                                             <i class="fas fa-clock mr-1"></i>
                                             Pending
                                         </span>
                                     </template>
-                                    <template x-if="user.latest_verification && user.latest_verification.admin_status === 'rejected'">
+                                    <template x-if="user.verification_status === 'rejected'">
                                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                                             <i class="fas fa-times-circle mr-1"></i>
                                             Rejected
                                         </span>
                                     </template>
-                                    <template x-if="!user.is_verified && (!user.latest_verification || user.latest_verification.admin_status === 'rejected')">
+                                    <template x-if="user.verification_status === 'none'">
                                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                                             <i class="fas fa-user mr-1"></i>
                                             Not Submitted
@@ -706,11 +747,12 @@
                 search: '',
                 status: '',
                 country: '',
-                // verified: '', // Commented out
+                verification: '',
                 social_circles: '',
                 date_from: '',
                 date_to: ''
             },
+            filtersVisible: true, // Start with filters visible
             searchTimeout: null,
              async loadSocialCircles() {
                 console.log('Loading social circles...');
@@ -849,6 +891,19 @@
                 if (page >= 1 && page <= this.pagination.last_page) {
                     this.loadUsers(page);
                 }
+            },
+
+            clearAllFilters() {
+                this.filters = {
+                    search: '',
+                    status: '',
+                    country: '',
+                    verification: '',
+                    social_circles: '',
+                    date_from: '',
+                    date_to: ''
+                };
+                this.loadUsers();
             },
 
             async loadUsers(page = 1) {

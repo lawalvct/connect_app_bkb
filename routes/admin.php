@@ -182,6 +182,29 @@ Route::prefix('admin')->name('admin.')->group(function () {
                     ], 500);
                 }
             });
+
+            // Debug route for users API
+            Route::get('/test-users', function () {
+                try {
+                    $userCount = \App\Models\User::count();
+                    $users = \App\Models\User::take(3)->get(['id', 'name', 'email']);
+
+                    return response()->json([
+                        'success' => true,
+                        'user_count' => $userCount,
+                        'sample_users' => $users,
+                        'authenticated_admin' => auth('admin')->check(),
+                        'admin_user' => auth('admin')->user() ? auth('admin')->user()->name : 'None',
+                        'test_timestamp' => now()->toISOString()
+                    ]);
+                } catch (\Exception $e) {
+                    return response()->json([
+                        'success' => false,
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString()
+                    ], 500);
+                }
+            });
         });
 
         // User Management
