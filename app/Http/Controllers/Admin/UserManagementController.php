@@ -281,22 +281,46 @@ class UserManagementController extends Controller
     public function getSocialCircles()
     {
         try {
+            // Get social circles with proper error handling
             $socialCircles = \App\Models\SocialCircle::withoutGlobalScope('active')
                 ->where('is_active', true)
-                ->where('deleted_flag', 'N')
+                ->whereNull('deleted_at') // Use soft deletes instead of deleted_flag
                 ->orderBy('order_by', 'asc')
                 ->get(['id', 'name', 'color']);
 
+            // Log for debugging
+            \Illuminate\Support\Facades\Log::info('Social circles loaded: ' . $socialCircles->count());
+
             return response()->json([
+                'success' => true,
                 'social_circles' => $socialCircles
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Error fetching social circles: ' . $e->getMessage());
-            return response()->json([
-                'error' => 'Failed to load social circles',
-                'social_circles' => []
-            ], 200);
+            \Illuminate\Support\Facades\Log::error('Error fetching social circles: ' . $e->getMessage());
+
+            // Try without deleted_at filter as backup
+            try {
+                $socialCircles = \App\Models\SocialCircle::withoutGlobalScope('active')
+                    ->where('is_active', true)
+                    ->orderBy('id', 'asc')
+                    ->get(['id', 'name', 'color']);
+
+                \Illuminate\Support\Facades\Log::info('Social circles loaded (backup method): ' . $socialCircles->count());
+
+                return response()->json([
+                    'success' => true,
+                    'social_circles' => $socialCircles
+                ]);
+            } catch (\Exception $e2) {
+                \Illuminate\Support\Facades\Log::error('Backup method also failed: ' . $e2->getMessage());
+
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Failed to load social circles',
+                    'social_circles' => []
+                ], 200);
+            }
         }
     }
 

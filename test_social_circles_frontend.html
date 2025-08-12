@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Social Circles Test</title>
+        <meta name="csrf-token" content="test-token" />
+        <script
+            src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"
+            defer
+        ></script>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                padding: 20px;
+            }
+            .container {
+                max-width: 800px;
+                margin: 0 auto;
+            }
+            .test-result {
+                margin: 10px 0;
+                padding: 10px;
+                border-radius: 5px;
+            }
+            .success {
+                background-color: #d4edda;
+                border: 1px solid #c3e6cb;
+                color: #155724;
+            }
+            .error {
+                background-color: #f8d7da;
+                border: 1px solid #f5c6cb;
+                color: #721c24;
+            }
+            .info {
+                background-color: #d1ecf1;
+                border: 1px solid #bee5eb;
+                color: #0c5460;
+            }
+            select {
+                padding: 8px;
+                margin: 10px 0;
+                width: 300px;
+            }
+            button {
+                padding: 10px 20px;
+                margin: 5px;
+                background: #007bff;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+            }
+            button:hover {
+                background: #0056b3;
+            }
+            .loading {
+                color: #666;
+                font-style: italic;
+            }
+            #logs {
+                background: #f8f9fa;
+                border: 1px solid #dee2e6;
+                padding: 15px;
+                border-radius: 5px;
+                height: 200px;
+                overflow-y: auto;
+                margin: 10px 0;
+                font-family: monospace;
+                font-size: 12px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container" x-data="socialCirclesTest()" x-init="init()">
+            <h1>Social Circles Loading Test</h1>
+
+            <div class="test-result info">
+                <strong>Purpose:</strong> Test the social circles API endpoint
+                that the admin interface uses
+            </div>
+
+            <button @click="testSocialCircles()" :disabled="loading">
+                <span x-show="!loading">Test Social Circles API</span>
+                <span x-show="loading" class="loading">Loading...</span>
+            </button>
+
+            <button @click="clearLogs()">Clear Logs</button>
+
+            <div
+                class="test-result"
+                :class="status === 'success' ? 'success' : status === 'error' ? 'error' : 'info'"
+            >
+                <strong>Status:</strong> <span x-text="statusMessage"></span>
+            </div>
+
+            <div>
+                <label for="socialCircleSelect"
+                    ><strong>Social Circles Dropdown:</strong></label
+                >
+                <select id="socialCircleSelect" x-model="selectedCircle">
+                    <option value="">All Users</option>
+                    <option value="has_circles">With Circles</option>
+                    <option value="no_circles">No Circles</option>
+                    <optgroup label="Specific Circles">
+                        <template
+                            x-for="circle in socialCircles"
+                            :key="circle.id"
+                        >
+                            <option
+                                :value="circle.id"
+                                x-text="circle.name"
+                            ></option>
+                        </template>
+                    </optgroup>
+                </select>
+                <div x-text="`Selected: ${selectedCircle || 'None'}`"></div>
+            </div>
+
+            <div>
+                <strong>Social Circles Data:</strong>
+                <div x-show="socialCircles.length > 0">
+                    <p>
+                        Found <span x-text="socialCircles.length"></span> social
+                        circles:
+                    </p>
+                    <ul>
+                        <template
+                            x-for="circle in socialCircles"
+                            :key="circle.id"
+                        >
+                            <li
+                                x-text="`ID: ${circle.id}, Name: ${circle.name}, Color: ${circle.color}`"
+                            ></li>
+                        </template>
+                    </ul>
+                </div>
+                <div x-show="socialCircles.length === 0" class="error">
+                    No social circles loaded
+                </div>
+            </div>
+
+            <div>
+                <strong>Debug Logs:</strong>
+                <div id="logs" x-html="logs"></div>
+            </div>
+        </div>
+
+        <script>
+            function socialCirclesTest() {
+                return {
+                    loading: false,
+                    status: "info",
+                    statusMessage: "Ready to test",
+                    socialCircles: [],
+                    selectedCircle: "",
+                    logs: "",
+
+                    init() {
+                        this.log(
+                            "Page loaded. Ready to test social circles API."
+                        );
+
+                        // Auto-test on load
+                        setTimeout(() => {
+                            this.testSocialCircles();
+                        }, 1000);
+                    },
+
+                    log(message) {
+                        const timestamp = new Date().toLocaleTimeString();
+                        this.logs += `[${timestamp}] ${message}<br>`;
+
+                        // Auto-scroll to bottom
+                        setTimeout(() => {
+                            const logsElement = document.getElementById("logs");
+                            logsElement.scrollTop = logsElement.scrollHeight;
+                        }, 100);
+                    },
+
+                    clearLogs() {
+                        this.logs = "";
+                    },
+
+                    async testSocialCircles() {
+                        this.loading = true;
+                        this.status = "info";
+                        this.statusMessage = "Testing...";
+                        this.log("Starting social circles API test...");
+
+                        try {
+                            this.log(
+                                "Making fetch request to /admin/api/social-circles"
+                            );
+
+                            const response = await fetch(
+                                "/admin/api/social-circles",
+                                {
+                                    method: "GET",
+                                    headers: {
+                                        Accept: "application/json",
+                                        "Content-Type": "application/json",
+                                        "X-CSRF-TOKEN": document
+                                            .querySelector(
+                                                'meta[name="csrf-token"]'
+                                            )
+                                            .getAttribute("content"),
+                                    },
+                                    credentials: "same-origin",
+                                }
+                            );
+
+                            this.log(
+                                `Response status: ${response.status} ${response.statusText}`
+                            );
+                            this.log(
+                                `Response headers: ${JSON.stringify(
+                                    Object.fromEntries(response.headers)
+                                )}`
+                            );
+
+                            if (!response.ok) {
+                                const errorText = await response.text();
+                                this.log(`Error response body: ${errorText}`);
+                                throw new Error(
+                                    `HTTP ${response.status}: ${response.statusText}`
+                                );
+                            }
+
+                            const data = await response.json();
+                            this.log(
+                                `Response data: ${JSON.stringify(
+                                    data,
+                                    null,
+                                    2
+                                )}`
+                            );
+
+                            if (data.success && data.social_circles) {
+                                this.socialCircles = data.social_circles;
+                                this.status = "success";
+                                this.statusMessage = `Successfully loaded ${this.socialCircles.length} social circles`;
+                                this.log(
+                                    `SUCCESS: Loaded ${this.socialCircles.length} social circles`
+                                );
+                            } else {
+                                this.status = "error";
+                                this.statusMessage =
+                                    "API response format unexpected";
+                                this.log(
+                                    "ERROR: Response does not contain expected social_circles data"
+                                );
+                            }
+                        } catch (error) {
+                            this.log(`ERROR: ${error.message}`);
+                            this.status = "error";
+                            this.statusMessage = `Failed: ${error.message}`;
+                            this.socialCircles = [];
+                        } finally {
+                            this.loading = false;
+                        }
+                    },
+                };
+            }
+        </script>
+    </body>
+</html>

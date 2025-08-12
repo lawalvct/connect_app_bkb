@@ -142,11 +142,13 @@
                             <option value="">All Users</option>
                             <option value="has_circles">With Circles</option>
                             <option value="no_circles">No Circles</option>
-                            <optgroup label="Specific Circles">
-                                <template x-for="circle in socialCircles" :key="circle.id">
-                                    <option :value="circle.id" x-text="circle.name"></option>
-                                </template>
-                            </optgroup>
+                            <!-- Direct options without template to ensure they render -->
+                            @foreach(\App\Models\SocialCircle::all() as $circle)
+                                <option value="{{ $circle->id }}">{{ $circle->name }}</option>
+                            @endforeach
+                        </select>
+                        <!-- Debug information -->
+                        
                         </select>
                     </div>
 
@@ -483,6 +485,99 @@
                 date_to: ''
             },
             searchTimeout: null,
+             async loadSocialCircles() {
+                console.log('Loading social circles...');
+
+                // Set dummy data first for testing - this ensures the binding works
+                this.socialCircles = [
+                    { id: 0, name: "Loading..." }
+                ];
+
+                try {
+                    // Direct AJAX request using XMLHttpRequest for maximum compatibility
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('GET', '/admin/api/social-circles', true);
+                    xhr.setRequestHeader('Accept', 'application/json');
+                    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+
+                    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+                    if (csrfToken) {
+                        xhr.setRequestHeader('X-CSRF-TOKEN', csrfToken);
+                    }
+
+                    xhr.onload = () => {
+                        if (xhr.status >= 200 && xhr.status < 300) {
+                            console.log('Success response:', xhr.responseText);
+
+                            try {
+                                const data = JSON.parse(xhr.responseText);
+                                console.log('Parsed data:', data);
+
+                                // Clear the dummy data
+                                this.socialCircles = [];
+
+                                // Check if we have social circles and it's an array
+                                if (data && data.social_circles && Array.isArray(data.social_circles)) {
+                                    console.log(`Found ${data.social_circles.length} social circles`);
+
+                                    // Add each item individually to ensure reactivity
+                                    data.social_circles.forEach(circle => {
+                                        if (circle && circle.id && circle.name) {
+                                            this.socialCircles.push({
+                                                id: circle.id,
+                                                name: circle.name
+                                            });
+                                        }
+                                    });
+
+                                    console.log('Social circles loaded:', this.socialCircles);
+
+                                    // Add this to help debug
+                                    document.getElementById('social-circles-debug').textContent =
+                                        `Loaded ${this.socialCircles.length} circles`;
+                                } else {
+                                    console.error('No social circles found in data:', data);
+                                    document.getElementById('social-circles-debug').textContent =
+                                        'No social circles in response';
+                                }
+                            } catch (e) {
+                                console.error('JSON parse error:', e);
+                                document.getElementById('social-circles-debug').textContent =
+                                    'Error parsing JSON: ' + e.message;
+                            }
+                        } else {
+                            console.error('HTTP error:', xhr.status, xhr.statusText);
+                            document.getElementById('social-circles-debug').textContent =
+                                `Error: ${xhr.status} ${xhr.statusText}`;
+                        }
+                    };
+
+                    xhr.onerror = () => {
+                        console.error('Network error');
+                        document.getElementById('social-circles-debug').textContent = 'Network error';
+                    };
+
+                    xhr.send();
+
+                } catch (error) {
+                    console.error('Failed to load social circles:', error);
+                    document.getElementById('social-circles-debug').textContent =
+                        'Error: ' + error.message;
+                }
+            },
+
+            debounceSearch() {
+                clearTimeout(this.searchTimeout);
+                this.searchTimeout = setTimeout(() => {
+                    this.loadUsers();
+                }, 500);
+            },
+
+            changePage(page) {
+                if (page >= 1 && page <= this.pagination.last_page) {
+                    this.loadUsers(page);
+                }
+            },
 
             async loadUsers(page = 1) {
                 this.loading = true;
@@ -532,40 +627,7 @@
                 }
             },
 
-            async loadSocialCircles() {
-                try {
-                    const response = await fetch('/admin/api/social-circles', {
-                        method: 'GET',
-                        headers: {
-                            'Accept': 'application/json',
-                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                        }
-                    });
 
-                    if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                    }
-
-                    const data = await response.json();
-                    this.socialCircles = data.social_circles || [];
-                } catch (error) {
-                    console.error('Failed to load social circles:', error);
-                    this.socialCircles = [];
-                }
-            },
-
-            debounceSearch() {
-                clearTimeout(this.searchTimeout);
-                this.searchTimeout = setTimeout(() => {
-                    this.loadUsers();
-                }, 500);
-            },
-
-            changePage(page) {
-                if (page >= 1 && page <= this.pagination.last_page) {
-                    this.loadUsers(page);
-                }
-            },
 
             getPageNumbers() {
                 const pages = [];

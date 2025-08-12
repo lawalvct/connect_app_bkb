@@ -41,6 +41,7 @@ return Application::configure(basePath: dirname(__DIR__))
           // Disable CSRF for API routes
           $middleware->validateCsrfTokens(except: [
             'api/*',
+            'admin/api/*', // Exclude admin API routes from CSRF validation
         ]);
         $middleware->append(\App\Http\Middleware\HandleCors::class);
 
