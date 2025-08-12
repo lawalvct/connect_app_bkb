@@ -209,9 +209,20 @@ class UserManagementController extends Controller
                 }
             }
 
-            // Get paginated results - include social circles relationship
-            $users = $query->select(['id', 'name', 'email', 'profile', 'profile_url', 'is_active', 'is_banned', 'banned_until', 'created_at', 'email_verified_at'])
-                ->with(['socialCircles:id,name,color']) // Load social circles with only needed fields
+            // Add country filtering
+            if ($request->filled('country')) {
+                $countryId = $request->get('country');
+                if (is_numeric($countryId)) {
+                    $query->where('country_id', $countryId);
+                }
+            }
+
+            // Get paginated results - include social circles and country relationships
+            $users = $query->select(['id', 'name', 'email', 'profile', 'profile_url', 'is_active', 'is_banned', 'banned_until', 'created_at', 'email_verified_at', 'country_id'])
+                ->with([
+                    'socialCircles:id,name,color', // Load social circles with only needed fields
+                    'country:id,name,code' // Load country data including code for flag URLs
+                ])
                 ->withCount('socialCircles') // Count social circles
                 ->orderBy('created_at', 'desc')
                 ->paginate(20);

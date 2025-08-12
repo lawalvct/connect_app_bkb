@@ -4,7 +4,7 @@
 
 
 @section('content')
-    <div x-data="userManagement()" x-init="loadUsers(); loadSocialCircles()">
+    <div x-data="userManagement()" x-init="loadUsers(); loadSocialCircles(); loadCountries()">>
 
         <!-- Header with Export -->
         <div class="flex justify-between items-center mb-6">
@@ -53,7 +53,7 @@
         <!-- Filters and Search -->
         <div class="bg-white rounded-lg shadow-md mb-6">
             <div class="p-6">
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
 
                     <!-- Search -->
                     <div>
@@ -90,20 +90,19 @@
                         </select>
                     </div>
 
-                    <!-- Verification Filter - COMMENTED OUT -->
-                    <!--
+                    <!-- Country Filter -->
                     <div>
-                        <label for="verified" class="block text-sm font-medium text-gray-700 mb-1">Verification</label>
-                        <select id="verified"
-                                x-model="filters.verified"
+                        <label for="country" class="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                        <select id="country"
+                                x-model="filters.country"
                                 @change="loadUsers()"
                                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary">
-                            <option value="">All Users</option>
-                            <option value="1">Verified</option>
-                            <option value="0">Unverified</option>
+                            <option value="">All Countries</option>
+                            <template x-for="country in countries" :key="country.id">
+                                <option :value="country.id" x-text="country.name"></option>
+                            </template>
                         </select>
                     </div>
-                    -->
 
                     <!-- Date Range Filter -->
                     <div>
@@ -142,13 +141,13 @@
                             <option value="">All Users</option>
                             <option value="has_circles">With Circles</option>
                             <option value="no_circles">No Circles</option>
-                            <!-- Direct options without template to ensure they render -->
+
                             @foreach(\App\Models\SocialCircle::all() as $circle)
                                 <option value="{{ $circle->id }}">{{ $circle->name }}</option>
                             @endforeach
                         </select>
-                        <!-- Debug information -->
-                        
+
+
                         </select>
                     </div>
 
@@ -158,23 +157,23 @@
                 <div class="mt-6 grid grid-cols-2 md:grid-cols-5 gap-4">
                     <div class="text-center p-3 bg-blue-50 rounded-md">
                         <p class="text-sm text-blue-600">Total Users</p>
-                        <p class="text-xl font-bold text-blue-900" x-text="stats.total || '0'">0</p>
+                        <p class="text-xl font-bold text-blue-900" x-text="formatNumber(stats.total)">0</p>
                     </div>
                     <div class="text-center p-3 bg-green-50 rounded-md">
                         <p class="text-sm text-green-600">Active</p>
-                        <p class="text-xl font-bold text-green-900" x-text="stats.active || '0'">0</p>
+                        <p class="text-xl font-bold text-green-900" x-text="formatNumber(stats.active)">0</p>
                     </div>
                     <div class="text-center p-3 bg-yellow-50 rounded-md">
                         <p class="text-sm text-yellow-600">Suspended</p>
-                        <p class="text-xl font-bold text-yellow-900" x-text="stats.suspended || '0'">0</p>
+                        <p class="text-xl font-bold text-yellow-900" x-text="formatNumber(stats.suspended)">0</p>
                     </div>
                     <div class="text-center p-3 bg-red-50 rounded-md">
                         <p class="text-sm text-red-600">Banned</p>
-                        <p class="text-xl font-bold text-red-900" x-text="stats.banned || '0'">0</p>
+                        <p class="text-xl font-bold text-red-900" x-text="formatNumber(stats.banned)">0</p>
                     </div>
                     <div class="text-center p-3 bg-purple-50 rounded-md">
                         <p class="text-sm text-purple-600">In Circles</p>
-                        <p class="text-xl font-bold text-purple-900" x-text="stats.with_social_circles || '0'">0</p>
+                        <p class="text-xl font-bold text-purple-900" x-text="formatNumber(stats.with_social_circles)">0</p>
                     </div>
 
                 </div>
@@ -219,8 +218,8 @@
 
                     <!-- Pagination Info -->
                     <div class="text-sm text-gray-600">
-                        Showing <span x-text="pagination.from || 0"></span> to <span x-text="pagination.to || 0"></span>
-                        of <span x-text="pagination.total || 0"></span> users
+                        Showing <span x-text="formatNumber(pagination.from || 0)"></span> to <span x-text="formatNumber(pagination.to || 0)"></span>
+                        of <span x-text="formatNumber(pagination.total || 0)"></span> users
                     </div>
                 </div>
             </div>
@@ -244,6 +243,9 @@
                             </th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 Contact
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Country
                             </th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 Status
@@ -297,6 +299,21 @@
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <div class="text-sm text-gray-900" x-text="user.email"></div>
                                     <div class="text-sm text-gray-500" x-text="user.phone || 'No phone'"></div>
+                                </td>
+
+                                <!-- Country -->
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        <template x-if="user.country">
+                                            <div class="flex items-center">
+
+                                                <span class="text-sm text-gray-900" x-text="user.country.name"></span>
+                                            </div>
+                                        </template>
+                                        <template x-if="!user.country">
+                                            <span class="text-sm text-gray-400 italic">No country</span>
+                                        </template>
+                                    </div>
                                 </td>
 
                                 <!-- Status -->
@@ -402,7 +419,7 @@
 
                         <!-- Empty State -->
                         <tr x-show="users.length === 0">
-                            <td colspan="8" class="px-6 py-12 text-center text-gray-500">
+                            <td colspan="9" class="px-6 py-12 text-center text-gray-500">
                                 <i class="fas fa-users text-4xl mb-4"></i>
                                 <p class="text-lg">No users found</p>
                                 <p class="text-sm">Try adjusting your search filters</p>
@@ -430,8 +447,8 @@
                     <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
                         <div>
                             <p class="text-sm text-gray-700">
-                                Showing <span x-text="pagination.from"></span> to <span x-text="pagination.to"></span> of
-                                <span x-text="pagination.total"></span> results
+                                Showing <span x-text="formatNumber(pagination.from)"></span> to <span x-text="formatNumber(pagination.to)"></span> of
+                                <span x-text="formatNumber(pagination.total)"></span> results
                             </p>
                         </div>
                         <div>
@@ -473,12 +490,14 @@
             stats: {},
             pagination: {},
             socialCircles: [],
+            countries: [],
             loading: false,
             selectedUsers: [],
             exportOpen: false,
             filters: {
                 search: '',
                 status: '',
+                country: '',
                 // verified: '', // Commented out
                 social_circles: '',
                 date_from: '',
@@ -563,6 +582,33 @@
                     console.error('Failed to load social circles:', error);
                     document.getElementById('social-circles-debug').textContent =
                         'Error: ' + error.message;
+                }
+            },
+
+            async loadCountries() {
+                try {
+                    const response = await fetch('/admin/api/countries', {
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                        }
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+
+                    const data = await response.json();
+
+                    // Handle both the new format and legacy format
+                    if (data.success && Array.isArray(data.countries)) {
+                        this.countries = data.countries;
+                    } else if (Array.isArray(data)) {
+                        this.countries = data;
+                    }
+                } catch (error) {
+                    console.error('Failed to load countries:', error);
+                    this.countries = [];
                 }
             },
 
@@ -667,6 +713,10 @@
 
             formatDate(dateString) {
                 return new Date(dateString).toLocaleDateString();
+            },
+
+            formatNumber(number) {
+                return Number(number || 0).toLocaleString();
             },
 
             async suspendUser(user) {

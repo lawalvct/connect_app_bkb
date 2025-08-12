@@ -33,4 +33,28 @@ class Country extends Model
     {
         return $this->hasMany(User::class);
     }
+
+    /**
+     * Get the flag URL for the country
+     */
+    public function getFlagUrlAttribute()
+    {
+        if (!$this->code) {
+            return null;
+        }
+
+        return 'https://flagcdn.com/w80/' . strtolower($this->code) . '.png';
+    }
+
+    /**
+     * Get a small flag URL for the country
+     */
+    public function getSmallFlagUrlAttribute()
+    {
+        if (!$this->code) {
+            return null;
+        }
+
+        return 'https://flagcdn.com/w40/' . strtolower($this->code) . '.png';
+    }
 }

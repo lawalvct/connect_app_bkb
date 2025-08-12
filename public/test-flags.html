@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Flag Test</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                margin: 20px;
+            }
+            .flag-test {
+                margin: 10px 0;
+                padding: 10px;
+                border: 1px solid #ddd;
+                border-radius: 5px;
+            }
+            .flag {
+                width: 40px;
+                height: 27px;
+                margin-right: 10px;
+                border: 1px solid #ccc;
+            }
+            .flag-small {
+                width: 24px;
+                height: 16px;
+                margin-right: 8px;
+                border: 1px solid #ccc;
+            }
+            .error {
+                color: red;
+            }
+            .success {
+                color: green;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Flag URL Test</h1>
+
+        <div class="flag-test">
+            <h3>Sample Flags (w40 size):</h3>
+            <p>
+                <img
+                    src="https://flagcdn.com/w40/us.png"
+                    alt="USA"
+                    class="flag"
+                />
+                United States (US)
+            </p>
+            <p>
+                <img
+                    src="https://flagcdn.com/w40/ca.png"
+                    alt="Canada"
+                    class="flag"
+                />
+                Canada (CA)
+            </p>
+            <p>
+                <img
+                    src="https://flagcdn.com/w40/gb.png"
+                    alt="United Kingdom"
+                    class="flag"
+                />
+                United Kingdom (GB)
+            </p>
+            <p>
+                <img
+                    src="https://flagcdn.com/w40/de.png"
+                    alt="Germany"
+                    class="flag"
+                />
+                Germany (DE)
+            </p>
+            <p>
+                <img
+                    src="https://flagcdn.com/w40/fr.png"
+                    alt="France"
+                    class="flag"
+                />
+                France (FR)
+            </p>
+            <p>
+                <img
+                    src="https://flagcdn.com/w40/jp.png"
+                    alt="Japan"
+                    class="flag"
+                />
+                Japan (JP)
+            </p>
+            <p>
+                <img
+                    src="https://flagcdn.com/w40/au.png"
+                    alt="Australia"
+                    class="flag"
+                />
+                Australia (AU)
+            </p>
+            <p>
+                <img
+                    src="https://flagcdn.com/w40/ng.png"
+                    alt="Nigeria"
+                    class="flag"
+                />
+                Nigeria (NG)
+            </p>
+        </div>
+
+        <div class="flag-test">
+            <h3>Small Flags (w20 size):</h3>
+            <p>
+                <img
+                    src="https://flagcdn.com/w20/us.png"
+                    alt="USA"
+                    class="flag-small"
+                />
+                United States (US)
+            </p>
+            <p>
+                <img
+                    src="https://flagcdn.com/w20/ca.png"
+                    alt="Canada"
+                    class="flag-small"
+                />
+                Canada (CA)
+            </p>
+            <p>
+                <img
+                    src="https://flagcdn.com/w20/gb.png"
+                    alt="United Kingdom"
+                    class="flag-small"
+                />
+                United Kingdom (GB)
+            </p>
+            <p>
+                <img
+                    src="https://flagcdn.com/w20/de.png"
+                    alt="Germany"
+                    class="flag-small"
+                />
+                Germany (DE)
+            </p>
+        </div>
+
+        <div class="flag-test">
+            <h3>Test API Call:</h3>
+            <button onclick="testCountriesAPI()">Test Countries API</button>
+            <div id="api-result"></div>
+        </div>
+
+        <script>
+            async function testCountriesAPI() {
+                const resultDiv = document.getElementById("api-result");
+                resultDiv.innerHTML = "Loading...";
+
+                try {
+                    const response = await fetch("/admin/api/countries");
+                    const data = await response.json();
+
+                    if (data.success && data.countries) {
+                        resultDiv.innerHTML = `
+                        <div class="success">✅ API Success! Found ${
+                            data.countries.length
+                        } countries</div>
+                        <div>Sample countries with flags:</div>
+                        <div style="margin-top: 10px;">
+                            ${data.countries
+                                .slice(0, 5)
+                                .map(
+                                    (country) =>
+                                        `<p>
+                                    <img src="https://flagcdn.com/w20/${country.code?.toLowerCase()}.png"
+                                         alt="${
+                                             country.name
+                                         }" class="flag-small"
+                                         onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';">
+                                    <span style="display:none">🌍</span>
+                                    ${country.name} (${
+                                            country.code || "No code"
+                                        })
+                                </p>`
+                                )
+                                .join("")}
+                            ${
+                                data.countries.length > 5
+                                    ? `<p>... and ${
+                                          data.countries.length - 5
+                                      } more</p>`
+                                    : ""
+                            }
+                        </div>
+                    `;
+                    } else {
+                        resultDiv.innerHTML =
+                            '<div class="error">❌ API Error: ' +
+                            JSON.stringify(data) +
+                            "</div>";
+                    }
+                } catch (error) {
+                    resultDiv.innerHTML =
+                        '<div class="error">❌ Network Error: ' +
+                        error.message +
+                        "</div>";
+                }
+            }
+
+            // Test flag loading errors
+            document.querySelectorAll("img").forEach((img) => {
+                img.addEventListener("error", function () {
+                    console.log("Failed to load flag:", this.src);
+                    this.style.border = "1px solid red";
+                    this.title = "Failed to load flag";
+                });
+
+                img.addEventListener("load", function () {
+                    console.log("Successfully loaded flag:", this.src);
+                    this.style.border = "1px solid green";
+                });
+            });
+        </script>
+    </body>
+</html>

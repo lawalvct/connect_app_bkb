@@ -496,11 +496,15 @@ class AdManagementController extends Controller
     public function getCountries()
     {
         try {
-            $countries = \App\Models\Country::select('id', 'name')
+            $countries = \App\Models\Country::select('id', 'name', 'code')
+                ->where('active', true)
                 ->orderBy('name')
                 ->get();
 
-            return response()->json($countries);
+            return response()->json([
+                'success' => true,
+                'countries' => $countries
+            ]);
         } catch (\Exception $e) {
             return response()->json(['error' => 'Failed to load countries'], 500);
         }
