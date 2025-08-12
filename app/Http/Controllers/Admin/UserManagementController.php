@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\UsersExport;
@@ -217,13 +218,17 @@ class UserManagementController extends Controller
                 }
             }
 
-            // Get paginated results - include social circles and country relationships
+            // Get paginated results - include social circles, country relationships, and verification data
             $users = $query->select(['id', 'name', 'email', 'profile', 'profile_url', 'is_active', 'is_banned', 'banned_until', 'created_at', 'email_verified_at', 'country_id'])
                 ->with([
                     'socialCircles:id,name,color', // Load social circles with only needed fields
-                    'country:id,name,code' // Load country data including code for flag URLs
+                    'country:id,name,code', // Load country data including code for flag URLs
+                    'verifications' => function($query) {
+                        $query->select('id', 'user_id', 'admin_status', 'submitted_at', 'reviewed_at', 'reviewed_by', 'admin_reason')
+                              ->orderBy('submitted_at', 'desc');
+                    }
                 ])
-                ->withCount('socialCircles') // Count social circles
+                ->withCount(['socialCircles', 'verifications']) // Count social circles and verifications
                 ->orderBy('created_at', 'desc')
                 ->paginate(20);
 
@@ -254,6 +259,18 @@ class UserManagementController extends Controller
                 $user->social_circles_names = $user->socialCircles ? $user->socialCircles->pluck('name')->toArray() : [];
                 $user->social_circles_colors = $user->socialCircles ? $user->socialCircles->pluck('color', 'name')->toArray() : [];
 
+                // Format verification data
+                $user->verification_status = 'none';
+                $user->has_pending_verification = false;
+                $user->latest_verification = null;
+
+                if ($user->verifications && $user->verifications->count() > 0) {
+                    $latestVerification = $user->verifications->first();
+                    $user->latest_verification = $latestVerification;
+                    $user->verification_status = $latestVerification->status;
+                    $user->has_pending_verification = $latestVerification->status === 'pending';
+                }
+
                 return $user;
             });
 
@@ -264,7 +281,10 @@ class UserManagementController extends Controller
                 'suspended' => User::where('is_active', false)->count(),
                 'banned' => User::where('is_banned', true)->count(),
                 'with_social_circles' => User::whereHas('socialCircles')->count(),
-                'avg_social_circles' => round(User::withCount('socialCircles')->get()->avg('social_circles_count') ?? 0, 1)
+                'avg_social_circles' => round(User::withCount('socialCircles')->get()->avg('social_circles_count') ?? 0, 1),
+                'pending_verifications' => \App\Models\UserVerification::where('admin_status', 'pending')->count(),
+                'verified_users' => \App\Models\UserVerification::where('admin_status', 'approved')->distinct('user_id')->count(),
+                'rejected_verifications' => \App\Models\UserVerification::where('admin_status', 'rejected')->count()
             ];
 
             Log::info('UserManagement getUsers success - returning ' . $users->count() . ' users');
@@ -517,7 +537,7 @@ class UserManagementController extends Controller
 
             // If dataset is large (>1000 records), use queue processing
             if ($totalRecords > 1000) {
-                $user = auth()->user();
+                $user = Auth::user();
 
                 // Dispatch the export job
                 \App\Jobs\ExportUsersJob::dispatch($filters, $format, $user);

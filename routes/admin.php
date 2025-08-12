@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\UserManagementController;
+use App\Http\Controllers\Admin\VerificationController;
 use App\Http\Controllers\Admin\StoryManagementController;
 use App\Http\Controllers\Admin\AdManagementController;
 use App\Http\Controllers\Admin\SubscriptionManagementController;
@@ -44,6 +45,14 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::patch('/users/{user}/status', [UserManagementController::class, 'updateStatus']);
             Route::patch('/users/bulk-status', [UserManagementController::class, 'bulkUpdateStatus']);
             Route::post('/users/{user}/reset-password', [UserManagementController::class, 'resetPassword']);
+
+            // Verification Management API
+            Route::prefix('verifications')->group(function () {
+                Route::get('/pending-count', [\App\Http\Controllers\Admin\VerificationController::class, 'getPendingCount']);
+                Route::get('/pending', [\App\Http\Controllers\Admin\VerificationController::class, 'getPendingVerifications']);
+                Route::post('/{verification}/approve', [\App\Http\Controllers\Admin\VerificationController::class, 'approveVerification']);
+                Route::post('/{verification}/reject', [\App\Http\Controllers\Admin\VerificationController::class, 'rejectVerification']);
+            });
 
             // Post Management API
             Route::get('/posts', [\App\Http\Controllers\Admin\PostManagementController::class, 'getPosts']);
