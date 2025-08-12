@@ -15,10 +15,10 @@ class HandleCors
      */
     public function handle(Request $request, Closure $next): Response
     {
-        // Get the origin from the request
-        $origin = $request->headers->get('Origin');
+        // For browser Postman compatibility, allow all origins in development
+        $allowOrigin = '*';
 
-        // Define allowed origins
+        // Define allowed origins for production
         $allowedOrigins = [
             'http://localhost:3000',
             'http://localhost:3001',
@@ -27,33 +27,33 @@ class HandleCors
             'http://127.0.0.1:3000',
             'http://127.0.0.1:8080',
             'https://stg.connectinc.app',  // Production frontend
-        'https://dick-connect-app-1zqh.vercel.app',   // Staging frontend
-        '*',
+            'https://dick-connect-app-1zqh.vercel.app',   // Staging frontend
+            '*', // Allow all origins for development/testing
         ];
 
-        // For development, you can temporarily use '*' for any origin
-        // Comment out the above array and uncomment the line below for development
-        // $allowedOrigins = ['*'];
+        // Get the origin from the request
+        $origin = $request->headers->get('Origin');
 
-        // Determine the origin to allow
-        $allowOrigin = '*';
-        if (in_array($origin, $allowedOrigins)) {
-            $allowOrigin = $origin;
-        } elseif (in_array('*', $allowedOrigins)) {
-            $allowOrigin = '*';
+        // In development, allow all origins for browser Postman
+        if (app()->environment('local') || in_array('*', $allowedOrigins)) {
+            $allowOrigin = $origin ?: '*';
+        } else {
+            // In production, check allowed origins
+            if (in_array($origin, $allowedOrigins)) {
+                $allowOrigin = $origin;
+            }
         }
 
-        // Handle preflight OPTIONS requests
+        // Handle preflight OPTIONS requests immediately
         if ($request->getMethod() === 'OPTIONS') {
-            return response('', 200, [
-                'Access-Control-Allow-Origin' => $allowOrigin,
-                'Access-Control-Allow-Methods' => 'GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD',
-                'Access-Control-Allow-Headers' => 'Origin, Content-Type, Authorization, Accept, X-Requested-With, X-CSRF-TOKEN, X-XSRF-TOKEN, Cache-Control, Pragma',
-                'Access-Control-Expose-Headers' => 'Authorization, Content-Type, X-Requested-With, X-CSRF-TOKEN',
-                'Access-Control-Max-Age' => '86400',
-                'Access-Control-Allow-Credentials' => 'true',
-                'Vary' => 'Origin',
-            ]);
+            return response('', 200)
+                ->header('Access-Control-Allow-Origin', $allowOrigin)
+                ->header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD')
+                ->header('Access-Control-Allow-Headers', 'Origin, Content-Type, Authorization, Accept, X-Requested-With, X-CSRF-TOKEN, X-XSRF-TOKEN, Cache-Control, Pragma')
+                ->header('Access-Control-Expose-Headers', 'Authorization, Content-Type, X-Requested-With, X-CSRF-TOKEN')
+                ->header('Access-Control-Max-Age', '86400')
+                ->header('Access-Control-Allow-Credentials', 'true')
+                ->header('Vary', 'Origin, Access-Control-Request-Method, Access-Control-Request-Headers');
         }
 
         $response = $next($request);
@@ -64,7 +64,7 @@ class HandleCors
         $response->headers->set('Access-Control-Allow-Headers', 'Origin, Content-Type, Authorization, Accept, X-Requested-With, X-CSRF-TOKEN, X-XSRF-TOKEN, Cache-Control, Pragma');
         $response->headers->set('Access-Control-Expose-Headers', 'Authorization, Content-Type, X-Requested-With, X-CSRF-TOKEN');
         $response->headers->set('Access-Control-Allow-Credentials', 'true');
-        $response->headers->set('Vary', 'Origin');
+        $response->headers->set('Vary', 'Origin, Access-Control-Request-Method, Access-Control-Request-Headers');
 
         return $response;
     }

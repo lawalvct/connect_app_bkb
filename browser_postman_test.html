@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Browser Postman Test Fix</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                margin: 20px;
+                background: #f5f5f5;
+            }
+            .container {
+                max-width: 800px;
+                margin: 0 auto;
+                background: white;
+                padding: 20px;
+                border-radius: 8px;
+                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            }
+            .test-section {
+                margin: 20px 0;
+                padding: 15px;
+                border: 1px solid #ddd;
+                border-radius: 5px;
+                background: #fafafa;
+            }
+            .success {
+                color: #28a745;
+                font-weight: bold;
+            }
+            .error {
+                color: #dc3545;
+                font-weight: bold;
+            }
+            .info {
+                color: #17a2b8;
+            }
+            button {
+                padding: 12px 20px;
+                margin: 8px;
+                background: #007bff;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 14px;
+            }
+            button:hover {
+                background: #0056b3;
+            }
+            button:disabled {
+                background: #6c757d;
+                cursor: not-allowed;
+            }
+            .result {
+                background: #f8f9fa;
+                padding: 15px;
+                margin: 10px 0;
+                border-radius: 4px;
+                border-left: 4px solid #007bff;
+                white-space: pre-wrap;
+                font-family: "Courier New", monospace;
+                font-size: 12px;
+                max-height: 300px;
+                overflow-y: auto;
+            }
+            .status-indicator {
+                display: inline-block;
+                width: 12px;
+                height: 12px;
+                border-radius: 50%;
+                margin-right: 8px;
+            }
+            .status-success {
+                background: #28a745;
+            }
+            .status-error {
+                background: #dc3545;
+            }
+            .status-warning {
+                background: #ffc107;
+            }
+            input[type="text"] {
+                padding: 8px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                width: 300px;
+                margin: 5px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🔧 Browser Postman CORS Fix Test</h1>
+            <p>
+                <strong
+                    >This page will help you test if the CORS fixes work for
+                    browser-based requests (like browser Postman).</strong
+                >
+            </p>
+
+            <div class="test-section">
+                <h2>🌐 Backend Configuration</h2>
+                <label>Backend URL:</label>
+                <input
+                    type="text"
+                    id="backendUrl"
+                    value="http://localhost:8000"
+                    placeholder="http://localhost:8000"
+                />
+                <button onclick="updateUrl()">Update URL</button>
+                <p>
+                    <small
+                        >Change this if your Laravel server runs on a different
+                        port.</small
+                    >
+                </p>
+            </div>
+
+            <div class="test-section">
+                <h2>1️⃣ API Route Test</h2>
+                <p>Testing if API v1 routes are accessible...</p>
+                <button onclick="testDebugRoute()">Test Debug Route</button>
+                <div id="debugResult" class="result"></div>
+            </div>
+
+            <div class="test-section">
+                <h2>2️⃣ CORS Preflight Test</h2>
+                <p>
+                    Testing OPTIONS requests (what browser Postman sends
+                    first)...
+                </p>
+                <button onclick="testCorsOptions()">Test CORS Preflight</button>
+                <div id="corsResult" class="result"></div>
+            </div>
+
+            <div class="test-section">
+                <h2>3️⃣ Registration Endpoint Test</h2>
+                <p>
+                    Testing the actual registration endpoint with validation...
+                </p>
+                <button onclick="testRegistrationEmpty()">
+                    Test Empty Data (Should get 422)
+                </button>
+                <button onclick="testRegistrationValid()">
+                    Test Valid Data
+                </button>
+                <div id="registerResult" class="result"></div>
+            </div>
+
+            <div class="test-section">
+                <h2>4️⃣ Full Browser Postman Simulation</h2>
+                <p>Simulating exactly what browser Postman does...</p>
+                <button onclick="simulateBrowserPostman()">
+                    Run Browser Postman Simulation
+                </button>
+                <div id="browserPostmanResult" class="result"></div>
+            </div>
+
+            <div class="test-section">
+                <h2>📋 Test Summary</h2>
+                <div id="testSummary">
+                    <p>Click the test buttons above to see results here.</p>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            let backendUrl = "http://localhost:8000";
+            let testResults = {};
+
+            function updateUrl() {
+                backendUrl = document.getElementById("backendUrl").value;
+                log(
+                    "info",
+                    `Backend URL updated to: ${backendUrl}`,
+                    "debugResult"
+                );
+            }
+
+            function log(type, message, targetId, updateSummary = true) {
+                const timestamp = new Date().toLocaleTimeString();
+                const logMessage = `[${timestamp}] ${message}\n`;
+
+                if (targetId) {
+                    const element = document.getElementById(targetId);
+                    element.textContent += logMessage;
+                    element.scrollTop = element.scrollHeight;
+                }
+
+                console.log(`${type.toUpperCase()}: ${message}`);
+
+                if (updateSummary) {
+                    updateTestSummary(type, message);
+                }
+            }
+
+            function updateTestSummary(type, message) {
+                const summary = document.getElementById("testSummary");
+                const indicator =
+                    type === "success" ? "🟢" : type === "error" ? "🔴" : "🟡";
+                const time = new Date().toLocaleTimeString();
+
+                summary.innerHTML += `<p>${indicator} [${time}] ${message}</p>`;
+            }
+
+            async function testDebugRoute() {
+                const resultDiv = document.getElementById("debugResult");
+                resultDiv.textContent = "Testing debug route...\n";
+
+                try {
+                    const response = await fetch(
+                        `${backendUrl}/api/v1/debug-routes`,
+                        {
+                            method: "GET",
+                            headers: {
+                                Accept: "application/json",
+                                "X-Requested-With": "XMLHttpRequest",
+                            },
+                        }
+                    );
+
+                    log(
+                        "info",
+                        `Debug route response status: ${response.status}`,
+                        "debugResult"
+                    );
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        log(
+                            "success",
+                            "✅ Debug route working!",
+                            "debugResult"
+                        );
+                        log(
+                            "info",
+                            `Response: ${JSON.stringify(data, null, 2)}`,
+                            "debugResult",
+                            false
+                        );
+                        testResults.debugRoute = true;
+                    } else {
+                        log(
+                            "error",
+                            `❌ Debug route failed with status: ${response.status}`,
+                            "debugResult"
+                        );
+                        testResults.debugRoute = false;
+                    }
+                } catch (error) {
+                    log(
+                        "error",
+                        `❌ Debug route failed: ${error.message}`,
+                        "debugResult"
+                    );
+                    testResults.debugRoute = false;
+                }
+            }
+
+            async function testCorsOptions() {
+                const resultDiv = document.getElementById("corsResult");
+                resultDiv.textContent = "Testing CORS preflight...\n";
+
+                try {
+                    const response = await fetch(
+                        `${backendUrl}/api/v1/register`,
+                        {
+                            method: "OPTIONS",
+                            headers: {
+                                Origin: window.location.origin,
+                                "Access-Control-Request-Method": "POST",
+                                "Access-Control-Request-Headers":
+                                    "Content-Type, Authorization",
+                            },
+                        }
+                    );
+
+                    log(
+                        "info",
+                        `CORS OPTIONS response status: ${response.status}`,
+                        "corsResult"
+                    );
+
+                    // Check CORS headers
+                    const corsHeaders = {};
+                    response.headers.forEach((value, key) => {
+                        if (key.toLowerCase().includes("access-control")) {
+                            corsHeaders[key] = value;
+                        }
+                    });
+
+                    log(
+                        "info",
+                        `CORS Headers: ${JSON.stringify(corsHeaders, null, 2)}`,
+                        "corsResult",
+                        false
+                    );
+
+                    if (response.status === 200) {
+                        log(
+                            "success",
+                            "✅ CORS preflight successful!",
+                            "corsResult"
+                        );
+                        testResults.cors = true;
+                    } else {
+                        log("error", "❌ CORS preflight failed!", "corsResult");
+                        testResults.cors = false;
+                    }
+                } catch (error) {
+                    log(
+                        "error",
+                        `❌ CORS test failed: ${error.message}`,
+                        "corsResult"
+                    );
+                    testResults.cors = false;
+                }
+            }
+
+            async function testRegistrationEmpty() {
+                const resultDiv = document.getElementById("registerResult");
+                resultDiv.textContent =
+                    "Testing registration with empty data...\n";
+
+                try {
+                    const response = await fetch(
+                        `${backendUrl}/api/v1/register`,
+                        {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                                Accept: "application/json",
+                                "X-Requested-With": "XMLHttpRequest",
+                            },
+                            body: JSON.stringify({}), // Empty body to trigger validation
+                        }
+                    );
+
+                    log(
+                        "info",
+                        `Registration (empty) response status: ${response.status}`,
+                        "registerResult"
+                    );
+
+                    const data = await response.json();
+                    log(
+                        "info",
+                        `Response: ${JSON.stringify(data, null, 2)}`,
+                        "registerResult",
+                        false
+                    );
+
+                    if (response.status === 422) {
+                        log(
+                            "success",
+                            "✅ Registration validation working! (422 expected)",
+                            "registerResult"
+                        );
+                        testResults.validation = true;
+                    } else if (response.status === 405) {
+                        log(
+                            "error",
+                            "❌ Still getting 405 Method Not Allowed!",
+                            "registerResult"
+                        );
+                        testResults.validation = false;
+                    } else {
+                        log(
+                            "info",
+                            `Unexpected status: ${response.status}`,
+                            "registerResult"
+                        );
+                        testResults.validation = false;
+                    }
+                } catch (error) {
+                    log(
+                        "error",
+                        `❌ Registration test failed: ${error.message}`,
+                        "registerResult"
+                    );
+                    testResults.validation = false;
+                }
+            }
+
+            async function testRegistrationValid() {
+                const resultDiv = document.getElementById("registerResult");
+                resultDiv.textContent +=
+                    "\nTesting registration with valid data...\n";
+
+                const testData = {
+                    name: "Test User",
+                    email: `test${Date.now()}@example.com`,
+                    username: `testuser${Date.now()}`,
+                    password: "password123",
+                    password_confirmation: "password123",
+                };
+
+                try {
+                    const response = await fetch(
+                        `${backendUrl}/api/v1/register`,
+                        {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                                Accept: "application/json",
+                                "X-Requested-With": "XMLHttpRequest",
+                            },
+                            body: JSON.stringify(testData),
+                        }
+                    );
+
+                    log(
+                        "info",
+                        `Registration (valid) response status: ${response.status}`,
+                        "registerResult"
+                    );
+
+                    const data = await response.json();
+                    log(
+                        "info",
+                        `Response: ${JSON.stringify(data, null, 2)}`,
+                        "registerResult",
+                        false
+                    );
+
+                    if (response.status === 201 || response.status === 200) {
+                        log(
+                            "success",
+                            "✅ Registration successful!",
+                            "registerResult"
+                        );
+                        testResults.register = true;
+                    } else {
+                        log(
+                            "info",
+                            `Registration responded with: ${response.status}`,
+                            "registerResult"
+                        );
+                        testResults.register = false;
+                    }
+                } catch (error) {
+                    log(
+                        "error",
+                        `❌ Registration test failed: ${error.message}`,
+                        "registerResult"
+                    );
+                    testResults.register = false;
+                }
+            }
+
+            async function simulateBrowserPostman() {
+                const resultDiv = document.getElementById(
+                    "browserPostmanResult"
+                );
+                resultDiv.textContent =
+                    "Simulating browser Postman workflow...\n";
+
+                log(
+                    "info",
+                    "🚀 Starting browser Postman simulation...",
+                    "browserPostmanResult"
+                );
+
+                // Step 1: OPTIONS preflight (automatic)
+                log(
+                    "info",
+                    "Step 1: Sending OPTIONS preflight request...",
+                    "browserPostmanResult"
+                );
+                await testCorsOptions();
+
+                // Step 2: Actual POST request
+                log(
+                    "info",
+                    "Step 2: Sending POST request...",
+                    "browserPostmanResult"
+                );
+                await testRegistrationEmpty();
+
+                // Summary
+                log(
+                    "info",
+                    "📊 Browser Postman simulation complete!",
+                    "browserPostmanResult"
+                );
+
+                if (testResults.cors && testResults.validation) {
+                    log(
+                        "success",
+                        "✅ Browser Postman should work now!",
+                        "browserPostmanResult"
+                    );
+                } else {
+                    log(
+                        "error",
+                        "❌ Browser Postman may still have issues",
+                        "browserPostmanResult"
+                    );
+                }
+            }
+
+            // Auto-run basic test on page load
+            window.addEventListener("load", () => {
+                setTimeout(() => {
+                    testDebugRoute();
+                }, 1000);
+            });
+        </script>
+    </body>
+</html>

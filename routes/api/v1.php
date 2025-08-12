@@ -22,6 +22,29 @@ use App\Http\Controllers\API\V1\StreamController;
 use App\Http\Controllers\API\V1\StreamPaymentController;
 use App\Http\Controllers\API\V1\StreamChatMvpController;
 
+// Handle OPTIONS requests for CORS preflight (browser Postman compatibility)
+Route::options('{any}', function () {
+    return response('', 200)
+        ->header('Access-Control-Allow-Origin', '*')
+        ->header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD')
+        ->header('Access-Control-Allow-Headers', 'Origin, Content-Type, Authorization, Accept, X-Requested-With, X-CSRF-TOKEN, X-XSRF-TOKEN, Cache-Control, Pragma')
+        ->header('Access-Control-Expose-Headers', 'Authorization, Content-Type, X-Requested-With, X-CSRF-TOKEN')
+        ->header('Access-Control-Max-Age', '86400')
+        ->header('Access-Control-Allow-Credentials', 'true');
+})->where('any', '.*');
+
+// Debug route to test API v1 routes are working
+Route::get('/debug-routes', function () {
+    return response()->json([
+        'success' => true,
+        'message' => 'API v1 routes are working perfectly!',
+        'timestamp' => now(),
+        'environment' => app()->environment(),
+        'routes_registered' => count(Route::getRoutes()),
+        'cors_enabled' => true
+    ]);
+});
+
 // MVP Testing Routes (Unprotected for testing with rate limiting)
 Route::prefix('streams/{id}')->middleware('throttle:30,1')->group(function () {
     // Get stream chats (unprotected)
