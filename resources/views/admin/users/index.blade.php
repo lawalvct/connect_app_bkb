@@ -752,7 +752,7 @@
                 date_from: '',
                 date_to: ''
             },
-            filtersVisible: true, // Start with filters visible
+            filtersVisible: false, // Start with filters collapsed
             searchTimeout: null,
              async loadSocialCircles() {
                 console.log('Loading social circles...');
