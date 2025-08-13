@@ -203,7 +203,7 @@
 
 
                 <!-- Quick Stats -->
-                <div class="mt-6 grid grid-cols-2 md:grid-cols-6 gap-4">
+                <div class="mt-6 grid grid-cols-2 md:grid-cols-7 gap-4">
                     <div class="text-center p-3 bg-blue-50 rounded-md">
                         <p class="text-sm text-blue-600">Total Users</p>
                         <p class="text-xl font-bold text-blue-900" x-text="formatNumber(stats.total)">0</p>
@@ -227,6 +227,10 @@
                     <div class="text-center p-3 bg-orange-50 rounded-md">
                         <p class="text-sm text-orange-600">Verified</p>
                         <p class="text-xl font-bold text-orange-900" x-text="formatNumber(stats.verified_users)">0</p>
+                    </div>
+                    <div class="text-center p-3 bg-teal-50 rounded-md">
+                        <p class="text-sm text-teal-600">Connected</p>
+                        <p class="text-xl font-bold text-teal-900" x-text="formatNumber(stats.users_with_connections)">0</p>
                     </div>
                 </div>
             </div>
@@ -298,6 +302,9 @@
                             </th>
                              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 Social Circles
+                            </th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Connections
                             </th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 Country
@@ -378,6 +385,22 @@
                                     </div>
                                     <div class="text-xs text-gray-400 italic" x-show="!user.social_circles_names || user.social_circles_names.length === 0">
                                         No circles
+                                    </div>
+                                </td>
+
+                                <!-- Connections -->
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900">
+                                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                            <i class="fas fa-handshake mr-1"></i>
+                                            <span x-text="user.connections_count || 0"></span>
+                                        </span>
+                                    </div>
+                                    <div class="text-xs text-gray-500 mt-1" x-show="user.connections_count > 0">
+                                        {{-- <span x-text="user.connections_count === 1 ? '1 connection' : `${user.connections_count} connections`"></span> --}}
+                                    </div>
+                                    <div class="text-xs text-gray-400 italic" x-show="!user.connections_count || user.connections_count === 0">
+
                                     </div>
                                 </td>
 

@@ -263,6 +263,9 @@ class UserManagementController extends Controller
                 $user->posts_count = 0;
                 $user->streams_count = 0;
 
+                // Add connection count using the helper method
+                $user->connections_count = \App\Helpers\UserRequestsHelper::getConnectionCount($user->id);
+
                 // Add profile picture using the same logic as UserResource
                 $user->profile_picture = $this->getProfileUrl($user);
 
@@ -320,7 +323,22 @@ class UserManagementController extends Controller
                 'avg_social_circles' => round(User::withCount('socialCircles')->get()->avg('social_circles_count') ?? 0, 1),
                 'pending_verifications' => \App\Models\UserVerification::where('admin_status', 'pending')->count(),
                 'verified_users' => \App\Models\UserVerification::where('admin_status', 'approved')->distinct('user_id')->count(),
-                'rejected_verifications' => \App\Models\UserVerification::where('admin_status', 'rejected')->count()
+                'rejected_verifications' => \App\Models\UserVerification::where('admin_status', 'rejected')->count(),
+                'total_connections' => \App\Models\UserRequest::where('status', 'accepted')
+                    ->where('sender_status', 'accepted')
+                    ->where('receiver_status', 'accepted')
+                    ->count(),
+                'users_with_connections' => \App\Models\User::whereHas('sentRequests', function($q) {
+                        $q->where('status', 'accepted')
+                          ->where('sender_status', 'accepted')
+                          ->where('receiver_status', 'accepted');
+                    })
+                    ->orWhereHas('receivedRequests', function($q) {
+                        $q->where('status', 'accepted')
+                          ->where('sender_status', 'accepted')
+                          ->where('receiver_status', 'accepted');
+                    })
+                    ->count()
             ];
 
             Log::info('UserManagement getUsers success - returning ' . $users->count() . ' users');

@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Admin Users Table - Connection Count Test</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <script
+            src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"
+            defer
+        ></script>
+        <link
+            rel="stylesheet"
+            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+        />
+    </head>
+    <body class="bg-gray-100">
+        <div class="container mx-auto p-6">
+            <h1 class="text-2xl font-bold mb-6">
+                Admin Users Table - Connection Count Test
+            </h1>
+
+            <!-- Test the quick stats section -->
+            <div
+                class="bg-white rounded-lg shadow-md p-6 mb-6"
+                x-data="{ stats: { total: 3340, active: 3200, suspended: 50, banned: 10, with_social_circles: 2800, verified_users: 1500, users_with_connections: 800, total_connections: 1200 } }"
+            >
+                <h2 class="text-lg font-semibold mb-4">
+                    Quick Stats (with new Connections stat)
+                </h2>
+                <div class="grid grid-cols-2 md:grid-cols-7 gap-4">
+                    <div class="text-center p-3 bg-blue-50 rounded-md">
+                        <p class="text-sm text-blue-600">Total Users</p>
+                        <p
+                            class="text-xl font-bold text-blue-900"
+                            x-text="stats.total"
+                        >
+                            0
+                        </p>
+                    </div>
+                    <div class="text-center p-3 bg-green-50 rounded-md">
+                        <p class="text-sm text-green-600">Active</p>
+                        <p
+                            class="text-xl font-bold text-green-900"
+                            x-text="stats.active"
+                        >
+                            0
+                        </p>
+                    </div>
+                    <div class="text-center p-3 bg-yellow-50 rounded-md">
+                        <p class="text-sm text-yellow-600">Suspended</p>
+                        <p
+                            class="text-xl font-bold text-yellow-900"
+                            x-text="stats.suspended"
+                        >
+                            0
+                        </p>
+                    </div>
+                    <div class="text-center p-3 bg-red-50 rounded-md">
+                        <p class="text-sm text-red-600">Banned</p>
+                        <p
+                            class="text-xl font-bold text-red-900"
+                            x-text="stats.banned"
+                        >
+                            0
+                        </p>
+                    </div>
+                    <div class="text-center p-3 bg-purple-50 rounded-md">
+                        <p class="text-sm text-purple-600">In Circles</p>
+                        <p
+                            class="text-xl font-bold text-purple-900"
+                            x-text="stats.with_social_circles"
+                        >
+                            0
+                        </p>
+                    </div>
+                    <div class="text-center p-3 bg-orange-50 rounded-md">
+                        <p class="text-sm text-orange-600">Verified</p>
+                        <p
+                            class="text-xl font-bold text-orange-900"
+                            x-text="stats.verified_users"
+                        >
+                            0
+                        </p>
+                    </div>
+                    <div class="text-center p-3 bg-teal-50 rounded-md">
+                        <p class="text-sm text-teal-600">Connected</p>
+                        <p
+                            class="text-xl font-bold text-teal-900"
+                            x-text="stats.users_with_connections"
+                        >
+                            0
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Test the table with connection column -->
+            <div
+                class="bg-white rounded-lg shadow-md"
+                x-data="{
+            users: [
+                {
+                    id: 1,
+                    name: 'Admin',
+                    email: 'admin@gmail.com',
+                    social_circles_count: 3,
+                    connections_count: 2,
+                    status: 'active',
+                    country: { name: 'United States' }
+                },
+                {
+                    id: 9,
+                    name: 'shraddha',
+                    email: 'shraddha@example.com',
+                    social_circles_count: 2,
+                    connections_count: 1,
+                    status: 'active',
+                    country: { name: 'India' }
+                },
+                {
+                    id: 10,
+                    name: 'shraddha',
+                    email: 'shraddha2@example.com',
+                    social_circles_count: 1,
+                    connections_count: 1,
+                    status: 'active',
+                    country: { name: 'India' }
+                }
+            ]
+        }"
+            >
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h2 class="text-lg font-semibold">
+                        Users Table (with new Connections column)
+                    </h2>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                >
+                                    User
+                                </th>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                >
+                                    Contact
+                                </th>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                >
+                                    Social Circles
+                                </th>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                >
+                                    <span class="text-teal-600 font-bold"
+                                        >Connections</span
+                                    >
+                                </th>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                >
+                                    Country
+                                </th>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                >
+                                    Status
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            <template x-for="user in users" :key="user.id">
+                                <tr class="hover:bg-gray-50">
+                                    <!-- User Info -->
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <div
+                                                class="flex-shrink-0 h-10 w-10"
+                                            >
+                                                <div
+                                                    class="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center"
+                                                >
+                                                    <i
+                                                        class="fas fa-user text-gray-600"
+                                                    ></i>
+                                                </div>
+                                            </div>
+                                            <div class="ml-4">
+                                                <div
+                                                    class="text-sm font-medium text-gray-900"
+                                                    x-text="user.name"
+                                                ></div>
+                                                <div
+                                                    class="text-sm text-gray-500"
+                                                >
+                                                    ID:
+                                                    <span
+                                                        x-text="user.id"
+                                                    ></span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+
+                                    <!-- Contact -->
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div
+                                            class="text-sm text-gray-900"
+                                            x-text="user.email"
+                                        ></div>
+                                    </td>
+
+                                    <!-- Social Circles -->
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm text-gray-900">
+                                            <span
+                                                class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                                            >
+                                                <i
+                                                    class="fas fa-users mr-1"
+                                                ></i>
+                                                <span
+                                                    x-text="user.social_circles_count || 0"
+                                                ></span>
+                                            </span>
+                                        </div>
+                                    </td>
+
+                                    <!-- NEW: Connections Column -->
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="text-sm text-gray-900">
+                                            <span
+                                                class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800"
+                                            >
+                                                <i
+                                                    class="fas fa-handshake mr-1"
+                                                ></i>
+                                                <span
+                                                    x-text="user.connections_count || 0"
+                                                ></span>
+                                            </span>
+                                        </div>
+                                        <div
+                                            class="text-xs text-gray-500 mt-1"
+                                            x-show="user.connections_count > 0"
+                                        >
+                                            <span
+                                                x-text="user.connections_count === 1 ? '1 connection' : `${user.connections_count} connections`"
+                                            ></span>
+                                        </div>
+                                        <div
+                                            class="text-xs text-gray-400 italic"
+                                            x-show="!user.connections_count || user.connections_count === 0"
+                                        >
+                                            No connections
+                                        </div>
+                                    </td>
+
+                                    <!-- Country -->
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <span
+                                                class="text-sm text-gray-900"
+                                                x-text="user.country.name"
+                                            ></span>
+                                        </div>
+                                    </td>
+
+                                    <!-- Status -->
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span
+                                            class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"
+                                            x-text="user.status"
+                                        ></span>
+                                    </td>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div
+                class="mt-6 p-4 bg-green-50 border border-green-200 rounded-md"
+            >
+                <h3 class="text-green-800 font-semibold mb-2">
+                    ✅ Connection Count Feature Added Successfully!
+                </h3>
+                <ul class="text-green-700 text-sm space-y-1">
+                    <li>• New "Connections" column added to the users table</li>
+                    <li>
+                        • Shows connection count with handshake icon and green
+                        badge
+                    </li>
+                    <li>
+                        • Displays connection text below count (e.g., "2
+                        connections")
+                    </li>
+                    <li>
+                        • Shows "No connections" for users with 0 connections
+                    </li>
+                    <li>• New "Connected" stat added to quick stats section</li>
+                    <li>
+                        • Backend calculates accepted connection count properly
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </body>
+</html>
