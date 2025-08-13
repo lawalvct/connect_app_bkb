@@ -26,6 +26,11 @@ class NotificationController extends Controller
         return view('admin.notifications.push.index');
     }
 
+    public function subscriptionIndex()
+    {
+        return view('admin.notifications.subscription');
+    }
+
     public function sendPushNotification(Request $request)
     {
         $request->validate([
@@ -590,6 +595,198 @@ class NotificationController extends Controller
         return response()->json([
             'success' => true,
             'target_count' => $count
+        ]);
+    }
+
+    // Admin FCM Token Management
+    public function subscribeAdmin(Request $request)
+    {
+        $request->validate([
+            'fcm_token' => 'required|string',
+            'device_name' => 'nullable|string',
+            'platform' => 'nullable|string',
+            'browser' => 'nullable|string',
+            'notification_preferences' => 'nullable|array'
+        ]);
+
+        $admin = Auth::guard('admin')->user();
+
+        // Check if token already exists for this admin
+        $existingToken = \App\Models\AdminFcmToken::where('admin_id', $admin->id)
+            ->where('fcm_token', $request->fcm_token)
+            ->first();
+
+        if ($existingToken) {
+            // Update existing token
+            $existingToken->update([
+                'device_name' => $request->device_name,
+                'platform' => $request->platform ?? 'web',
+                'browser' => $request->browser,
+                'is_active' => true,
+                'notification_preferences' => $request->notification_preferences ?? \App\Models\AdminFcmToken::getDefaultPreferences(),
+                'last_used_at' => now()
+            ]);
+            $token = $existingToken;
+        } else {
+            // Create new token
+            $token = \App\Models\AdminFcmToken::create([
+                'admin_id' => $admin->id,
+                'fcm_token' => $request->fcm_token,
+                'device_name' => $request->device_name,
+                'platform' => $request->platform ?? 'web',
+                'browser' => $request->browser,
+                'is_active' => true,
+                'notification_preferences' => $request->notification_preferences ?? \App\Models\AdminFcmToken::getDefaultPreferences(),
+                'last_used_at' => now()
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Successfully subscribed to admin notifications',
+            'token_id' => $token->id,
+            'preferences' => $token->notification_preferences
+        ]);
+    }
+
+    public function unsubscribeAdmin(Request $request)
+    {
+        $request->validate([
+            'fcm_token' => 'required|string'
+        ]);
+
+        $admin = Auth::guard('admin')->user();
+
+        $token = \App\Models\AdminFcmToken::where('admin_id', $admin->id)
+            ->where('fcm_token', $request->fcm_token)
+            ->first();
+
+        if ($token) {
+            $token->deactivate();
+            return response()->json([
+                'success' => true,
+                'message' => 'Successfully unsubscribed from admin notifications'
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Token not found'
+        ], 404);
+    }
+
+    public function getAdminTokens()
+    {
+        $admin = Auth::guard('admin')->user();
+        $tokens = $admin->fcmTokens()->orderBy('last_used_at', 'desc')->get();
+
+        return response()->json([
+            'success' => true,
+            'tokens' => $tokens
+        ]);
+    }
+
+    public function updateAdminPreferences(Request $request)
+    {
+        $request->validate([
+            'token_id' => 'required|integer',
+            'preferences' => 'required|array'
+        ]);
+
+        $admin = Auth::guard('admin')->user();
+
+        $token = \App\Models\AdminFcmToken::where('admin_id', $admin->id)
+            ->where('id', $request->token_id)
+            ->first();
+
+        if (!$token) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Token not found'
+            ], 404);
+        }
+
+        $token->update([
+            'notification_preferences' => $request->preferences
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Notification preferences updated successfully',
+            'preferences' => $token->notification_preferences
+        ]);
+    }
+
+    // Send notification to admins
+    public function notifyAdmins($type, $title, $body, $data = [])
+    {
+        try {
+            $sent = 0;
+            $failed = 0;
+
+            // Get all active admin tokens that want this type of notification
+            $adminTokens = \App\Models\AdminFcmToken::active()
+                ->with('admin')
+                ->get()
+                ->filter(function ($token) use ($type) {
+                    return $token->wantsNotification($type);
+                });
+
+            foreach ($adminTokens as $token) {
+                $result = $this->firebaseService->sendNotification(
+                    $token->fcm_token,
+                    $title,
+                    $body,
+                    array_merge($data, [
+                        'type' => 'admin_notification',
+                        'notification_type' => $type,
+                        'admin_id' => $token->admin_id
+                    ]),
+                    $token->admin_id
+                );
+
+                if ($result) {
+                    $sent++;
+                    $token->markAsUsed();
+                } else {
+                    $failed++;
+                }
+            }
+
+            \Illuminate\Support\Facades\Log::info("Admin notification sent: {$title}", [
+                'type' => $type,
+                'sent' => $sent,
+                'failed' => $failed
+            ]);
+
+            return ['sent' => $sent, 'failed' => $failed];
+
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to notify admins: ' . $e->getMessage());
+            return ['sent' => 0, 'failed' => 1];
+        }
+    }
+
+    // Test admin notification
+    public function testAdminNotification(Request $request)
+    {
+        $request->validate([
+            'title' => 'required|string|max:255',
+            'body' => 'required|string',
+        ]);
+
+        $result = $this->notifyAdmins(
+            'test_notifications',
+            $request->title,
+            $request->body,
+            ['test' => true, 'sent_at' => now()->toISOString()]
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => "Test notification sent. Sent: {$result['sent']}, Failed: {$result['failed']}",
+            'sent' => $result['sent'],
+            'failed' => $result['failed']
         ]);
     }
 }

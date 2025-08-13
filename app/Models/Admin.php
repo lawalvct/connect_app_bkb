@@ -200,4 +200,20 @@ class Admin extends Authenticatable
             default => ucfirst($this->role)
         };
     }
+
+    /**
+     * Get the FCM tokens for the admin.
+     */
+    public function fcmTokens()
+    {
+        return $this->hasMany(AdminFcmToken::class);
+    }
+
+    /**
+     * Get only active FCM tokens for the admin.
+     */
+    public function activeFcmTokens()
+    {
+        return $this->hasMany(AdminFcmToken::class)->active();
+    }
 }

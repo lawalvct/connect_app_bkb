@@ -118,6 +118,15 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::prefix('push')->group(function () {
                     Route::post('/send', [NotificationController::class, 'sendPushNotification']);
                     Route::post('/preview-targets', [NotificationController::class, 'previewTargets']);
+                    Route::post('/test-admin', [NotificationController::class, 'testAdminNotification']);
+                });
+
+                // Admin FCM token management
+                Route::prefix('admin-fcm')->group(function () {
+                    Route::post('/subscribe', [NotificationController::class, 'subscribeAdmin']);
+                    Route::post('/unsubscribe', [NotificationController::class, 'unsubscribeAdmin']);
+                    Route::get('/tokens', [NotificationController::class, 'getAdminTokens']);
+                    Route::put('/preferences', [NotificationController::class, 'updateAdminPreferences']);
                 });
 
                 // Get notification resources
@@ -296,6 +305,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         // Notification Management
         Route::prefix('notifications')->name('notifications.')->group(function () {
             Route::get('/push', [NotificationController::class, 'pushIndex'])->name('push.index');
+            Route::get('/subscription', [NotificationController::class, 'subscriptionIndex'])->name('subscription.index');
             Route::get('/email', [NotificationController::class, 'emailTemplatesIndex'])->name('email.index');
             Route::get('/sms', [NotificationController::class, 'smsIndex'])->name('sms.index');
             Route::get('/logs', [NotificationController::class, 'logsIndex'])->name('logs.index');
