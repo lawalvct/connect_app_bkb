@@ -33,7 +33,13 @@ class StreamManagementController extends Controller
      */
     public function create()
     {
-        return view('admin.streams.create');
+        // Get users for the dropdown
+        $users = User::select('id', 'name', 'email')
+                    ->where('status', 'active')
+                    ->orderBy('name')
+                    ->get();
+
+        return view('admin.streams.create', compact('users'));
     }
 
     /**
@@ -51,6 +57,7 @@ class StreamManagementController extends Controller
             'max_viewers' => 'nullable|integer|min:1',
             'stream_type' => 'required|in:immediate,scheduled',
             'scheduled_at' => 'required_if:stream_type,scheduled|nullable|date|after:now',
+            'user_id' => 'required|exists:users,id', // Require valid user selection
         ]);
 
         if ($validator->fails()) {
@@ -62,7 +69,16 @@ class StreamManagementController extends Controller
 
         try {
             $data = $validator->validated();
-            $data['user_id'] = auth('admin')->user()->id;
+
+            // Verify the user exists and is active
+            $user = User::find($data['user_id']);
+            if (!$user || $user->status !== 'active') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Selected user is not available for streaming'
+                ], 422);
+            }
+
             $data['channel_name'] = 'admin_stream_' . time() . '_' . Str::random(8);
             $data['go_live_immediately'] = $request->stream_type === 'immediate';
 
@@ -235,7 +251,7 @@ class StreamManagementController extends Controller
             ]);
 
             // Log the stream start for debugging
-            \Log::info('Stream started successfully', [
+            Log::info('Stream started successfully', [
                 'stream_id' => $stream->id,
                 'channel_name' => $stream->channel_name,
                 'user_id' => $stream->user_id,
@@ -249,7 +265,7 @@ class StreamManagementController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            \Log::error('Failed to start stream', [
+            Log::error('Failed to start stream', [
                 'stream_id' => $id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()

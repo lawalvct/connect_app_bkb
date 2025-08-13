@@ -11,6 +11,18 @@ use Illuminate\Support\Facades\Auth;
 
 class VerificationController extends Controller
 {
+    public function __construct()
+    {
+        $this->middleware('auth:admin');
+        $this->middleware(function ($request, $next) {
+            $admin = Auth::guard('admin')->user();
+            if (!$admin->hasPermission('verify_users') && !$admin->canManageUsers()) {
+                abort(403, 'Unauthorized to manage user verifications');
+            }
+            return $next($request);
+        });
+    }
+
     /**
      * Get pending verifications count
      */

@@ -889,7 +889,7 @@
 
             async loadPendingVerificationsCount() {
                 try {
-                    const response = await fetch('/admin/api/verifications/count', {
+                    const response = await fetch('/admin/api/verifications/pending-count', {
                         headers: {
                             'Accept': 'application/json',
                             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')

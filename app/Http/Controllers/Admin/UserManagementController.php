@@ -16,6 +16,18 @@ use App\Exports\SimpleUsersExport;
 
 class UserManagementController extends Controller
 {
+    public function __construct()
+    {
+        $this->middleware('auth:admin');
+        $this->middleware(function ($request, $next) {
+            $admin = Auth::guard('admin')->user();
+            if (!$admin->canManageUsers()) {
+                abort(403, 'Unauthorized to manage users');
+            }
+            return $next($request);
+        });
+    }
+
     /**
      * Display users listing
      */
@@ -324,17 +336,20 @@ class UserManagementController extends Controller
                 'pending_verifications' => \App\Models\UserVerification::where('admin_status', 'pending')->count(),
                 'verified_users' => \App\Models\UserVerification::where('admin_status', 'approved')->distinct('user_id')->count(),
                 'rejected_verifications' => \App\Models\UserVerification::where('admin_status', 'rejected')->count(),
-                'total_connections' => \App\Models\UserRequest::where('status', 'accepted')
+                'total_connections' => \App\Models\UserRequest::withTrashed()
+                    ->where('status', 'accepted')
                     ->where('sender_status', 'accepted')
                     ->where('receiver_status', 'accepted')
                     ->count(),
                 'users_with_connections' => \App\Models\User::whereHas('sentRequests', function($q) {
-                        $q->where('status', 'accepted')
+                        $q->withTrashed()
+                          ->where('status', 'accepted')
                           ->where('sender_status', 'accepted')
                           ->where('receiver_status', 'accepted');
                     })
                     ->orWhereHas('receivedRequests', function($q) {
-                        $q->where('status', 'accepted')
+                        $q->withTrashed()
+                          ->where('status', 'accepted')
                           ->where('sender_status', 'accepted')
                           ->where('receiver_status', 'accepted');
                     })
@@ -406,6 +421,32 @@ class UserManagementController extends Controller
                     'social_circles' => []
                 ], 200);
             }
+        }
+    }
+
+    /**
+     * Get countries for filter dropdown
+     */
+    public function getCountries()
+    {
+        try {
+            $countries = \App\Models\Country::select(['id', 'name', 'code'])
+                ->orderBy('name', 'asc')
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'countries' => $countries
+            ]);
+
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error fetching countries: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'error' => 'Failed to load countries',
+                'countries' => []
+            ], 200);
         }
     }
 
