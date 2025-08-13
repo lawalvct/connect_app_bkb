@@ -121,13 +121,16 @@
                 </a>
 
                 <!-- User Management -->
+                @if(auth('admin')->user()->canManageUsers())
                 <a href="{{ route('admin.users.index') }}"
                    class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-primary-light hover:text-primary transition-colors duration-200 {{ request()->routeIs('admin.users*') ? 'bg-primary-light text-primary' : '' }}">
                     <i class="fas fa-users w-6"></i>
                     <span class="ml-3">Users</span>
                 </a>
+                @endif
 
                 <!-- Content Management -->
+                @if(auth('admin')->user()->canManageContent())
                 <div x-data="{ open: {{ request()->routeIs('admin.posts*') || request()->routeIs('admin.stories*') ? 'true' : 'false' }} }">
                     <button @click="open = !open"
                             class="w-full flex items-center justify-between px-4 py-3 text-gray-700 rounded-lg hover:bg-primary-light hover:text-primary transition-colors duration-200">
@@ -148,15 +151,19 @@
                         </a>
                     </div>
                 </div>
+                @endif
 
                 <!-- Ads Management -->
+                @if(auth('admin')->user()->canManageAds())
                 <a href="{{ route('admin.ads.index') }}"
                    class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-primary-light hover:text-primary transition-colors duration-200 {{ request()->routeIs('admin.ads*') ? 'bg-primary-light text-primary' : '' }}">
                     <i class="fas fa-ad w-6"></i>
                     <span class="ml-3">Advertisements</span>
                 </a>
+                @endif
 
                 <!-- Subscriptions -->
+                @if(auth('admin')->user()->canManageSubscriptions())
                 <div x-data="{ open: {{ request()->routeIs('admin.subscriptions*') ? 'true' : 'false' }} }">
                     <button @click="open = !open"
                             class="w-full flex items-center justify-between px-4 py-3 text-gray-700 rounded-lg hover:bg-primary-light hover:text-primary transition-colors duration-200">
@@ -177,15 +184,19 @@
                         </a>
                     </div>
                 </div>
+                @endif
 
                 <!-- Streams -->
+                @if(auth('admin')->user()->canManageStreams())
                 <a href="{{ route('admin.streams.index') }}"
                    class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-primary-light hover:text-primary  {{ request()->routeIs('admin.streams*') ? 'bg-primary-light text-primary' : '' }} transition-colors duration-200">
                     <i class="fas fa-video w-6"></i>
                     <span class="ml-3">Live Streams</span>
                 </a>
+                @endif
 
                 <!-- Notifications -->
+                @if(auth('admin')->user()->canSendNotifications())
                 <div x-data="{ open: {{ request()->routeIs('admin.notifications*') ? 'true' : 'false' }} }">
                     <button @click="open = !open"
                             class="w-full flex items-center justify-between px-4 py-3 text-gray-700 rounded-lg hover:bg-primary-light hover:text-primary transition-colors duration-200">
@@ -204,22 +215,24 @@
                            class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.notifications.subscription*') ? 'bg-primary-light text-primary' : '' }}">
                             <span>My Subscription</span>
                         </a>
+                        @if(auth('admin')->user()->hasPermission('manage_email_templates'))
                         <a href="{{ route('admin.notifications.email.index') }}"
                            class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.notifications.email*') ? 'bg-primary-light text-primary' : '' }}">
                             <span>Email Templates</span>
                         </a>
-                        {{-- <a href="{{ route('admin.notifications.sms.index') }}"
-                           class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.notifications.sms*') ? 'bg-primary-light text-primary' : '' }}">
-                            <span>SMS Settings</span>
-                        </a> --}}
+                        @endif
+                        @if(auth('admin')->user()->hasPermission('view_notification_logs'))
                         <a href="{{ route('admin.notifications.logs.index') }}"
                            class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.notifications.logs*') ? 'bg-primary-light text-primary' : '' }}">
                             <span>Notification Logs</span>
                         </a>
+                        @endif
                     </div>
                 </div>
+                @endif
 
                 <!-- Analytics -->
+                @if(auth('admin')->user()->canViewAnalytics())
                 <div x-data="{ open: {{ request()->routeIs('admin.analytics*') ? 'true' : 'false' }} }">
                     <button @click="open = !open"
                             class="w-full flex items-center justify-between px-4 py-3 text-gray-700 rounded-lg hover:bg-primary-light hover:text-primary transition-colors duration-200">
@@ -234,30 +247,42 @@
                            class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.analytics.index') ? 'bg-primary-light text-primary' : '' }}">
                             <span>Overview</span>
                         </a>
+                        @if(auth('admin')->user()->hasPermission('view_user_analytics'))
                         <a href="{{ route('admin.analytics.users') }}"
                            class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.analytics.users') ? 'bg-primary-light text-primary' : '' }}">
                             <span>Users</span>
                         </a>
+                        @endif
+                        @if(auth('admin')->user()->hasPermission('view_content_analytics'))
                         <a href="{{ route('admin.analytics.content') }}"
                            class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.analytics.content') ? 'bg-primary-light text-primary' : '' }}">
                             <span>Content</span>
                         </a>
+                        @endif
+                        @if(auth('admin')->user()->hasPermission('view_revenue_analytics'))
                         <a href="{{ route('admin.analytics.revenue') }}"
                            class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.analytics.revenue') ? 'bg-primary-light text-primary' : '' }}">
                             <span>Revenue</span>
                         </a>
+                        @endif
+                        @if(auth('admin')->user()->hasPermission('view_advertising_analytics'))
                         <a href="{{ route('admin.analytics.advertising') }}"
                            class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.analytics.advertising') ? 'bg-primary-light text-primary' : '' }}">
                             <span>Advertising</span>
                         </a>
+                        @endif
+                        @if(auth('admin')->user()->hasPermission('view_streaming_analytics'))
                         <a href="{{ route('admin.analytics.streaming') }}"
                            class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.analytics.streaming') ? 'bg-primary-light text-primary' : '' }}">
                             <span>Streaming</span>
                         </a>
+                        @endif
                     </div>
                 </div>
+                @endif
 
                 <!-- Settings -->
+                @if(auth('admin')->user()->hasRole('super_admin') || auth('admin')->user()->canManageAdmins())
                 <div x-data="{ open: {{ request()->routeIs('admin.admins*') ? 'true' : 'false' }} }">
                     <button @click="open = !open"
                             class="w-full flex items-center justify-between px-4 py-3 text-gray-700 rounded-lg hover:bg-primary-light hover:text-primary transition-colors duration-200">
@@ -268,10 +293,12 @@
                         <i class="fas fa-chevron-down transform transition-transform duration-200" :class="open ? 'rotate-180' : ''"></i>
                     </button>
                     <div x-show="open" x-collapse class="ml-6 mt-2 space-y-2">
+                        @if(auth('admin')->user()->hasRole('super_admin'))
                         <a href="#" class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary">
                             <span>System Settings</span>
                         </a>
-                        @if(auth('admin')->user() && (auth('admin')->user()->hasRole('super_admin') || auth('admin')->user()->hasRole('admin')) && Route::has('admin.admins.index'))
+                        @endif
+                        @if(auth('admin')->user()->canManageAdmins() && Route::has('admin.admins.index'))
                         <a href="{{ route('admin.admins.index') }}"
                            class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.admins*') ? 'bg-primary-light text-primary' : '' }}">
                             <span>Admin Management</span>
@@ -279,6 +306,7 @@
                         @endif
                     </div>
                 </div>
+                @endif
 
             </div>
         </nav>

@@ -53,6 +53,8 @@ class Admin extends Authenticatable
     const ROLE_ADMIN = 'admin';
     const ROLE_MODERATOR = 'moderator';
     const ROLE_CONTENT_MANAGER = 'content_manager';
+    const ROLE_ANALYTICS_MANAGER = 'analytics_manager';
+    const ROLE_SUBSCRIPTION_MANAGER = 'subscription_manager';
 
     // Status constants
     const STATUS_ACTIVE = 'active';
@@ -188,6 +190,57 @@ class Admin extends Authenticatable
     }
 
     /**
+     * Check if admin can manage ads
+     */
+    public function canManageAds(): bool
+    {
+        return $this->hasRole(self::ROLE_SUPER_ADMIN) ||
+               $this->hasRole(self::ROLE_ADMIN) ||
+               $this->hasPermission('manage_ads');
+    }
+
+    /**
+     * Check if admin can manage subscriptions
+     */
+    public function canManageSubscriptions(): bool
+    {
+        return $this->hasRole(self::ROLE_SUPER_ADMIN) ||
+               $this->hasRole(self::ROLE_ADMIN) ||
+               $this->hasPermission('manage_subscriptions');
+    }
+
+    /**
+     * Check if admin can manage streams
+     */
+    public function canManageStreams(): bool
+    {
+        return $this->hasRole(self::ROLE_SUPER_ADMIN) ||
+               $this->hasRole(self::ROLE_ADMIN) ||
+               $this->hasRole(self::ROLE_MODERATOR) ||
+               $this->hasPermission('manage_streams');
+    }
+
+    /**
+     * Check if admin can send notifications
+     */
+    public function canSendNotifications(): bool
+    {
+        return $this->hasRole(self::ROLE_SUPER_ADMIN) ||
+               $this->hasRole(self::ROLE_ADMIN) ||
+               $this->hasRole(self::ROLE_MODERATOR) ||
+               $this->hasPermission('send_notifications');
+    }
+
+    /**
+     * Check if admin can manage other admins
+     */
+    public function canManageAdmins(): bool
+    {
+        return $this->hasRole(self::ROLE_SUPER_ADMIN) ||
+               $this->hasRole(self::ROLE_ADMIN);
+    }
+
+    /**
      * Get role display name
      */
     public function getRoleDisplayName(): string
@@ -197,6 +250,8 @@ class Admin extends Authenticatable
             self::ROLE_ADMIN => 'Admin',
             self::ROLE_MODERATOR => 'Moderator',
             self::ROLE_CONTENT_MANAGER => 'Content Manager',
+            self::ROLE_ANALYTICS_MANAGER => 'Analytics Manager',
+            self::ROLE_SUBSCRIPTION_MANAGER => 'Subscription Manager',
             default => ucfirst($this->role)
         };
     }

@@ -27,7 +27,7 @@ class AuthController extends Controller
      */
     public function login(Request $request)
     {
-    
+
         Log::info('=== ADMIN LOGIN ATTEMPT START ===');
         Log::info('Request method: ' . $request->method());
         Log::info('Request URL: ' . $request->fullUrl());
@@ -84,7 +84,11 @@ class AuthController extends Controller
 
         // Login directly if OTP not needed
         Auth::guard('admin')->login($admin, $request->filled('remember'));
+
+        // Update last login time and clear any OTP data
         $admin->clearOtp();
+
+        Log::info('Admin logged in successfully (no OTP required)', ['admin_id' => $admin->id, 'last_login_at' => now()]);
 
         return redirect()->intended(route('admin.dashboard'));
     }
@@ -105,7 +109,7 @@ class AuthController extends Controller
         */
 
         // For testing - simulate an admin email
-        session(['admin_email' => 'test@example.com']);
+        session(['admin_email' => 'admin@connectapp.inc']);
 
         return view('admin.auth.otp');
     }
@@ -158,10 +162,13 @@ class AuthController extends Controller
             // Log the admin in
             Auth::guard('admin')->login($admin);
 
+            // Update last login time and clear OTP data
+            $admin->clearOtp();
+
             // Clear OTP session data
             session()->forget(['admin_login_id', 'admin_email']);
 
-            Log::info('Admin logged in successfully', ['admin_id' => $admin->id]);
+            Log::info('Admin logged in successfully via OTP', ['admin_id' => $admin->id, 'last_login_at' => now()]);
         }
 
         Log::info('OTP verification successful, redirecting to dashboard');

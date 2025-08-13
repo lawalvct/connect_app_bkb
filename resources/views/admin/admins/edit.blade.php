@@ -183,8 +183,10 @@
                             <select class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary @error('role') border-red-300 @enderror"
                                     id="role" name="role" required>
                                 <option value="admin" {{ old('role', $admin->role) === 'admin' ? 'selected' : '' }}>Administrator</option>
-                                <option value="moderator" {{ old('role', $admin->role) === 'moderator' ? 'selected' : '' }}>Moderator</option>
                                 <option value="content_manager" {{ old('role', $admin->role) === 'content_manager' ? 'selected' : '' }}>Content Manager</option>
+                                <option value="moderator" {{ old('role', $admin->role) === 'moderator' ? 'selected' : '' }}>Moderator</option>
+                                <option value="analytics_manager" {{ old('role', $admin->role) === 'analytics_manager' ? 'selected' : '' }}>Analytics Manager</option>
+                                <option value="subscription_manager" {{ old('role', $admin->role) === 'subscription_manager' ? 'selected' : '' }}>Subscription Manager</option>
                             </select>
                             @error('role')
                                 <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
@@ -197,12 +199,35 @@
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 @php
                                     $allPermissions = [
-                                        'view_analytics' => 'View Analytics',
+                                        // User Management
+                                        'manage_users' => 'Manage Users',
+                                        'verify_users' => 'Verify User Identity',
+
+                                        // Content Management
+                                        'manage_posts' => 'Manage Posts',
+                                        'manage_stories' => 'Manage Stories',
+                                        'manage_streams' => 'Manage Live Streams',
+
+                                        // Business Operations
                                         'manage_ads' => 'Manage Advertisements',
                                         'manage_subscriptions' => 'Manage Subscriptions',
-                                        'send_notifications' => 'Send Notifications',
-                                        'view_reports' => 'View Reports',
-                                        'export_data' => 'Export Data'
+                                        'manage_subscription_plans' => 'Manage Subscription Plans',
+
+                                        // Communications
+                                        'send_push_notifications' => 'Send Push Notifications',
+                                        'manage_email_templates' => 'Manage Email Templates',
+                                        'view_notification_logs' => 'View Notification Logs',
+
+                                        // Analytics & Reports
+                                        'view_user_analytics' => 'View User Analytics',
+                                        'view_content_analytics' => 'View Content Analytics',
+                                        'view_revenue_analytics' => 'View Revenue Analytics',
+                                        'view_advertising_analytics' => 'View Advertising Analytics',
+                                        'view_streaming_analytics' => 'View Streaming Analytics',
+                                        'export_data' => 'Export Data',
+
+                                        // System
+                                        'view_system_settings' => 'View System Settings'
                                     ];
                                     $currentPermissions = old('permissions', $admin->permissions ?? []);
                                 @endphp
