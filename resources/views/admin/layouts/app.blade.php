@@ -247,36 +247,36 @@
                            class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.analytics.index') ? 'bg-primary-light text-primary' : '' }}">
                             <span>Overview</span>
                         </a>
-                        @if(auth('admin')->user()->hasPermission('view_user_analytics'))
+                        {{-- @if(auth('admin')->user()->hasPermission('view_user_analytics'))
                         <a href="{{ route('admin.analytics.users') }}"
                            class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.analytics.users') ? 'bg-primary-light text-primary' : '' }}">
                             <span>Users</span>
                         </a>
-                        @endif
-                        @if(auth('admin')->user()->hasPermission('view_content_analytics'))
+                        @endif --}}
+                        {{-- @if(auth('admin')->user()->hasPermission('view_content_analytics'))
                         <a href="{{ route('admin.analytics.content') }}"
                            class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.analytics.content') ? 'bg-primary-light text-primary' : '' }}">
                             <span>Content</span>
                         </a>
-                        @endif
-                        @if(auth('admin')->user()->hasPermission('view_revenue_analytics'))
+                        @endif --}}
+                        {{-- @if(auth('admin')->user()->hasPermission('view_revenue_analytics'))
                         <a href="{{ route('admin.analytics.revenue') }}"
                            class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.analytics.revenue') ? 'bg-primary-light text-primary' : '' }}">
                             <span>Revenue</span>
                         </a>
-                        @endif
-                        @if(auth('admin')->user()->hasPermission('view_advertising_analytics'))
+                        @endif --}}
+                        {{-- @if(auth('admin')->user()->hasPermission('view_advertising_analytics'))
                         <a href="{{ route('admin.analytics.advertising') }}"
                            class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.analytics.advertising') ? 'bg-primary-light text-primary' : '' }}">
                             <span>Advertising</span>
                         </a>
-                        @endif
-                        @if(auth('admin')->user()->hasPermission('view_streaming_analytics'))
+                        @endif --}}
+                        {{-- @if(auth('admin')->user()->hasPermission('view_streaming_analytics'))
                         <a href="{{ route('admin.analytics.streaming') }}"
                            class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.analytics.streaming') ? 'bg-primary-light text-primary' : '' }}">
                             <span>Streaming</span>
                         </a>
-                        @endif
+                        @endif --}}
                     </div>
                 </div>
                 @endif
