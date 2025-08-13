@@ -467,8 +467,7 @@
                                         Last: <span x-text="user.last_login_at ? formatDate(user.last_login_at) : 'Never'"></span>
                                     </div>
                                     <div class="text-xs text-gray-500">
-                                        Posts: <span x-text="user.posts_count || 0"></span> |
-                                        Streams: <span x-text="user.streams_count || 0"></span>
+                                        Posts: <span x-text="user.posts_count || 0"></span>
                                     </div>
                                 </td>
 
@@ -689,7 +688,7 @@
              x-transition:leave="transition ease-in duration-200"
              x-transition:leave-start="opacity-100"
              x-transition:leave-end="opacity-0"
-             class="fixed inset-0 bg-black bg-opacity-75 overflow-y-auto h-full w-full z-60"
+             class="fixed inset-0 bg-black bg-opacity-75 overflow-y-auto h-full w-full z-[9999]"
              @click.self="showImagePreview = false">
 
             <div class="relative top-20 mx-auto p-5 w-11/12 max-w-4xl">
@@ -717,7 +716,7 @@
              x-transition:leave="transition ease-in duration-200"
              x-transition:leave-start="opacity-100"
              x-transition:leave-end="opacity-0"
-             class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50"
+             class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-[60]"
              @click.self="showRejectReasonModal = false">
 
             <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-md shadow-lg rounded-md bg-white">
