@@ -156,14 +156,50 @@
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-2 mb-8">
             <!-- User Growth Chart -->
             <div class="bg-white shadow rounded-lg p-6">
-                <h3 class="text-lg font-medium text-gray-900 mb-4">User Growth</h3>
-                <canvas id="userGrowthChart" height="300"></canvas>
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-medium text-gray-900">User Growth</h3>
+                    @if($userGrowth->isEmpty())
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                            No Data
+                        </span>
+                    @else
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            {{ $userGrowth->count() }} days
+                        </span>
+                    @endif
+                </div>
+                <div style="position: relative; height: 300px; width: 100%;">
+                    <canvas id="userGrowthChart"></canvas>
+                </div>
+                @if($userGrowth->isEmpty())
+                    <div class="text-center mt-4">
+                        <p class="text-sm text-gray-500">No user registration data available for the selected period.</p>
+                    </div>
+                @endif
             </div>
 
             <!-- Revenue Trends Chart -->
             <div class="bg-white shadow rounded-lg p-6">
-                <h3 class="text-lg font-medium text-gray-900 mb-4">Revenue Trends</h3>
-                <canvas id="revenueTrendsChart" height="300"></canvas>
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-medium text-gray-900">Revenue Trends</h3>
+                    @if($revenueData->isEmpty())
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                            No Data
+                        </span>
+                    @else
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            {{ $revenueData->count() }} days
+                        </span>
+                    @endif
+                </div>
+                <div style="position: relative; height: 300px; width: 100%;">
+                    <canvas id="revenueTrendsChart"></canvas>
+                </div>
+                @if($revenueData->isEmpty())
+                    <div class="text-center mt-4">
+                        <p class="text-sm text-gray-500">No revenue data available for the selected period.</p>
+                    </div>
+                @endif
             </div>
         </div>
 
@@ -266,60 +302,173 @@
 </div>
 
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0"></script>
 <script>
-// User Growth Chart
-const userGrowthCtx = document.getElementById('userGrowthChart').getContext('2d');
-const userGrowthChart = new Chart(userGrowthCtx, {
-    type: 'line',
-    data: {
-        labels: @json($userGrowth->pluck('date')),
-        datasets: [{
-            label: 'New Users',
-            data: @json($userGrowth->pluck('count')),
-            borderColor: 'rgb(79, 70, 229)',
-            backgroundColor: 'rgba(79, 70, 229, 0.1)',
-            tension: 0.1
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-            y: {
-                beginAtZero: true
-            }
-        }
-    }
-});
+document.addEventListener('DOMContentLoaded', function() {
+    // Prepare data with fallbacks for empty datasets
+    const userGrowthData = @json($userGrowth->pluck('count')->map(function($item) { return (int)$item; }));
+    const userGrowthLabels = @json($userGrowth->pluck('date'));
+    const revenueData = @json($revenueData->pluck('revenue')->map(function($item) { return (float)$item; }));
+    const revenueLabels = @json($revenueData->pluck('date'));
 
-// Revenue Trends Chart
-const revenueTrendsCtx = document.getElementById('revenueTrendsChart').getContext('2d');
-const revenueTrendsChart = new Chart(revenueTrendsCtx, {
-    type: 'bar',
-    data: {
-        labels: @json($revenueData->pluck('date')),
-        datasets: [{
-            label: 'Daily Revenue ($)',
-            data: @json($revenueData->pluck('revenue')),
-            backgroundColor: 'rgba(34, 197, 94, 0.8)',
-            borderColor: 'rgb(34, 197, 94)',
-            borderWidth: 1
-        }]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-            y: {
-                beginAtZero: true,
-                ticks: {
-                    callback: function(value) {
-                        return '$' + value.toLocaleString();
+    // Default data for empty cases
+    const hasUserData = userGrowthData.length > 0;
+    const hasRevenueData = revenueData.length > 0;
+    const maxUserGrowth = hasUserData ? Math.max(...userGrowthData) : 0;
+    const maxRevenue = hasRevenueData ? Math.max(...revenueData) : 0;
+
+    // User Growth Chart
+    const userGrowthCtx = document.getElementById('userGrowthChart');
+    if (userGrowthCtx) {
+        const userGrowthChart = new Chart(userGrowthCtx, {
+            type: 'line',
+            data: {
+                labels: hasUserData ? userGrowthLabels : ['No Data'],
+                datasets: [{
+                    label: 'New Users',
+                    data: hasUserData ? userGrowthData : [0],
+                    borderColor: 'rgb(79, 70, 229)',
+                    backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                    tension: 0.3,
+                    fill: true,
+                    pointRadius: hasUserData ? 4 : 0,
+                    pointHoverRadius: hasUserData ? 6 : 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    },
+                    tooltip: {
+                        enabled: hasUserData,
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleColor: 'white',
+                        bodyColor: 'white'
+                    }
+                },
+                scales: {
+                    x: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Date'
+                        },
+                        grid: {
+                            display: false
+                        }
+                    },
+                    y: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Number of Users'
+                        },
+                        beginAtZero: true,
+                        min: 0,
+                        max: maxUserGrowth > 0 ? Math.ceil(maxUserGrowth * 1.2) : 10,
+                        ticks: {
+                            stepSize: maxUserGrowth > 10 ? Math.ceil(maxUserGrowth / 10) : 1,
+                            callback: function(value) {
+                                return Number.isInteger(value) ? value : '';
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.1)'
+                        }
                     }
                 }
             }
-        }
+        });
+    }
+
+    // Revenue Trends Chart
+    const revenueTrendsCtx = document.getElementById('revenueTrendsChart');
+    if (revenueTrendsCtx) {
+        const revenueTrendsChart = new Chart(revenueTrendsCtx, {
+            type: 'bar',
+            data: {
+                labels: hasRevenueData ? revenueLabels : ['No Data'],
+                datasets: [{
+                    label: 'Daily Revenue ($)',
+                    data: hasRevenueData ? revenueData : [0],
+                    backgroundColor: 'rgba(34, 197, 94, 0.8)',
+                    borderColor: 'rgb(34, 197, 94)',
+                    borderWidth: 1,
+                    borderRadius: 4,
+                    borderSkipped: false
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    },
+                    tooltip: {
+                        enabled: hasRevenueData,
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleColor: 'white',
+                        bodyColor: 'white',
+                        callbacks: {
+                            label: function(context) {
+                                return 'Revenue: $' + context.parsed.y.toLocaleString('en-US', {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2
+                                });
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Date'
+                        },
+                        grid: {
+                            display: false
+                        }
+                    },
+                    y: {
+                        display: true,
+                        title: {
+                            display: true,
+                            text: 'Revenue ($)'
+                        },
+                        beginAtZero: true,
+                        min: 0,
+                        max: maxRevenue > 0 ? Math.ceil(maxRevenue * 1.2) : 100,
+                        ticks: {
+                            stepSize: maxRevenue > 100 ? Math.ceil(maxRevenue / 10) : 10,
+                            callback: function(value) {
+                                return '$' + value.toLocaleString('en-US', {
+                                    minimumFractionDigits: 0,
+                                    maximumFractionDigits: 0
+                                });
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.1)'
+                        }
+                    }
+                }
+            }
+        });
     }
 });
 </script>
