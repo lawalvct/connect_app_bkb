@@ -1,103 +1,122 @@
 @extends('admin.layouts.app')
 
-@section('page-title', 'Edit Admin')
+@section('title', 'Edit Admin - ' . $admin->name)
 
-@section('content')
-<div class="container-fluid">
-    <!-- Page Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
+@section('header')
+    <div class="flex justify-between items-center">
         <div>
-            <h1 class="h3 mb-0 text-gray-800">Edit Administrator</h1>
-            <p class="mb-0 text-gray-600">Update administrator account information</p>
+            <h1 class="text-2xl font-bold text-gray-900">Edit Administrator</h1>
+            <p class="text-gray-600">Update administrator account information</p>
         </div>
-        <div class="d-flex gap-2">
-            <a href="{{ route('admin.admins.show', $admin) }}" class="btn btn-outline-secondary">
-                <i class="fas fa-eye"></i> View Details
+        <div class="flex space-x-3">
+            <a href="{{ route('admin.admins.show', $admin) }}"
+               class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                <i class="fas fa-eye mr-2"></i>
+                View Details
             </a>
-            <a href="{{ route('admin.admins.index') }}" class="btn btn-secondary">
-                <i class="fas fa-arrow-left"></i> Back to Admins
+            <a href="{{ route('admin.admins.index') }}"
+               class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                <i class="fas fa-arrow-left mr-2"></i>
+                Back to Admins
             </a>
         </div>
     </div>
+@endsection
 
-    <div class="row">
-        <div class="col-lg-8">
-            <form action="{{ route('admin.admins.update', $admin) }}" method="POST" enctype="multipart/form-data">
+@section('content')
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6" x-data="adminEdit()">
+        <div class="lg:col-span-2">
+            <form action="{{ route('admin.admins.update', $admin) }}" method="POST" enctype="multipart/form-data" @submit="validateForm">
                 @csrf
                 @method('PUT')
 
                 <!-- Personal Information -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0">Personal Information</h5>
+                <div class="bg-white rounded-lg shadow-md">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <h3 class="text-lg font-medium text-gray-900">Personal Information</h3>
                     </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <!-- Current Profile Image -->
-                            <div class="col-md-12 mb-3">
-                                <label for="profile_image" class="form-label">Profile Image</label>
-                                <div class="d-flex align-items-center">
-                                    <div id="currentImage" class="me-3" style="width: 80px; height: 80px; border-radius: 50%; overflow: hidden;">
+                    <div class="p-6">
+                        <!-- Current Profile Image -->
+                        <div class="mb-6">
+                            <label for="profile_image" class="block text-sm font-medium text-gray-700 mb-2">Profile Image</label>
+                            <div class="flex items-center space-x-4">
+                                <div class="flex-shrink-0">
+                                    <div id="currentImage" class="h-20 w-20 rounded-full overflow-hidden border-4 border-gray-200">
                                         @if($admin->profile_image)
-                                            <img src="{{ Storage::url($admin->profile_image) }}" style="width: 100%; height: 100%; object-fit: cover;">
+                                            <img src="{{ Storage::url($admin->profile_image) }}"
+                                                 class="w-full h-full object-cover" alt="{{ $admin->name }}">
                                         @else
-                                            <div class="w-100 h-100 bg-primary d-flex align-items-center justify-content-center text-white fw-bold" style="font-size: 2rem;">
+                                            <div class="w-full h-full bg-primary flex items-center justify-center text-white text-2xl font-bold">
                                                 {{ strtoupper(substr($admin->name, 0, 1)) }}
                                             </div>
                                         @endif
                                     </div>
-                                    <div>
-                                        <input type="file" class="form-control @error('profile_image') is-invalid @enderror"
-                                               id="profile_image" name="profile_image" accept="image/*">
-                                        <small class="form-text text-muted">Leave empty to keep current image</small>
-                                        @error('profile_image')
-                                            <div class="invalid-feedback">{{ $message }}</div>
-                                        @enderror
-                                    </div>
+                                </div>
+                                <div class="flex-1">
+                                    <input type="file"
+                                           class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-medium file:bg-primary file:text-white hover:file:bg-primary-dark @error('profile_image') border-red-300 @enderror"
+                                           id="profile_image" name="profile_image" accept="image/*" @change="previewImage">
+                                    <p class="text-sm text-gray-500 mt-1">Leave empty to keep current image</p>
+                                    @error('profile_image')
+                                        <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
+                                    @enderror
                                 </div>
                             </div>
+                        </div>
 
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <!-- Name -->
-                            <div class="col-md-6 mb-3">
-                                <label for="name" class="form-label">Full Name <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control @error('name') is-invalid @enderror"
+                            <div>
+                                <label for="name" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Full Name <span class="text-red-500">*</span>
+                                </label>
+                                <input type="text"
+                                       class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary @error('name') border-red-300 @enderror"
                                        id="name" name="name" value="{{ old('name', $admin->name) }}" required>
                                 @error('name')
-                                    <div class="invalid-feedback">{{ $message }}</div>
+                                    <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                                 @enderror
                             </div>
 
                             <!-- Email -->
-                            <div class="col-md-6 mb-3">
-                                <label for="email" class="form-label">Email Address <span class="text-danger">*</span></label>
-                                <input type="email" class="form-control @error('email') is-invalid @enderror"
+                            <div>
+                                <label for="email" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Email Address <span class="text-red-500">*</span>
+                                </label>
+                                <input type="email"
+                                       class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary @error('email') border-red-300 @enderror"
                                        id="email" name="email" value="{{ old('email', $admin->email) }}" required>
                                 @error('email')
-                                    <div class="invalid-feedback">{{ $message }}</div>
+                                    <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                                 @enderror
                             </div>
 
                             <!-- Phone -->
-                            <div class="col-md-6 mb-3">
-                                <label for="phone" class="form-label">Phone Number</label>
-                                <input type="tel" class="form-control @error('phone') is-invalid @enderror"
+                            <div>
+                                <label for="phone" class="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
+                                <input type="tel"
+                                       class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary @error('phone') border-red-300 @enderror"
                                        id="phone" name="phone" value="{{ old('phone', $admin->phone) }}">
                                 @error('phone')
-                                    <div class="invalid-feedback">{{ $message }}</div>
+                                    <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                                 @enderror
                             </div>
 
                             <!-- Status (only if not editing own profile) -->
                             @if(auth('admin')->user()->id !== $admin->id)
-                            <div class="col-md-6 mb-3">
-                                <label for="status" class="form-label">Status <span class="text-danger">*</span></label>
-                                <select class="form-select @error('status') is-invalid @enderror" id="status" name="status" required>
+                            <div>
+                                <label for="status" class="block text-sm font-medium text-gray-700 mb-2">
+                                    Status <span class="text-red-500">*</span>
+                                </label>
+                                <select class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary @error('status') border-red-300 @enderror"
+                                        id="status" name="status" required>
                                     <option value="active" {{ old('status', $admin->status) === 'active' ? 'selected' : '' }}>Active</option>
                                     <option value="inactive" {{ old('status', $admin->status) === 'inactive' ? 'selected' : '' }}>Inactive</option>
                                     <option value="suspended" {{ old('status', $admin->status) === 'suspended' ? 'selected' : '' }}>Suspended</option>
                                 </select>
                                 @error('status')
-                                    <div class="invalid-feedback">{{ $message }}</div>
+                                    <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                                 @enderror
                             </div>
                             @endif
@@ -106,35 +125,40 @@
                 </div>
 
                 <!-- Password Change (Optional) -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0">Password Change (Optional)</h5>
+                <div class="bg-white rounded-lg shadow-md mt-6">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <h3 class="text-lg font-medium text-gray-900">Password Change (Optional)</h3>
                     </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="password" class="form-label">New Password</label>
-                                <input type="password" class="form-control @error('password') is-invalid @enderror"
-                                       id="password" name="password">
-                                <small class="form-text text-muted">Leave empty to keep current password</small>
+                    <div class="p-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label for="password" class="block text-sm font-medium text-gray-700 mb-2">New Password</label>
+                                <input type="password"
+                                       class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary @error('password') border-red-300 @enderror"
+                                       id="password" name="password" x-model="password">
+                                <p class="text-sm text-gray-500 mt-1">Leave empty to keep current password</p>
                                 @error('password')
-                                    <div class="invalid-feedback">{{ $message }}</div>
+                                    <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                                 @enderror
                             </div>
 
-                            <div class="col-md-6 mb-3">
-                                <label for="password_confirmation" class="form-label">Confirm New Password</label>
-                                <input type="password" class="form-control"
-                                       id="password_confirmation" name="password_confirmation">
+                            <div>
+                                <label for="password_confirmation" class="block text-sm font-medium text-gray-700 mb-2">Confirm New Password</label>
+                                <input type="password"
+                                       class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+                                       :class="{ 'border-red-300': passwordMismatch }"
+                                       id="password_confirmation" name="password_confirmation" x-model="passwordConfirmation">
+                                <p x-show="passwordMismatch" class="text-red-500 text-sm mt-1">Passwords do not match</p>
                             </div>
 
                             @if(auth('admin')->user()->id !== $admin->id)
-                            <div class="col-md-12 mb-3">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="force_password_change"
+                            <div class="md:col-span-2">
+                                <div class="flex items-center">
+                                    <input class="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                                           type="checkbox" id="force_password_change"
                                            name="force_password_change" value="1"
                                            {{ old('force_password_change', $admin->force_password_change) ? 'checked' : '' }}>
-                                    <label class="form-check-label" for="force_password_change">
+                                    <label class="ml-2 block text-sm text-gray-900" for="force_password_change">
                                         Force password change on next login
                                     </label>
                                 </div>
@@ -146,28 +170,31 @@
 
                 <!-- Role & Permissions (only if not editing own profile) -->
                 @if(auth('admin')->user()->id !== $admin->id)
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0">Role & Permissions</h5>
+                <div class="bg-white rounded-lg shadow-md mt-6">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <h3 class="text-lg font-medium text-gray-900">Role & Permissions</h3>
                     </div>
-                    <div class="card-body">
+                    <div class="p-6">
                         <!-- Role Selection -->
-                        <div class="mb-4">
-                            <label for="role" class="form-label">Role <span class="text-danger">*</span></label>
-                            <select class="form-select @error('role') is-invalid @enderror" id="role" name="role" required>
+                        <div class="mb-6">
+                            <label for="role" class="block text-sm font-medium text-gray-700 mb-2">
+                                Role <span class="text-red-500">*</span>
+                            </label>
+                            <select class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary @error('role') border-red-300 @enderror"
+                                    id="role" name="role" required>
                                 <option value="admin" {{ old('role', $admin->role) === 'admin' ? 'selected' : '' }}>Administrator</option>
                                 <option value="moderator" {{ old('role', $admin->role) === 'moderator' ? 'selected' : '' }}>Moderator</option>
                                 <option value="content_manager" {{ old('role', $admin->role) === 'content_manager' ? 'selected' : '' }}>Content Manager</option>
                             </select>
                             @error('role')
-                                <div class="invalid-feedback">{{ $message }}</div>
+                                <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
                             @enderror
                         </div>
 
                         <!-- Additional Permissions -->
-                        <div class="mb-3">
-                            <label class="form-label">Additional Permissions</label>
-                            <div class="row">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-4">Additional Permissions</label>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 @php
                                     $allPermissions = [
                                         'view_analytics' => 'View Analytics',
@@ -181,15 +208,14 @@
                                 @endphp
 
                                 @foreach($allPermissions as $key => $label)
-                                <div class="col-md-6">
-                                    <div class="form-check mb-2">
-                                        <input class="form-check-input" type="checkbox" id="{{ $key }}"
-                                               name="permissions[]" value="{{ $key }}"
-                                               {{ in_array($key, $currentPermissions) ? 'checked' : '' }}>
-                                        <label class="form-check-label" for="{{ $key }}">
-                                            {{ $label }}
-                                        </label>
-                                    </div>
+                                <div class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                                    <input class="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                                           type="checkbox" id="{{ $key }}"
+                                           name="permissions[]" value="{{ $key }}"
+                                           {{ in_array($key, $currentPermissions) ? 'checked' : '' }}>
+                                    <label class="flex-1 text-sm text-gray-900" for="{{ $key }}">
+                                        {{ $label }}
+                                    </label>
                                 </div>
                                 @endforeach
                             </div>
@@ -199,12 +225,17 @@
                 @endif
 
                 <!-- Submit Buttons -->
-                <div class="card">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-end gap-2">
-                            <a href="{{ route('admin.admins.show', $admin) }}" class="btn btn-secondary">Cancel</a>
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save"></i> Update Administrator
+                <div class="bg-white rounded-lg shadow-md mt-6">
+                    <div class="p-6">
+                        <div class="flex justify-end space-x-3">
+                            <a href="{{ route('admin.admins.show', $admin) }}"
+                               class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                                Cancel
+                            </a>
+                            <button type="submit"
+                                    class="bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                                <i class="fas fa-save mr-2"></i>
+                                Update Administrator
                             </button>
                         </div>
                     </div>
@@ -213,117 +244,135 @@
         </div>
 
         <!-- Sidebar -->
-        <div class="col-lg-4">
-            <div class="card">
-                <div class="card-header">
-                    <h6 class="mb-0">Current Information</h6>
+        <div class="lg:col-span-1">
+            <div class="bg-white rounded-lg shadow-md">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900">Current Information</h3>
                 </div>
-                <div class="card-body">
-                    <table class="table table-sm table-borderless">
-                        <tr>
-                            <td class="text-muted">Current Role:</td>
-                            <td><span class="badge role-badge role-{{ str_replace(' ', '_', strtolower($admin->getRoleDisplayName())) }}">{{ $admin->getRoleDisplayName() }}</span></td>
-                        </tr>
-                        <tr>
-                            <td class="text-muted">Current Status:</td>
-                            <td><span class="badge status-badge status-{{ $admin->status }}">{{ ucfirst($admin->status) }}</span></td>
-                        </tr>
-                        <tr>
-                            <td class="text-muted">Last Login:</td>
-                            <td>{{ $admin->last_login_at ? $admin->last_login_at->format('M d, Y') : 'Never' }}</td>
-                        </tr>
-                        <tr>
-                            <td class="text-muted">Created:</td>
-                            <td>{{ $admin->created_at->format('M d, Y') }}</td>
-                        </tr>
-                    </table>
+                <div class="p-6 space-y-3 text-sm">
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-500">Current Role:</span>
+                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium
+                            @if($admin->role === 'super_admin')
+                                bg-purple-100 text-purple-800
+                            @elseif($admin->role === 'admin')
+                                bg-blue-100 text-blue-800
+                            @elseif($admin->role === 'moderator')
+                                bg-green-100 text-green-800
+                            @else
+                                bg-yellow-100 text-yellow-800
+                            @endif">
+                            {{ $admin->getRoleDisplayName() }}
+                        </span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-500">Current Status:</span>
+                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium
+                            @if($admin->status === 'active')
+                                bg-green-100 text-green-800
+                            @elseif($admin->status === 'suspended')
+                                bg-yellow-100 text-yellow-800
+                            @else
+                                bg-red-100 text-red-800
+                            @endif">
+                            {{ ucfirst($admin->status) }}
+                        </span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Last Login:</span>
+                        <span class="text-gray-900">{{ $admin->last_login_at ? $admin->last_login_at->format('M d, Y') : 'Never' }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Created:</span>
+                        <span class="text-gray-900">{{ $admin->created_at->format('M d, Y') }}</span>
+                    </div>
+                    @if($admin->permissions && count($admin->permissions) > 0)
+                    <div class="pt-3 border-t border-gray-200">
+                        <span class="text-gray-500 text-xs uppercase tracking-wide">Current Permissions</span>
+                        <div class="mt-2 space-y-1">
+                            @foreach($admin->permissions as $permission)
+                            <div class="flex items-center space-x-2">
+                                <i class="fas fa-check text-green-500 text-xs"></i>
+                                <span class="text-xs text-gray-700">{{ ucwords(str_replace('_', ' ', $permission)) }}</span>
+                            </div>
+                            @endforeach
+                        </div>
+                    </div>
+                    @endif
                 </div>
             </div>
 
             @if(auth('admin')->user()->id === $admin->id)
-            <div class="alert alert-info mt-3">
-                <i class="fas fa-info-circle me-2"></i>
-                <strong>Note:</strong> You are editing your own profile. Role and permission changes are not allowed.
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-info-circle text-blue-400"></i>
+                    </div>
+                    <div class="ml-3">
+                        <h3 class="text-sm font-medium text-blue-800">Note</h3>
+                        <div class="mt-2 text-sm text-blue-700">
+                            <p>You are editing your own profile. Role and permission changes are not allowed.</p>
+                        </div>
+                    </div>
+                </div>
             </div>
             @endif
         </div>
     </div>
-</div>
 @endsection
-
-@push('styles')
-<style>
-.status-badge {
-    font-size: 0.75rem;
-    padding: 0.25rem 0.5rem;
-}
-
-.status-active { background-color: #d4edda; color: #155724; }
-.status-inactive { background-color: #f8d7da; color: #721c24; }
-.status-suspended { background-color: #fff3cd; color: #856404; }
-
-.role-badge {
-    font-size: 0.75rem;
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.375rem;
-}
-
-.role-super_admin { background-color: #e7e3ff; color: #5b21b6; }
-.role-admin { background-color: #dbeafe; color: #1e40af; }
-.role-moderator { background-color: #d1fae5; color: #065f46; }
-.role-content_manager { background-color: #fef3c7; color: #92400e; }
-</style>
-@endpush
 
 @push('scripts')
 <script>
-$(document).ready(function() {
-    // Image preview
-    $('#profile_image').change(function(e) {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                $('#currentImage').html('<img src="' + e.target.result + '" style="width: 100%; height: 100%; object-fit: cover;">');
+    function adminEdit() {
+        return {
+            password: '',
+            passwordConfirmation: '',
+
+            get passwordMismatch() {
+                return this.password && this.passwordConfirmation && this.password !== this.passwordConfirmation;
+            },
+
+            previewImage(event) {
+                const file = event.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        document.getElementById('currentImage').innerHTML =
+                            `<img src="${e.target.result}" class="w-full h-full object-cover" alt="Preview">`;
+                    };
+                    reader.readAsDataURL(file);
+                }
+            },
+
+            validateForm(event) {
+                // Password validation
+                if (this.password) {
+                    if (this.password.length < 8) {
+                        event.preventDefault();
+                        this.showToast('Password must be at least 8 characters long', 'error');
+                        return false;
+                    }
+
+                    if (this.password !== this.passwordConfirmation) {
+                        event.preventDefault();
+                        this.showToast('Password and confirm password do not match', 'error');
+                        return false;
+                    }
+                }
+
+                return true;
+            },
+
+            showToast(message, type = 'success') {
+                const toast = document.createElement('div');
+                toast.className = `fixed top-4 right-4 px-4 py-2 rounded-md shadow-lg z-50 text-white max-w-sm ${
+                    type === 'success' ? 'bg-green-500' : 'bg-red-500'
+                }`;
+                toast.textContent = message;
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 4000);
             }
-            reader.readAsDataURL(file);
         }
-    });
-
-    // Password confirmation validation
-    $('#password, #password_confirmation').on('keyup', function() {
-        const password = $('#password').val();
-        const confirmPassword = $('#password_confirmation').val();
-
-        if (password && confirmPassword) {
-            if (password !== confirmPassword) {
-                $('#password_confirmation').addClass('is-invalid');
-                $('#password_confirmation').next('.invalid-feedback').remove();
-                $('#password_confirmation').after('<div class="invalid-feedback">Passwords do not match</div>');
-            } else {
-                $('#password_confirmation').removeClass('is-invalid');
-                $('#password_confirmation').next('.invalid-feedback').remove();
-            }
-        }
-    });
-
-    // Form validation
-    $('form').submit(function(e) {
-        const password = $('#password').val();
-        const confirmPassword = $('#password_confirmation').val();
-
-        if (password && password !== confirmPassword) {
-            e.preventDefault();
-            alert('Password and confirm password do not match');
-            return false;
-        }
-
-        if (password && password.length < 8) {
-            e.preventDefault();
-            alert('Password must be at least 8 characters long');
-            return false;
-        }
-    });
-});
+    }
 </script>
 @endpush

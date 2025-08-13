@@ -1,140 +1,166 @@
 @extends('admin.layouts.app')
 
-@section('page-title', 'Admin Details')
+@section('title', 'Admin Details - ' . $admin->name)
 
-@section('content')
-<div class="container-fluid">
-    <!-- Page Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
+@section('header')
+    <div class="flex justify-between items-center">
         <div>
-            <h1 class="h3 mb-0 text-gray-800">Administrator Details</h1>
-            <p class="mb-0 text-gray-600">View administrator account information</p>
+            <h1 class="text-2xl font-bold text-gray-900">Administrator Details</h1>
+            <p class="text-gray-600">View and manage administrator account information</p>
         </div>
-        <div class="d-flex gap-2">
+        <div class="flex space-x-3">
+            <a href="{{ route('admin.admins.index') }}"
+               class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                <i class="fas fa-arrow-left mr-2"></i>
+                Back to Admins
+            </a>
             @if(auth('admin')->user()->id !== $admin->id && (auth('admin')->user()->hasRole('super_admin') || (auth('admin')->user()->hasRole('admin') && $admin->role !== 'super_admin')))
-            <a href="{{ route('admin.admins.edit', $admin) }}" class="btn btn-primary">
-                <i class="fas fa-edit"></i> Edit Admin
+            <a href="{{ route('admin.admins.edit', $admin) }}"
+               class="bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                <i class="fas fa-edit mr-2"></i>
+                Edit Admin
             </a>
             @endif
-            <a href="{{ route('admin.admins.index') }}" class="btn btn-secondary">
-                <i class="fas fa-arrow-left"></i> Back to Admins
-            </a>
         </div>
     </div>
+@endsection
 
-    <div class="row">
-        <!-- Main Profile Information -->
-        <div class="col-lg-8">
-            <!-- Personal Information -->
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="mb-0">Personal Information</h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-3 text-center mb-3">
+@section('content')
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <!-- Administrator Information Card -->
+        <div class="lg:col-span-2">
+            <div class="bg-white rounded-lg shadow-md">
+                <div class="p-6">
+                    <div class="flex items-start space-x-6">
+                        <!-- Profile Picture -->
+                        <div class="flex-shrink-0">
                             @if($admin->profile_image)
-                                <img src="{{ Storage::url($admin->profile_image) }}" alt="Profile"
-                                     class="rounded-circle" style="width: 120px; height: 120px; object-fit: cover;">
+                                <img class="h-20 w-20 rounded-full object-cover border-4 border-gray-200"
+                                     src="{{ Storage::url($admin->profile_image) }}"
+                                     alt="{{ $admin->name }}">
                             @else
-                                <div class="rounded-circle bg-primary d-inline-flex align-items-center justify-content-center text-white"
-                                     style="width: 120px; height: 120px; font-size: 3rem; font-weight: bold;">
+                                <div class="h-20 w-20 rounded-full bg-primary flex items-center justify-center text-white text-2xl font-bold border-4 border-gray-200">
                                     {{ strtoupper(substr($admin->name, 0, 1)) }}
                                 </div>
                             @endif
                         </div>
-                        <div class="col-md-9">
-                            <table class="table table-borderless">
-                                <tr>
-                                    <td class="fw-semibold text-muted" width="120">Name:</td>
-                                    <td>{{ $admin->name }}</td>
-                                </tr>
-                                <tr>
-                                    <td class="fw-semibold text-muted">Email:</td>
-                                    <td>{{ $admin->email }}</td>
-                                </tr>
-                                <tr>
-                                    <td class="fw-semibold text-muted">Phone:</td>
-                                    <td>{{ $admin->phone ?: 'Not provided' }}</td>
-                                </tr>
-                                <tr>
-                                    <td class="fw-semibold text-muted">Role:</td>
-                                    <td>
-                                        <span class="badge role-badge role-{{ str_replace(' ', '_', strtolower($admin->getRoleDisplayName())) }}">
-                                            {{ $admin->getRoleDisplayName() }}
-                                        </span>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td class="fw-semibold text-muted">Status:</td>
-                                    <td>
-                                        <span class="badge status-badge status-{{ $admin->status }}">
-                                            {{ ucfirst($admin->status) }}
-                                        </span>
-                                    </td>
-                                </tr>
-                            </table>
+
+                        <!-- Admin Info -->
+                        <div class="flex-1">
+                            <div class="flex items-center justify-between">
+                                <h2 class="text-xl font-bold text-gray-900">{{ $admin->name }}</h2>
+                                <div class="flex items-center space-x-2">
+                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                        @if($admin->status === 'active')
+                                            bg-green-100 text-green-800
+                                        @elseif($admin->status === 'suspended')
+                                            bg-yellow-100 text-yellow-800
+                                        @else
+                                            bg-red-100 text-red-800
+                                        @endif">
+                                        {{ ucfirst($admin->status) }}
+                                    </span>
+                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                                        @if($admin->role === 'super_admin')
+                                            bg-purple-100 text-purple-800
+                                        @elseif($admin->role === 'admin')
+                                            bg-blue-100 text-blue-800
+                                        @elseif($admin->role === 'moderator')
+                                            bg-green-100 text-green-800
+                                        @else
+                                            bg-yellow-100 text-yellow-800
+                                        @endif">
+                                        {{ $admin->getRoleDisplayName() }}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class="mt-2 space-y-2">
+                                <p class="text-gray-600">
+                                    <i class="fas fa-envelope mr-2 text-gray-400"></i>
+                                    {{ $admin->email }}
+                                </p>
+
+                                @if($admin->phone)
+                                <p class="text-gray-600">
+                                    <i class="fas fa-phone mr-2 text-gray-400"></i>
+                                    {{ $admin->phone }}
+                                </p>
+                                @endif
+
+                                <p class="text-gray-600">
+                                    <i class="fas fa-calendar mr-2 text-gray-400"></i>
+                                    Created {{ $admin->created_at->format('M d, Y') }}
+                                </p>
+
+                                @if($admin->last_login_at)
+                                <p class="text-gray-600">
+                                    <i class="fas fa-clock mr-2 text-gray-400"></i>
+                                    Last login {{ $admin->last_login_at->diffForHumans() }}
+                                </p>
+                                @endif
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Account Security -->
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="mb-0">Account Security</h5>
+            <!-- Account Security Information -->
+            <div class="bg-white rounded-lg shadow-md mt-6">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900">Account Security</h3>
                 </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <table class="table table-borderless">
-                                <tr>
-                                    <td class="fw-semibold text-muted">Last Login:</td>
-                                    <td>{{ $admin->last_login_at ? $admin->last_login_at->format('M d, Y \a\t g:i A') : 'Never logged in' }}</td>
-                                </tr>
-                                <tr>
-                                    <td class="fw-semibold text-muted">Last OTP Sent:</td>
-                                    <td>{{ $admin->last_otp_sent_at ? $admin->last_otp_sent_at->format('M d, Y \a\t g:i A') : 'Never' }}</td>
-                                </tr>
-                                <tr>
-                                    <td class="fw-semibold text-muted">Failed Attempts:</td>
-                                    <td>
-                                        @if($admin->failed_login_attempts > 0)
-                                            <span class="text-warning">{{ $admin->failed_login_attempts }}</span>
-                                        @else
-                                            <span class="text-success">0</span>
-                                        @endif
-                                    </td>
-                                </tr>
-                            </table>
+                <div class="p-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="space-y-4">
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-500">Last Login:</span>
+                                <span class="text-gray-900">{{ $admin->last_login_at ? $admin->last_login_at->format('M d, Y g:i A') : 'Never' }}</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-500">Last OTP Sent:</span>
+                                <span class="text-gray-900">{{ $admin->last_otp_sent_at ? $admin->last_otp_sent_at->format('M d, Y g:i A') : 'Never' }}</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-500">Failed Attempts:</span>
+                                <span class="@if($admin->failed_login_attempts > 0) text-yellow-600 @else text-green-600 @endif">
+                                    {{ $admin->failed_login_attempts }}
+                                </span>
+                            </div>
                         </div>
-                        <div class="col-md-6">
-                            <table class="table table-borderless">
-                                <tr>
-                                    <td class="fw-semibold text-muted">Force Password Change:</td>
-                                    <td>
-                                        @if($admin->force_password_change)
-                                            <span class="badge bg-warning">Yes</span>
-                                        @else
-                                            <span class="badge bg-success">No</span>
-                                        @endif
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td class="fw-semibold text-muted">Account Locked:</td>
-                                    <td>
-                                        @if($admin->isLocked())
-                                            <span class="badge bg-danger">Yes (until {{ $admin->locked_until->format('M d, Y g:i A') }})</span>
-                                        @else
-                                            <span class="badge bg-success">No</span>
-                                        @endif
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td class="fw-semibold text-muted">Created:</td>
-                                    <td>{{ $admin->created_at->format('M d, Y \a\t g:i A') }}</td>
-                                </tr>
-                            </table>
+                        <div class="space-y-4">
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-500">Force Password Change:</span>
+                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium
+                                    @if($admin->force_password_change)
+                                        bg-yellow-100 text-yellow-800
+                                    @else
+                                        bg-green-100 text-green-800
+                                    @endif">
+                                    @if($admin->force_password_change) Yes @else No @endif
+                                </span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-500">Account Locked:</span>
+                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium
+                                    @if($admin->isLocked())
+                                        bg-red-100 text-red-800
+                                    @else
+                                        bg-green-100 text-green-800
+                                    @endif">
+                                    @if($admin->isLocked())
+                                        Yes (until {{ $admin->locked_until->format('M d, Y g:i A') }})
+                                    @else
+                                        No
+                                    @endif
+                                </span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-500">Created:</span>
+                                <span class="text-gray-900">{{ $admin->created_at->format('M d, Y g:i A') }}</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -142,182 +168,249 @@
 
             <!-- Permissions -->
             @if($admin->permissions && count($admin->permissions) > 0)
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="mb-0">Additional Permissions</h5>
+            <div class="bg-white rounded-lg shadow-md mt-6">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900">Additional Permissions ({{ count($admin->permissions) }})</h3>
                 </div>
-                <div class="card-body">
-                    <div class="row">
+                <div class="p-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         @foreach($admin->permissions as $permission)
-                        <div class="col-md-6 mb-2">
-                            <i class="fas fa-check text-success me-2"></i>
-                            {{ ucwords(str_replace('_', ' ', $permission)) }}
+                        <div class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-check text-green-500"></i>
+                            </div>
+                            <div class="flex-1">
+                                <p class="text-sm font-medium text-gray-900">{{ ucwords(str_replace('_', ' ', $permission)) }}</p>
+                            </div>
                         </div>
                         @endforeach
+                    </div>
+                </div>
+            </div>
+            @else
+            <div class="bg-white rounded-lg shadow-md mt-6">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900">Additional Permissions</h3>
+                </div>
+                <div class="p-6">
+                    <div class="text-center py-8">
+                        <i class="fas fa-shield-alt text-4xl text-gray-300 mb-4"></i>
+                        <p class="text-gray-500">No additional permissions assigned beyond role permissions.</p>
                     </div>
                 </div>
             </div>
             @endif
         </div>
 
-        <!-- Sidebar -->
-        <div class="col-lg-4">
+        <!-- Actions Sidebar -->
+        <div class="lg:col-span-1">
             <!-- Quick Actions -->
             @if(auth('admin')->user()->id !== $admin->id && (auth('admin')->user()->hasRole('super_admin') || (auth('admin')->user()->hasRole('admin') && $admin->role !== 'super_admin')))
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h6 class="mb-0">Quick Actions</h6>
+            <div class="bg-white rounded-lg shadow-md">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900">Quick Actions</h3>
                 </div>
-                <div class="card-body d-grid gap-2">
-                    <!-- Status Actions -->
-                    <div class="btn-group" role="group">
-                        <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
-                            <i class="fas fa-cog"></i> Change Status
-                        </button>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item status-change" href="#" data-status="active">Activate</a></li>
-                            <li><a class="dropdown-item status-change" href="#" data-status="inactive">Deactivate</a></li>
-                            <li><a class="dropdown-item status-change" href="#" data-status="suspended">Suspend</a></li>
-                        </ul>
-                    </div>
+                <div class="p-6 space-y-3" x-data="adminActions()">
 
-                    <!-- Reset Password -->
-                    <button class="btn btn-outline-warning reset-password">
-                        <i class="fas fa-key"></i> Reset Password
+                    @if($admin->status === 'active')
+                    <button @click="updateStatus('inactive')"
+                            class="w-full bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                        <i class="fas fa-pause mr-2"></i>
+                        Deactivate Admin
+                    </button>
+                    @elseif($admin->status === 'inactive')
+                    <button @click="updateStatus('active')"
+                            class="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                        <i class="fas fa-play mr-2"></i>
+                        Activate Admin
+                    </button>
+                    @endif
+
+                    @if($admin->status !== 'suspended')
+                    <button @click="updateStatus('suspended')"
+                            class="w-full bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                        <i class="fas fa-ban mr-2"></i>
+                        Suspend Admin
+                    </button>
+                    @else
+                    <button @click="updateStatus('active')"
+                            class="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                        <i class="fas fa-unlock mr-2"></i>
+                        Unsuspend Admin
+                    </button>
+                    @endif
+
+                    <button @click="resetPassword()"
+                            class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                        <i class="fas fa-key mr-2"></i>
+                        Reset Password
                     </button>
 
-                    <!-- Edit Admin -->
-                    <a href="{{ route('admin.admins.edit', $admin) }}" class="btn btn-outline-primary">
-                        <i class="fas fa-edit"></i> Edit Admin
+                    <a href="{{ route('admin.admins.edit', $admin) }}"
+                       class="w-full bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-md text-sm font-medium transition-colors inline-block text-center">
+                        <i class="fas fa-edit mr-2"></i>
+                        Edit Admin
                     </a>
 
-                    <!-- Delete Admin (Super Admin Only) -->
                     @if(auth('admin')->user()->hasRole('super_admin'))
-                    <button class="btn btn-outline-danger delete-admin" data-id="{{ $admin->id }}">
-                        <i class="fas fa-trash"></i> Delete Admin
+                    <hr class="my-4">
+                    <button @click="deleteAdmin()"
+                            class="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                        <i class="fas fa-trash mr-2"></i>
+                        Delete Admin
                     </button>
                     @endif
                 </div>
             </div>
             @endif
 
-            <!-- Activity Summary -->
-            <div class="card">
-                <div class="card-header">
-                    <h6 class="mb-0">Activity Summary</h6>
+            <!-- Account Statistics -->
+            <div class="bg-white rounded-lg shadow-md mt-6">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900">Account Details</h3>
                 </div>
-                <div class="card-body">
-                    <div class="row text-center">
-                        <div class="col-6">
-                            <div class="border-end">
-                                <h4 class="mb-1">{{ $admin->created_at->diffInDays() }}</h4>
-                                <small class="text-muted">Days Active</small>
-                            </div>
-                        </div>
-                        <div class="col-6">
-                            <h4 class="mb-1">{{ $admin->last_login_at ? $admin->last_login_at->diffInDays() : 'N/A' }}</h4>
-                            <small class="text-muted">Days Since Login</small>
-                        </div>
+                <div class="p-6 space-y-3 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Admin ID:</span>
+                        <span class="text-gray-900">{{ $admin->id }}</span>
                     </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Created:</span>
+                        <span class="text-gray-900">{{ $admin->created_at->format('M d, Y') }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Role:</span>
+                        <span class="text-gray-900">{{ $admin->getRoleDisplayName() }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Status:</span>
+                        <span class="text-gray-900">
+                            @if($admin->status === 'suspended')
+                                <span class="text-yellow-600">Suspended</span>
+                            @elseif($admin->status === 'inactive')
+                                <span class="text-red-600">Inactive</span>
+                            @else
+                                <span class="text-green-600">Active</span>
+                            @endif
+                        </span>
+                    </div>
+                    @if($admin->last_login_at)
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Last Login:</span>
+                        <span class="text-gray-900">{{ $admin->last_login_at->diffForHumans() }}</span>
+                    </div>
+                    @endif
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Days Active:</span>
+                        <span class="text-gray-900">{{ $admin->created_at->diffInDays() }}</span>
+                    </div>
+                    @if($admin->isLocked())
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Account Locked:</span>
+                        <span class="text-red-600">Until {{ $admin->locked_until->format('M d, Y g:i A') }}</span>
+                    </div>
+                    @endif
+                    @if($admin->force_password_change)
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Password Change:</span>
+                        <span class="text-yellow-600">Required</span>
+                    </div>
+                    @endif
                 </div>
             </div>
         </div>
     </div>
-</div>
 @endsection
-
-@push('styles')
-<style>
-.status-badge {
-    font-size: 0.75rem;
-    padding: 0.25rem 0.5rem;
-}
-
-.status-active { background-color: #d4edda; color: #155724; }
-.status-inactive { background-color: #f8d7da; color: #721c24; }
-.status-suspended { background-color: #fff3cd; color: #856404; }
-
-.role-badge {
-    font-size: 0.75rem;
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.375rem;
-}
-
-.role-super_admin { background-color: #e7e3ff; color: #5b21b6; }
-.role-admin { background-color: #dbeafe; color: #1e40af; }
-.role-moderator { background-color: #d1fae5; color: #065f46; }
-.role-content_manager { background-color: #fef3c7; color: #92400e; }
-</style>
-@endpush
 
 @push('scripts')
 <script>
-$(document).ready(function() {
-    // Status change
-    $('.status-change').click(function(e) {
-        e.preventDefault();
-        const status = $(this).data('status');
+    function adminActions() {
+        return {
+            async updateStatus(status) {
+                const action = status === 'active' ? 'activate' :
+                              status === 'inactive' ? 'deactivate' : 'suspend';
 
-        if (confirm(`Are you sure you want to ${status} this admin?`)) {
-            $.ajax({
-                url: '{{ route("admin.admins.update-status", $admin) }}',
-                method: 'PATCH',
-                data: {
-                    status: status,
-                    _token: $('meta[name="csrf-token"]').attr('content')
-                },
-                success: function(response) {
-                    location.reload();
-                },
-                error: function(xhr) {
-                    alert(xhr.responseJSON?.message || 'Error updating status');
+                if (confirm(`Are you sure you want to ${action} this admin?`)) {
+                    try {
+                        const response = await fetch('{{ route("admin.admins.update-status", $admin) }}', {
+                            method: 'PATCH',
+                            headers: {
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ status: status })
+                        });
+
+                        const data = await response.json();
+                        if (response.ok) {
+                            showToast(data.message || 'Status updated successfully', 'success');
+                            setTimeout(() => window.location.reload(), 1500);
+                        } else {
+                            showToast(data.message || 'Error updating status', 'error');
+                        }
+                    } catch (error) {
+                        showToast('Error updating status', 'error');
+                    }
                 }
-            });
-        }
-    });
+            },
 
-    // Reset password
-    $('.reset-password').click(function(e) {
-        e.preventDefault();
+            async resetPassword() {
+                if (confirm('Are you sure you want to reset this admin\'s password?')) {
+                    try {
+                        const response = await fetch('{{ route("admin.admins.reset-password", $admin) }}', {
+                            method: 'PATCH',
+                            headers: {
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                                'Content-Type': 'application/json'
+                            }
+                        });
 
-        if (confirm('Are you sure you want to reset this admin\'s password?')) {
-            $.ajax({
-                url: '{{ route("admin.admins.reset-password", $admin) }}',
-                method: 'PATCH',
-                data: {
-                    _token: $('meta[name="csrf-token"]').attr('content')
-                },
-                success: function(response) {
-                    alert('Password reset successfully. New password: ' + response.new_password);
-                },
-                error: function(xhr) {
-                    alert(xhr.responseJSON?.message || 'Error resetting password');
+                        const data = await response.json();
+                        if (response.ok) {
+                            showToast('Password reset successfully. New password: ' + data.new_password, 'success');
+                        } else {
+                            showToast(data.message || 'Error resetting password', 'error');
+                        }
+                    } catch (error) {
+                        showToast('Error resetting password', 'error');
+                    }
                 }
-            });
-        }
-    });
+            },
 
-    // Delete admin
-    $('.delete-admin').click(function(e) {
-        e.preventDefault();
-        const adminId = $(this).data('id');
+            async deleteAdmin() {
+                if (confirm('Are you sure you want to delete this admin? This action cannot be undone.')) {
+                    try {
+                        const response = await fetch('{{ route("admin.admins.destroy", $admin) }}', {
+                            method: 'DELETE',
+                            headers: {
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                                'Content-Type': 'application/json'
+                            }
+                        });
 
-        if (confirm('Are you sure you want to delete this admin? This action cannot be undone.')) {
-            $.ajax({
-                url: `/admin/admins/${adminId}`,
-                method: 'DELETE',
-                data: {
-                    _token: $('meta[name="csrf-token"]').attr('content')
-                },
-                success: function(response) {
-                    window.location.href = '{{ route("admin.admins.index") }}';
-                },
-                error: function(xhr) {
-                    alert(xhr.responseJSON?.message || 'Error deleting admin');
+                        const data = await response.json();
+                        if (response.ok) {
+                            showToast('Admin deleted successfully', 'success');
+                            setTimeout(() => window.location.href = '{{ route("admin.admins.index") }}', 1500);
+                        } else {
+                            showToast(data.message || 'Error deleting admin', 'error');
+                        }
+                    } catch (error) {
+                        showToast('Error deleting admin', 'error');
+                    }
                 }
-            });
+            }
         }
-    });
-});
+    }
+
+    function showToast(message, type = 'success') {
+        const toast = document.createElement('div');
+        toast.className = `fixed top-4 right-4 px-4 py-2 rounded-md shadow-lg z-50 text-white max-w-sm ${
+            type === 'success' ? 'bg-green-500' : 'bg-red-500'
+        }`;
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 5000);
+    }
 </script>
 @endpush

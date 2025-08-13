@@ -29,7 +29,7 @@ class AdminManagementController extends Controller
     }
 
     /**
-     * Get admins data for DataTables (AJAX)
+     * Get admins data for Alpine.js (AJAX)
      */
     public function getAdmins(Request $request)
     {
@@ -43,8 +43,8 @@ class AdminManagementController extends Controller
         }
 
         // Search functionality
-        if ($request->has('search') && $request->search['value']) {
-            $search = $request->search['value'];
+        if ($request->has('search') && $request->search) {
+            $search = $request->search;
             $query->where(function($q) use ($search) {
                 $q->where('name', 'LIKE', "%{$search}%")
                   ->orWhere('email', 'LIKE', "%{$search}%")
@@ -62,42 +62,37 @@ class AdminManagementController extends Controller
             $query->where('status', $request->status);
         }
 
-        $totalRecords = $query->count();
+        // Default ordering
+        $query->orderBy('created_at', 'desc');
 
-        // Ordering
-        if ($request->has('order')) {
-            $orderColumn = $request->columns[$request->order[0]['column']]['data'];
-            $orderDirection = $request->order[0]['dir'];
-            $query->orderBy($orderColumn, $orderDirection);
-        } else {
-            $query->orderBy('created_at', 'desc');
-        }
+        // Paginate results
+        $perPage = $request->get('per_page', 15);
+        $admins = $query->paginate($perPage);
 
-        // Pagination
-        if ($request->has('length') && $request->length > 0) {
-            $query->skip($request->start)->take($request->length);
-        }
-
-        $admins = $query->get();
+        // Transform the data
+        $transformedData = $admins->getCollection()->map(function($admin) use ($currentAdmin) {
+            return [
+                'id' => $admin->id,
+                'name' => $admin->name,
+                'email' => $admin->email,
+                'role' => $admin->getRoleDisplayName(),
+                'status' => $admin->status,
+                'last_login_at' => $admin->last_login_at ? $admin->last_login_at->diffForHumans() : 'Never',
+                'created_at' => $admin->created_at->format('M d, Y'),
+                'can_edit' => $currentAdmin->id !== $admin->id && ($currentAdmin->hasRole(Admin::ROLE_SUPER_ADMIN) || $admin->role !== Admin::ROLE_SUPER_ADMIN),
+                'can_delete' => $currentAdmin->id !== $admin->id && ($currentAdmin->hasRole(Admin::ROLE_SUPER_ADMIN) || $admin->role !== Admin::ROLE_SUPER_ADMIN),
+                'profile_image' => $admin->profile_image ? Storage::url($admin->profile_image) : null,
+            ];
+        });
 
         return response()->json([
-            'draw' => $request->draw,
-            'recordsTotal' => Admin::count(),
-            'recordsFiltered' => $totalRecords,
-            'data' => $admins->map(function($admin) use ($currentAdmin) {
-                return [
-                    'id' => $admin->id,
-                    'name' => $admin->name,
-                    'email' => $admin->email,
-                    'role' => $admin->getRoleDisplayName(),
-                    'status' => $admin->status,
-                    'last_login_at' => $admin->last_login_at ? $admin->last_login_at->diffForHumans() : 'Never',
-                    'created_at' => $admin->created_at->format('M d, Y'),
-                    'can_edit' => $currentAdmin->id !== $admin->id && ($currentAdmin->hasRole(Admin::ROLE_SUPER_ADMIN) || $admin->role !== Admin::ROLE_SUPER_ADMIN),
-                    'can_delete' => $currentAdmin->id !== $admin->id && ($currentAdmin->hasRole(Admin::ROLE_SUPER_ADMIN) || $admin->role !== Admin::ROLE_SUPER_ADMIN),
-                    'profile_image' => $admin->profile_image ? Storage::url($admin->profile_image) : null,
-                ];
-            })
+            'data' => $transformedData,
+            'current_page' => $admins->currentPage(),
+            'last_page' => $admins->lastPage(),
+            'from' => $admins->firstItem(),
+            'to' => $admins->lastItem(),
+            'total' => $admins->total(),
+            'per_page' => $admins->perPage(),
         ]);
     }
 
