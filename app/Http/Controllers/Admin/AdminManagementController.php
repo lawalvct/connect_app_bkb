@@ -9,7 +9,8 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
-use Intervention\Image\ImageManagerStatic as Image;
+use Intervention\Image\ImageManager;
+use Intervention\Image\Drivers\Gd\Driver;
 
 class AdminManagementController extends Controller
 {
@@ -159,8 +160,11 @@ class AdminManagementController extends Controller
             $image = $request->file('profile_image');
             $filename = 'admin_' . uniqid() . '.' . $image->getClientOriginalExtension();
 
+            // Create ImageManager instance
+            $manager = new ImageManager(new Driver());
+
             // Resize and save image
-            $resizedImage = Image::make($image)->resize(200, 200)->encode();
+            $resizedImage = $manager->read($image)->resize(200, 200)->encode();
             Storage::disk('public')->put('admin/profiles/' . $filename, $resizedImage);
 
             $adminData['profile_image'] = 'admin/profiles/' . $filename;
@@ -286,8 +290,11 @@ class AdminManagementController extends Controller
             $image = $request->file('profile_image');
             $filename = 'admin_' . uniqid() . '.' . $image->getClientOriginalExtension();
 
+            // Create ImageManager instance
+            $manager = new ImageManager(new Driver());
+
             // Resize and save image
-            $resizedImage = Image::make($image)->resize(200, 200)->encode();
+            $resizedImage = $manager->read($image)->resize(200, 200)->encode();
             Storage::disk('public')->put('admin/profiles/' . $filename, $resizedImage);
 
             $updateData['profile_image'] = 'admin/profiles/' . $filename;

@@ -214,18 +214,44 @@
                                       placeholder="Enter test notification message"></textarea>
                         </div>
 
-                        <button type="submit"
-                                :disabled="sending"
-                                class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center">
-                            <span x-show="!sending">Send Test Notification</span>
-                            <span x-show="sending" class="flex items-center">
-                                <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                Sending...
-                            </span>
-                        </button>
+                        <div class="flex gap-3">
+                            <button type="submit"
+                                    :disabled="sending"
+                                    class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center">
+                                <span x-show="!sending">Send Test (Server)</span>
+                                <span x-show="sending" class="flex items-center">
+                                    <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Sending...
+                                </span>
+                            </button>
+
+                            <button type="button"
+                                    @click="sendClientTest()"
+                                    :disabled="sendingClient"
+                                    class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center">
+                                <span x-show="!sendingClient">Send Test (Browser)</span>
+                                <span x-show="sendingClient" class="flex items-center">
+                                    <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Sending...
+                                </span>
+                            </button>
+                        </div>
+
+                        <div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                            <div class="flex items-start">
+                                <i class="fas fa-info-circle text-blue-500 mr-2 mt-0.5"></i>
+                                <div class="text-sm text-blue-700">
+                                    <p><strong>Server Test:</strong> Uses Laravel backend + FCM API (may fail if FCM Legacy API is disabled)</p>
+                                    <p class="mt-1"><strong>Browser Test:</strong> Uses browser's native notification API (works locally)</p>
+                                </div>
+                            </div>
+                        </div>
                     </form>
                 </div>
             </div>
@@ -327,8 +353,26 @@
 @endsection
 
 @push('scripts')
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js"></script>
+
 <script>
-// Firebase configuration - move this to your main layout if needed
+// Debug: Log configuration values
+console.log('Firebase Configuration Debug:');
+console.log('API Key:', "{{ config('services.firebase.api_key') }}");
+console.log('Project ID:', "{{ config('services.firebase.project_id') }}");
+console.log('Auth Domain:', "{{ config('services.firebase.auth_domain') }}");
+
+// Debug: Check admin authentication
+@auth('admin')
+console.log('✅ Admin authenticated:', "{{ auth('admin')->user()->email }}");
+@else
+console.error('❌ Admin NOT authenticated - subscription will fail!');
+console.log('🔑 Please login at: http://localhost:8000/admin/login');
+@endauth
+
+// Firebase configuration
 const firebaseConfig = {
     apiKey: "{{ config('services.firebase.api_key') }}",
     authDomain: "{{ config('services.firebase.auth_domain') }}",
@@ -338,9 +382,39 @@ const firebaseConfig = {
     appId: "{{ config('services.firebase.app_id') }}"
 };
 
-// Initialize Firebase if not already done
-if (typeof firebase === 'undefined' || !firebase.apps.length) {
+// Debug: Log final config object
+console.log('Final Firebase Config:', firebaseConfig);
+
+// Check for empty values
+const emptyKeys = Object.keys(firebaseConfig).filter(key => !firebaseConfig[key] || firebaseConfig[key] === '');
+if (emptyKeys.length > 0) {
+    console.error('Missing Firebase configuration keys:', emptyKeys);
+    alert('Firebase configuration incomplete. Missing keys: ' + emptyKeys.join(', ') + '. Please check your .env file.');
+}
+
+// Initialize Firebase
+if (!firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
+}
+
+// Initialize messaging and register service worker
+let messaging;
+try {
+    messaging = firebase.messaging();
+
+    // Register service worker for messaging
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/firebase-messaging-sw.js')
+            .then((registration) => {
+                console.log('Service Worker registered successfully:', registration);
+                messaging.useServiceWorker(registration);
+            })
+            .catch((error) => {
+                console.error('Service Worker registration failed:', error);
+            });
+    }
+} catch (error) {
+    console.error('Failed to initialize Firebase messaging:', error);
 }
 
 // Alpine.js components
@@ -355,9 +429,29 @@ function notificationSubscription() {
             this.checkSubscriptionStatus();
         },
 
+        // Helper function to convert VAPID key
+        urlBase64ToUint8Array(base64String) {
+            const padding = '='.repeat((4 - base64String.length % 4) % 4);
+            const base64 = (base64String + padding)
+                .replace(/\-/g, '+')
+                .replace(/_/g, '/');
+
+            const rawData = window.atob(base64);
+            const outputArray = new Uint8Array(rawData.length);
+
+            for (let i = 0; i < rawData.length; ++i) {
+                outputArray[i] = rawData.charCodeAt(i);
+            }
+            return outputArray;
+        },
+
         async checkSubscriptionStatus() {
             try {
-                const messaging = firebase.messaging();
+                if (!messaging) {
+                    console.warn('Firebase messaging not initialized');
+                    return;
+                }
+
                 const currentToken = await messaging.getToken({
                     vapidKey: "{{ config('services.firebase.vapid_key') }}"
                 });
@@ -365,6 +459,9 @@ function notificationSubscription() {
                 if (currentToken) {
                     this.currentToken = currentToken;
                     this.isSubscribed = true;
+                    console.log('Current FCM token:', currentToken);
+                } else {
+                    console.log('No FCM token available');
                 }
             } catch (error) {
                 console.error('Error checking subscription status:', error);
@@ -374,33 +471,85 @@ function notificationSubscription() {
         async subscribe() {
             this.subscribing = true;
             try {
-                const messaging = firebase.messaging();
+                if (!messaging) {
+                    throw new Error('Firebase messaging not initialized');
+                }
 
-                // Request permission
+                // Request permission first
                 const permission = await Notification.requestPermission();
                 if (permission !== 'granted') {
                     throw new Error('Notification permission denied');
                 }
 
-                // Get token
-                const token = await messaging.getToken({
-                    vapidKey: "{{ config('services.firebase.vapid_key') }}"
-                });
+                // Get token with VAPID key
+                console.log('Attempting to get FCM token with VAPID key...');
+                const vapidKey = "{{ config('services.firebase.vapid_key') }}";
+                console.log('VAPID key (first 20 chars):', vapidKey.substring(0, 20) + '...');
+
+                let token;
+                try {
+                    // Try with VAPID key first
+                    token = await messaging.getToken({
+                        vapidKey: vapidKey
+                    });
+                } catch (vapidError) {
+                    console.warn('Failed with VAPID key, trying without:', vapidError.message);
+                    // If VAPID key fails, try without it for testing
+                    try {
+                        token = await messaging.getToken();
+                    } catch (noVapidError) {
+                        throw new Error('Failed to get token both with and without VAPID key: ' + noVapidError.message);
+                    }
+                }
 
                 if (token) {
-                    // Send token to server
+                    console.log('FCM token obtained:', token);
+
+                    // Also get Web Push subscription for server-side push
+                    let webPushSubscription = null;
+                    try {
+                        if ('serviceWorker' in navigator && 'PushManager' in window) {
+                            const registration = await navigator.serviceWorker.ready;
+                            const vapidPublicKey = "{{ config('services.vapid.public_key') }}";
+
+                            if (vapidPublicKey && vapidPublicKey !== 'your-vapid-public-key-here') {
+                                webPushSubscription = await registration.pushManager.subscribe({
+                                    userVisibleOnly: true,
+                                    applicationServerKey: this.urlBase64ToUint8Array(vapidPublicKey)
+                                });
+                                console.log('Web Push subscription obtained');
+                            }
+                        }
+                    } catch (webPushError) {
+                        console.warn('Failed to get Web Push subscription:', webPushError.message);
+                        // Continue without Web Push - FCM might still work
+                    }
+
+                    // Send token and web push subscription to server
+                    const subscriptionData = {
+                        fcm_token: token,
+                        device_name: navigator.userAgent,
+                        platform: 'web',
+                        browser: this.getBrowserName()
+                    };
+
+                    // Add Web Push data if available
+                    if (webPushSubscription) {
+                        subscriptionData.push_endpoint = webPushSubscription.endpoint;
+                        subscriptionData.push_p256dh = btoa(String.fromCharCode.apply(null, new Uint8Array(webPushSubscription.getKey('p256dh'))));
+                        subscriptionData.push_auth = btoa(String.fromCharCode.apply(null, new Uint8Array(webPushSubscription.getKey('auth'))));
+                        subscriptionData.subscription_type = 'both'; // FCM + Web Push
+                    } else {
+                        subscriptionData.subscription_type = 'fcm'; // FCM only
+                    }
+
                     const response = await fetch('/admin/api/notifications/admin-fcm/subscribe', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                         },
-                        body: JSON.stringify({
-                            fcm_token: token,
-                            device_name: navigator.userAgent,
-                            platform: 'web',
-                            browser: this.getBrowserName()
-                        })
+                        body: JSON.stringify(subscriptionData)
                     });
 
                     const result = await response.json();
@@ -413,8 +562,25 @@ function notificationSubscription() {
                     }
                 }
             } catch (error) {
-                console.error('Error subscribing:', error);
-                this.showNotification('Failed to subscribe: ' + error.message, 'error');
+                console.error('Subscription error:', error);
+
+                // Provide specific guidance based on error type
+                let errorMessage = 'Failed to subscribe: ' + error.message;
+
+                if (error.message.includes('authentication credential')) {
+                    errorMessage += '\n\n🔑 SOLUTION: You need to get the correct VAPID key from Firebase Console:\n';
+                    errorMessage += '1. Go to: https://console.firebase.google.com/project/connect-app-fbaca\n';
+                    errorMessage += '2. Project Settings → Cloud Messaging → Web Push certificates\n';
+                    errorMessage += '3. Generate key pair or copy existing key\n';
+                    errorMessage += '4. Update FIREBASE_VAPID_KEY in your .env file\n';
+                    errorMessage += '5. Run: php artisan config:clear';
+                } else if (error.message.includes('permission')) {
+                    errorMessage += '\n\n🔔 Please allow notifications when prompted by your browser.';
+                } else if (error.message.includes('not initialized')) {
+                    errorMessage += '\n\n⚙️ Firebase messaging failed to initialize. Check browser console for details.';
+                }
+
+                this.showNotification(errorMessage, 'error');
             }
             this.subscribing = false;
         },
@@ -606,6 +772,7 @@ function testNotifications() {
             body: 'This is a test notification for admin panel'
         },
         sending: false,
+        sendingClient: false,
 
         async sendTest() {
             if (!this.testData.title || !this.testData.body) {
@@ -635,6 +802,49 @@ function testNotifications() {
                 alert('Failed to send test notification: ' + error.message);
             }
             this.sending = false;
+        },
+
+        async sendClientTest() {
+            if (!this.testData.title || !this.testData.body) {
+                alert('Please enter both title and message');
+                return;
+            }
+
+            this.sendingClient = true;
+            try {
+                // Check if notifications are supported
+                if (!('Notification' in window)) {
+                    throw new Error('This browser does not support notifications');
+                }
+
+                // Request permission if needed
+                let permission = Notification.permission;
+                if (permission === 'default') {
+                    permission = await Notification.requestPermission();
+                }
+
+                if (permission === 'granted') {
+                    // Create a browser notification
+                    const notification = new Notification(this.testData.title, {
+                        body: this.testData.body,
+                        icon: '/favicon.ico',
+                        badge: '/favicon.ico',
+                        tag: 'admin-test-' + Date.now(),
+                        requireInteraction: false
+                    });
+
+                    // Auto-close after 5 seconds
+                    setTimeout(() => notification.close(), 5000);
+
+                    alert('✅ Browser notification sent successfully! Check your notifications.');
+                } else {
+                    throw new Error('Notification permission was denied');
+                }
+            } catch (error) {
+                console.error('Error sending client test:', error);
+                alert('Failed to send browser notification: ' + error.message);
+            }
+            this.sendingClient = false;
         }
     }
 }

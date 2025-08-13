@@ -13,6 +13,10 @@ class AdminFcmToken extends Model
     protected $fillable = [
         'admin_id',
         'fcm_token',
+        'push_endpoint',
+        'push_p256dh',
+        'push_auth',
+        'subscription_type',
         'device_id',
         'device_name',
         'platform',

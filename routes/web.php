@@ -27,6 +27,16 @@ Route::get('/test-conversation', function () {
     return view('test-conversation');
 });
 
+// Firebase configuration test page
+Route::get('/firebase-test', function () {
+    return view('firebase-test');
+});
+
+// Firebase setup helper page
+Route::get('/firebase-setup', function () {
+    return view('firebase-setup-helper');
+});
+
 // Broadcasting authentication route for Pusher
 Route::post('/broadcasting/auth', function (Request $request) {
     // This will handle Pusher channel authentication
@@ -270,9 +280,99 @@ Route::get('api/v1/auth/google/callback', [AuthController::class, 'handleGoogleC
 
 Route::get('/payment/callback', [SubscriptionController::class, 'handleNombaCallbackWeb'])->name('payment.callback.web');
 
+// Firebase service worker with dynamic config
+Route::get('/firebase-messaging-sw.js', function () {
+    $config = [
+        'apiKey' => config('services.firebase.api_key'),
+        'authDomain' => config('services.firebase.auth_domain'),
+        'projectId' => config('services.firebase.project_id'),
+        'storageBucket' => config('services.firebase.storage_bucket'),
+        'messagingSenderId' => config('services.firebase.messaging_sender_id'),
+        'appId' => config('services.firebase.app_id'),
+    ];
+
+    $js = "
+// firebase-messaging-sw.js
+
+// Import Firebase scripts
+importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js');
+
+// Firebase configuration
+const firebaseConfig = " . json_encode($config) . ";
+
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
+
+// Retrieve Firebase Messaging object
+const messaging = firebase.messaging();
+
+// Handle background messages
+messaging.onBackgroundMessage(function(payload) {
+    console.log('[firebase-messaging-sw.js] Received background message ', payload);
+
+    const notificationTitle = payload.notification?.title || payload.data?.title || 'Admin Notification';
+    const notificationOptions = {
+        body: payload.notification?.body || payload.data?.body || 'You have a new notification',
+        icon: payload.notification?.icon || '/admin-assets/img/logo.png',
+        badge: '/admin-assets/img/badge.png',
+        tag: payload.data?.type || 'admin-notification',
+        requireInteraction: true,
+        data: {
+            url: payload.data?.url || '/admin/dashboard',
+            type: payload.data?.type || 'general',
+            ...payload.data
+        }
+    };
+
+    self.registration.showNotification(notificationTitle, notificationOptions);
+});
+
+// Handle notification click
+self.addEventListener('notificationclick', function(event) {
+    console.log('[firebase-messaging-sw.js] Notification click received.');
+
+    event.notification.close();
+
+    // Get URL from notification data
+    const url = event.notification.data?.url || '/admin/dashboard';
+
+    event.waitUntil(
+        clients.matchAll({
+            type: 'window',
+            includeUncontrolled: true
+        }).then(function(clientList) {
+            // Check if admin panel is already open
+            for (let i = 0; i < clientList.length; i++) {
+                const client = clientList[i];
+                if (client.url.includes('/admin') && 'focus' in client) {
+                    client.navigate(url);
+                    return client.focus();
+                }
+            }
+
+            // Open new window/tab if admin panel not found
+            if (clients.openWindow) {
+                return clients.openWindow(url);
+            }
+        })
+    );
+});
+";
+
+    return response($js)
+        ->header('Content-Type', 'application/javascript')
+        ->header('Service-Worker-Allowed', '/');
+});
 
 //for ads redirection
     Route::get('/payment/{payment}/success', [AdController::class, 'paymentSuccess'])
         ->name('ads.payment.success');
     Route::get('/payment/{payment}/cancel', [AdController::class, 'paymentCancel'])
         ->name('ads.payment.cancel');
+Route::get('/debug/web-push-check', function () {
+    return response()->json([
+        'vapid_public' => config('services.vapid.public_key'),
+        'vapid_configured' => !empty(config('services.vapid.public_key')),
+    ]);
+});

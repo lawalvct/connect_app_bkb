@@ -603,6 +603,10 @@ class NotificationController extends Controller
     {
         $request->validate([
             'fcm_token' => 'required|string',
+            'push_endpoint' => 'nullable|string',
+            'push_p256dh' => 'nullable|string',
+            'push_auth' => 'nullable|string',
+            'subscription_type' => 'nullable|string|in:fcm,web_push,both',
             'device_name' => 'nullable|string',
             'platform' => 'nullable|string',
             'browser' => 'nullable|string',
@@ -616,35 +620,36 @@ class NotificationController extends Controller
             ->where('fcm_token', $request->fcm_token)
             ->first();
 
+        $tokenData = [
+            'device_name' => $request->device_name,
+            'platform' => $request->platform ?? 'web',
+            'browser' => $request->browser,
+            'push_endpoint' => $request->push_endpoint,
+            'push_p256dh' => $request->push_p256dh,
+            'push_auth' => $request->push_auth,
+            'subscription_type' => $request->subscription_type ?? 'fcm',
+            'is_active' => true,
+            'notification_preferences' => $request->notification_preferences ?? \App\Models\AdminFcmToken::getDefaultPreferences(),
+            'last_used_at' => now()
+        ];
+
         if ($existingToken) {
             // Update existing token
-            $existingToken->update([
-                'device_name' => $request->device_name,
-                'platform' => $request->platform ?? 'web',
-                'browser' => $request->browser,
-                'is_active' => true,
-                'notification_preferences' => $request->notification_preferences ?? \App\Models\AdminFcmToken::getDefaultPreferences(),
-                'last_used_at' => now()
-            ]);
+            $existingToken->update($tokenData);
             $token = $existingToken;
         } else {
             // Create new token
-            $token = \App\Models\AdminFcmToken::create([
+            $token = \App\Models\AdminFcmToken::create(array_merge($tokenData, [
                 'admin_id' => $admin->id,
                 'fcm_token' => $request->fcm_token,
-                'device_name' => $request->device_name,
-                'platform' => $request->platform ?? 'web',
-                'browser' => $request->browser,
-                'is_active' => true,
-                'notification_preferences' => $request->notification_preferences ?? \App\Models\AdminFcmToken::getDefaultPreferences(),
-                'last_used_at' => now()
-            ]);
+            ]));
         }
 
         return response()->json([
             'success' => true,
             'message' => 'Successfully subscribed to admin notifications',
             'token_id' => $token->id,
+            'subscription_type' => $token->subscription_type,
             'preferences' => $token->notification_preferences
         ]);
     }
@@ -742,7 +747,7 @@ class NotificationController extends Controller
                         'notification_type' => $type,
                         'admin_id' => $token->admin_id
                     ]),
-                    $token->admin_id
+                    null // Set user_id to null for admin notifications to avoid foreign key constraint
                 );
 
                 if ($result) {
