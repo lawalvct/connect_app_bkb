@@ -18,6 +18,7 @@ return new class extends Migration
             $table->string('name');
             $table->string('username')->unique();
             $table->string('email')->unique();
+              $table->string('phone')->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             $table->string('reset_otp')->nullable();
@@ -80,6 +81,10 @@ return new class extends Migration
             $table->boolean('is_banned')->default(false);
             $table->timestamp('banned_until')->nullable();
             $table->text('ban_reason')->nullable();
+
+            // Registration tracking
+            $table->integer('registration_step')->default(1);
+            $table->date('registration_completed_at')->nullable();
 
             // Metadata
             $table->unsignedBigInteger('created_by')->nullable();

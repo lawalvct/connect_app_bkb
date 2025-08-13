@@ -1,271 +1,329 @@
 @extends('admin.layouts.app')
 
 @section('title', 'Notification Subscription')
+@section('page-title', 'Notification Subscription')
 
 @section('content')
-<div class="container-fluid py-4">
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header pb-0">
-                    <div class="d-lg-flex">
-                        <div>
-                            <h5 class="mb-0">Admin Notification Subscription</h5>
-                            <p class="text-sm mb-0">
-                                Manage your notification preferences and devices
-                            </p>
+<div x-data="{ subscriptionData: null, devicesData: null }" x-init="loadInitialData()">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <!-- Subscription Status & Management -->
+        <div class="lg:col-span-2 space-y-6">
+
+            <!-- Current Subscription Status -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+                <div class="p-6 border-b border-gray-200">
+                    <h3 class="text-lg font-semibold text-gray-900">Subscription Status</h3>
+                    <p class="text-sm text-gray-500 mt-1">Manage your push notification subscription</p>
+                </div>
+
+                <div class="p-6" x-data="notificationSubscription()">
+                    <!-- Not Subscribed -->
+                    <div x-show="!isSubscribed" x-cloak class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <i class="fas fa-info-circle text-blue-500 mr-3"></i>
+                                <div>
+                                    <h4 class="text-sm font-medium text-blue-900">Not Subscribed</h4>
+                                    <p class="text-sm text-blue-700">Subscribe to receive push notifications on this device</p>
+                                </div>
+                            </div>
+                            <button @click="subscribe()"
+                                    :disabled="subscribing"
+                                    class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center">
+                                <span x-show="!subscribing">Subscribe</span>
+                                <span x-show="subscribing" class="flex items-center">
+                                    <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Subscribing...
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Subscribed -->
+                    <div x-show="isSubscribed" x-cloak class="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <i class="fas fa-check-circle text-green-500 mr-3"></i>
+                                <div>
+                                    <h4 class="text-sm font-medium text-green-900">Subscribed</h4>
+                                    <p class="text-sm text-green-700">You will receive push notifications on this device</p>
+                                </div>
+                            </div>
+                            <button @click="unsubscribe()"
+                                    :disabled="unsubscribing"
+                                    class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center">
+                                <span x-show="!unsubscribing">Unsubscribe</span>
+                                <span x-show="unsubscribing" class="flex items-center">
+                                    <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Unsubscribing...
+                                </span>
+                            </button>
                         </div>
                     </div>
                 </div>
-                <div class="card-body">
-                    <!-- Current Subscription Status -->
-                    <div class="row mb-4" x-data="notificationSubscription()">
-                        <div class="col-12">
-                            <div class="alert alert-info" x-show="!isSubscribed" x-cloak>
-                                <div class="d-flex align-items-center">
-                                    <i class="material-icons text-info me-2">info</i>
-                                    <div>
-                                        <strong>Not Subscribed</strong><br>
-                                        Subscribe to receive push notifications on this device
-                                    </div>
-                                    <button class="btn btn-info ms-auto" @click="subscribe()" :disabled="subscribing">
-                                        <span x-show="!subscribing">Subscribe</span>
-                                        <span x-show="subscribing">
-                                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
-                                            Subscribing...
-                                        </span>
-                                    </button>
+            </div>
+
+            <!-- Notification Preferences -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+                <div class="p-6 border-b border-gray-200">
+                    <h3 class="text-lg font-semibold text-gray-900">Notification Preferences</h3>
+                    <p class="text-sm text-gray-500 mt-1">Choose which types of notifications you want to receive</p>
+                </div>
+
+                <div class="p-6" x-data="notificationPreferences()">
+                    <form @submit.prevent="updatePreferences()" class="space-y-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <!-- New User Registrations -->
+                            <div class="flex items-start space-x-3">
+                                <div class="flex items-center h-5">
+                                    <input type="checkbox"
+                                           x-model="preferences.new_users"
+                                           id="newUsers"
+                                           class="w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary focus:ring-2">
+                                </div>
+                                <div class="text-sm">
+                                    <label for="newUsers" class="font-medium text-gray-900">New User Registrations</label>
+                                    <p class="text-gray-500">Get notified when new users register</p>
                                 </div>
                             </div>
 
-                            <div class="alert alert-success" x-show="isSubscribed" x-cloak>
-                                <div class="d-flex align-items-center">
-                                    <i class="material-icons text-success me-2">check_circle</i>
-                                    <div>
-                                        <strong>Subscribed</strong><br>
-                                        You will receive push notifications on this device
-                                    </div>
-                                    <button class="btn btn-outline-danger ms-auto" @click="unsubscribe()" :disabled="unsubscribing">
-                                        <span x-show="!unsubscribing">Unsubscribe</span>
-                                        <span x-show="unsubscribing">
-                                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
-                                            Unsubscribing...
-                                        </span>
-                                    </button>
+                            <!-- New Stories -->
+                            <div class="flex items-start space-x-3">
+                                <div class="flex items-center h-5">
+                                    <input type="checkbox"
+                                           x-model="preferences.new_stories"
+                                           id="newStories"
+                                           class="w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary focus:ring-2">
+                                </div>
+                                <div class="text-sm">
+                                    <label for="newStories" class="font-medium text-gray-900">New Stories</label>
+                                    <p class="text-gray-500">Get notified when users post new stories</p>
+                                </div>
+                            </div>
+
+                            <!-- Verification Requests -->
+                            <div class="flex items-start space-x-3">
+                                <div class="flex items-center h-5">
+                                    <input type="checkbox"
+                                           x-model="preferences.verification_requests"
+                                           id="verificationRequests"
+                                           class="w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary focus:ring-2">
+                                </div>
+                                <div class="text-sm">
+                                    <label for="verificationRequests" class="font-medium text-gray-900">Verification Requests</label>
+                                    <p class="text-gray-500">Get notified about new verification requests</p>
+                                </div>
+                            </div>
+
+                            <!-- Reported Content -->
+                            <div class="flex items-start space-x-3">
+                                <div class="flex items-center h-5">
+                                    <input type="checkbox"
+                                           x-model="preferences.reported_content"
+                                           id="reportedContent"
+                                           class="w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary focus:ring-2">
+                                </div>
+                                <div class="text-sm">
+                                    <label for="reportedContent" class="font-medium text-gray-900">Reported Content</label>
+                                    <p class="text-gray-500">Get notified about reported content</p>
+                                </div>
+                            </div>
+
+                            <!-- System Alerts -->
+                            <div class="flex items-start space-x-3">
+                                <div class="flex items-center h-5">
+                                    <input type="checkbox"
+                                           x-model="preferences.system_alerts"
+                                           id="systemAlerts"
+                                           class="w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary focus:ring-2">
+                                </div>
+                                <div class="text-sm">
+                                    <label for="systemAlerts" class="font-medium text-gray-900">System Alerts</label>
+                                    <p class="text-gray-500">Get notified about system issues and alerts</p>
+                                </div>
+                            </div>
+
+                            <!-- Test Notifications -->
+                            <div class="flex items-start space-x-3">
+                                <div class="flex items-center h-5">
+                                    <input type="checkbox"
+                                           x-model="preferences.test_notifications"
+                                           id="testNotifications"
+                                           class="w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary focus:ring-2">
+                                </div>
+                                <div class="text-sm">
+                                    <label for="testNotifications" class="font-medium text-gray-900">Test Notifications</label>
+                                    <p class="text-gray-500">Receive test notifications</p>
                                 </div>
                             </div>
                         </div>
+
+                        <div class="pt-4 border-t border-gray-200">
+                            <button type="submit"
+                                    :disabled="saving"
+                                    class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center">
+                                <span x-show="!saving">Save Preferences</span>
+                                <span x-show="saving" class="flex items-center">
+                                    <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Saving...
+                                </span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="space-y-6">
+
+            <!-- Test Notifications -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+                <div class="p-6 border-b border-gray-200">
+                    <h3 class="text-lg font-semibold text-gray-900">Test Notifications</h3>
+                    <p class="text-sm text-gray-500 mt-1">Send a test notification to verify your setup</p>
+                </div>
+
+                <div class="p-6" x-data="testNotifications()">
+                    <form @submit.prevent="sendTest()" class="space-y-4">
+                        <div>
+                            <label for="testTitle" class="block text-sm font-medium text-gray-700 mb-2">Test Title</label>
+                            <input type="text"
+                                   id="testTitle"
+                                   x-model="testData.title"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                                   placeholder="Enter test notification title">
+                        </div>
+
+                        <div>
+                            <label for="testMessage" class="block text-sm font-medium text-gray-700 mb-2">Test Message</label>
+                            <textarea id="testMessage"
+                                      x-model="testData.body"
+                                      rows="3"
+                                      class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary"
+                                      placeholder="Enter test notification message"></textarea>
+                        </div>
+
+                        <button type="submit"
+                                :disabled="sending"
+                                class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center">
+                            <span x-show="!sending">Send Test Notification</span>
+                            <span x-show="sending" class="flex items-center">
+                                <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Sending...
+                            </span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Quick Stats -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+                <div class="p-6 border-b border-gray-200">
+                    <h3 class="text-lg font-semibold text-gray-900">Quick Stats</h3>
+                </div>
+
+                <div class="p-6 space-y-4" x-data="{ stats: { devices: 0, lastNotification: null } }" x-init="loadStats()">
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-gray-600">Registered Devices</span>
+                        <span class="text-lg font-semibold text-gray-900" x-text="stats.devices"></span>
                     </div>
 
-                    <!-- Notification Preferences -->
-                    <div class="row mb-4" x-data="notificationPreferences()">
-                        <div class="col-12">
-                            <h6 class="text-dark text-sm">Notification Preferences</h6>
-                            <div class="card">
-                                <div class="card-body">
-                                    <form @submit.prevent="updatePreferences()">
-                                        <div class="row">
-                                            <div class="col-md-6">
-                                                <div class="form-check form-switch">
-                                                    <input class="form-check-input" type="checkbox"
-                                                           x-model="preferences.new_users" id="newUsers">
-                                                    <label class="form-check-label" for="newUsers">
-                                                        New User Registrations
-                                                    </label>
-                                                    <small class="form-text text-muted d-block">
-                                                        Get notified when new users register
-                                                    </small>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <div class="form-check form-switch">
-                                                    <input class="form-check-input" type="checkbox"
-                                                           x-model="preferences.new_stories" id="newStories">
-                                                    <label class="form-check-label" for="newStories">
-                                                        New Stories
-                                                    </label>
-                                                    <small class="form-text text-muted d-block">
-                                                        Get notified when users post new stories
-                                                    </small>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <div class="form-check form-switch">
-                                                    <input class="form-check-input" type="checkbox"
-                                                           x-model="preferences.verification_requests" id="verificationRequests">
-                                                    <label class="form-check-label" for="verificationRequests">
-                                                        Verification Requests
-                                                    </label>
-                                                    <small class="form-text text-muted d-block">
-                                                        Get notified about new verification requests
-                                                    </small>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <div class="form-check form-switch">
-                                                    <input class="form-check-input" type="checkbox"
-                                                           x-model="preferences.reported_content" id="reportedContent">
-                                                    <label class="form-check-label" for="reportedContent">
-                                                        Reported Content
-                                                    </label>
-                                                    <small class="form-text text-muted d-block">
-                                                        Get notified about reported content
-                                                    </small>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <div class="form-check form-switch">
-                                                    <input class="form-check-input" type="checkbox"
-                                                           x-model="preferences.system_alerts" id="systemAlerts">
-                                                    <label class="form-check-label" for="systemAlerts">
-                                                        System Alerts
-                                                    </label>
-                                                    <small class="form-text text-muted d-block">
-                                                        Get notified about system issues and alerts
-                                                    </small>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <div class="form-check form-switch">
-                                                    <input class="form-check-input" type="checkbox"
-                                                           x-model="preferences.test_notifications" id="testNotifications">
-                                                    <label class="form-check-label" for="testNotifications">
-                                                        Test Notifications
-                                                    </label>
-                                                    <small class="form-text text-muted d-block">
-                                                        Receive test notifications
-                                                    </small>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div class="mt-3">
-                                            <button type="submit" class="btn btn-primary" :disabled="saving">
-                                                <span x-show="!saving">Save Preferences</span>
-                                                <span x-show="saving">
-                                                    <span class="spinner-border spinner-border-sm me-2" role="status"></span>
-                                                    Saving...
-                                                </span>
-                                            </button>
-                                        </div>
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Registered Devices -->
-                    <div class="row mb-4" x-data="deviceManagement()">
-                        <div class="col-12">
-                            <h6 class="text-dark text-sm">Registered Devices</h6>
-                            <div class="card">
-                                <div class="card-body">
-                                    <div x-show="loading" class="text-center py-3">
-                                        <div class="spinner-border" role="status">
-                                            <span class="visually-hidden">Loading...</span>
-                                        </div>
-                                    </div>
-
-                                    <div x-show="!loading && devices.length === 0" class="text-center py-3 text-muted">
-                                        No devices registered for notifications
-                                    </div>
-
-                                    <div x-show="!loading && devices.length > 0">
-                                        <div class="table-responsive">
-                                            <table class="table table-hover">
-                                                <thead>
-                                                    <tr>
-                                                        <th>Device</th>
-                                                        <th>Platform</th>
-                                                        <th>Browser</th>
-                                                        <th>Last Used</th>
-                                                        <th>Status</th>
-                                                        <th>Actions</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    <template x-for="device in devices" :key="device.id">
-                                                        <tr>
-                                                            <td>
-                                                                <span x-text="device.device_name || 'Unknown Device'"></span>
-                                                            </td>
-                                                            <td>
-                                                                <span class="badge bg-secondary" x-text="device.platform"></span>
-                                                            </td>
-                                                            <td>
-                                                                <span x-text="device.browser || 'N/A'"></span>
-                                                            </td>
-                                                            <td>
-                                                                <span x-text="formatDate(device.last_used_at)"></span>
-                                                            </td>
-                                                            <td>
-                                                                <span class="badge"
-                                                                      :class="device.is_active ? 'bg-success' : 'bg-danger'"
-                                                                      x-text="device.is_active ? 'Active' : 'Inactive'">
-                                                                </span>
-                                                            </td>
-                                                            <td>
-                                                                <button class="btn btn-sm btn-outline-danger"
-                                                                        @click="deactivateDevice(device.id)"
-                                                                        x-show="device.is_active">
-                                                                    Deactivate
-                                                                </button>
-                                                            </td>
-                                                        </tr>
-                                                    </template>
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Test Notifications -->
-                    <div class="row">
-                        <div class="col-12">
-                            <h6 class="text-dark text-sm">Test Notifications</h6>
-                            <div class="card">
-                                <div class="card-body" x-data="testNotifications()">
-                                    <form @submit.prevent="sendTest()">
-                                        <div class="row">
-                                            <div class="col-md-6">
-                                                <div class="form-group">
-                                                    <label class="form-control-label">Test Title</label>
-                                                    <input type="text" class="form-control"
-                                                           x-model="testData.title"
-                                                           placeholder="Enter test notification title">
-                                                </div>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <div class="form-group">
-                                                    <label class="form-control-label">Test Message</label>
-                                                    <input type="text" class="form-control"
-                                                           x-model="testData.body"
-                                                           placeholder="Enter test notification message">
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="mt-3">
-                                            <button type="submit" class="btn btn-info" :disabled="sending">
-                                                <span x-show="!sending">Send Test Notification</span>
-                                                <span x-show="sending">
-                                                    <span class="spinner-border spinner-border-sm me-2" role="status"></span>
-                                                    Sending...
-                                                </span>
-                                            </button>
-                                        </div>
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-gray-600">Status</span>
+                        <span class="px-2 py-1 text-xs rounded-full"
+                              :class="stats.devices > 0 ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'"
+                              x-text="stats.devices > 0 ? 'Active' : 'Inactive'"></span>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+
+    <!-- Registered Devices Table -->
+    <div class="mt-6 bg-white rounded-lg shadow-sm border border-gray-200">
+        <div class="p-6 border-b border-gray-200">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900">Registered Devices</h3>
+                    <p class="text-sm text-gray-500 mt-1">Manage devices that can receive notifications</p>
+                </div>
+                <button @click="loadDevices()"
+                        class="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
+                    <i class="fas fa-sync-alt mr-2"></i>Refresh
+                </button>
+            </div>
+        </div>
+
+        <div class="p-6" x-data="deviceManagement()">
+            <div x-show="loading" class="flex justify-center py-8">
+                <svg class="animate-spin h-8 w-8 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            </div>
+
+            <div x-show="!loading && devices.length === 0" class="text-center py-8 text-gray-500">
+                <i class="fas fa-mobile-alt text-4xl mb-4"></i>
+                <p class="text-lg font-medium">No devices registered</p>
+                <p class="text-sm">Subscribe to notifications to register this device</p>
+            </div>
+
+            <div x-show="!loading && devices.length > 0" class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Device</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Platform</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Browser</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Used</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <template x-for="device in devices" :key="device.id">
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="device.device_name || 'Unknown Device'"></td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded-full" x-text="device.platform"></span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900" x-text="device.browser || 'N/A'"></td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" x-text="formatDate(device.last_used_at)"></td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 py-1 text-xs font-medium rounded-full"
+                                          :class="device.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'"
+                                          x-text="device.is_active ? 'Active' : 'Inactive'"></span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                    <button @click="deactivateDevice(device.id)"
+                                            x-show="device.is_active"
+                                            class="text-red-600 hover:text-red-900">
+                                        Deactivate
+                                    </button>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 </div>
+
 @endsection
 
 @push('scripts')

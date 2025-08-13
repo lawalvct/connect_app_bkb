@@ -27,6 +27,7 @@ class AuthController extends Controller
      */
     public function login(Request $request)
     {
+    
         Log::info('=== ADMIN LOGIN ATTEMPT START ===');
         Log::info('Request method: ' . $request->method());
         Log::info('Request URL: ' . $request->fullUrl());

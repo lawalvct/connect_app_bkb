@@ -200,6 +200,10 @@
                            class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.notifications.push*') ? 'bg-primary-light text-primary' : '' }}">
                             <span>Push Notifications</span>
                         </a>
+                        <a href="{{ route('admin.notifications.subscription.index') }}"
+                           class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.notifications.subscription*') ? 'bg-primary-light text-primary' : '' }}">
+                            <span>My Subscription</span>
+                        </a>
                         <a href="{{ route('admin.notifications.email.index') }}"
                            class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.notifications.email*') ? 'bg-primary-light text-primary' : '' }}">
                             <span>Email Templates</span>

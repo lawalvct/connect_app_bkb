@@ -65,11 +65,4 @@ class NotificationTemplate extends Model
 
         return $subject;
     }
-}space App\Models;
-
-use Illuminate\Database\Eloquent\Model;
-
-class NotificationTemplate extends Model
-{
-    //
 }

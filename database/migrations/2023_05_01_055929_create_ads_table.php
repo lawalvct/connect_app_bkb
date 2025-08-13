@@ -21,6 +21,8 @@ return new class extends Migration
             $table->date('start_date');
             $table->date('end_date');
             $table->json('target_audience')->nullable(); // Age, gender, location, interests
+            $table->json('target_countries')->nullable(); // Target specific countries
+            $table->json('target_social_circles')->nullable(); // Target specific social circles
             $table->decimal('budget', 10, 2)->default(0);
             $table->decimal('daily_budget', 8, 2)->nullable();
             $table->integer('target_impressions')->default(0);
@@ -50,7 +52,8 @@ return new class extends Migration
             $table->index(['user_id', 'status']);
             $table->index(['start_date', 'end_date']);
             $table->index('admin_status');
-            $table->index('ad_placement'); // Index for JSON column
+            // Note: Cannot index JSON columns directly in MySQL
+            // $table->index('ad_placement'); // Removed - JSON columns don't support direct indexing
         });
     }
 

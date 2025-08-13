@@ -306,6 +306,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::prefix('notifications')->name('notifications.')->group(function () {
             Route::get('/push', [NotificationController::class, 'pushIndex'])->name('push.index');
             Route::get('/subscription', [NotificationController::class, 'subscriptionIndex'])->name('subscription.index');
+            Route::get('/test-push', function() { return view('admin.test-push-notifications'); })->name('test-push');
             Route::get('/email', [NotificationController::class, 'emailTemplatesIndex'])->name('email.index');
             Route::get('/sms', [NotificationController::class, 'smsIndex'])->name('sms.index');
             Route::get('/logs', [NotificationController::class, 'logsIndex'])->name('logs.index');
