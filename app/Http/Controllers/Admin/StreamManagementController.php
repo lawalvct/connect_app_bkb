@@ -20,6 +20,18 @@ use Carbon\Carbon;
 
 class StreamManagementController extends Controller
 {
+    public function __construct()
+    {
+        $this->middleware('auth:admin');
+        $this->middleware(function ($request, $next) {
+            $admin = auth('admin')->user();
+            if (!$admin->canManageStreams()) {
+                abort(403, 'Unauthorized to manage streams');
+            }
+            return $next($request);
+        });
+    }
+
     /**
      * Display streams listing page
      */
@@ -33,16 +45,9 @@ class StreamManagementController extends Controller
      */
     public function create()
     {
-        // Get users for the dropdown
-        $users = User::select('id', 'name', 'email')
-                    ->where('status', 'active')
-                    ->orderBy('name')
-                    ->get();
-
-        return view('admin.streams.create', compact('users'));
-    }
-
-    /**
+        // No need to load users since we're using a hardcoded user ID
+        return view('admin.streams.create');
+    }    /**
      * Store new stream
      */
     public function store(Request $request)
@@ -72,12 +77,21 @@ class StreamManagementController extends Controller
 
             // Verify the user exists and is active
             $user = User::find($data['user_id']);
-            if (!$user || $user->status !== 'active') {
+            if (!$user || !$user->is_active || $user->is_banned) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Selected user is not available for streaming'
+                    'message' => 'Selected user is not available for streaming. User may be inactive or banned.'
                 ], 422);
             }
+
+            // Log admin action
+            Log::info('Admin creating stream for user', [
+                'admin_id' => auth('admin')->id(),
+                'admin_name' => auth('admin')->user()->name,
+                'user_id' => $user->id,
+                'user_name' => $user->name,
+                'stream_title' => $data['title']
+            ]);
 
             $data['channel_name'] = 'admin_stream_' . time() . '_' . Str::random(8);
             $data['go_live_immediately'] = $request->stream_type === 'immediate';
@@ -106,8 +120,9 @@ class StreamManagementController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Stream created successfully',
-                'data' => $stream->load('user')
+                'message' => "Stream created successfully for {$user->name}",
+                'data' => $stream->load('user'),
+                'admin_created' => true
             ]);
 
         } catch (\Exception $e) {

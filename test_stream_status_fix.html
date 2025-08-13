@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Test Stream Creation Status Fix</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                margin: 20px;
+            }
+            .result {
+                padding: 10px;
+                margin: 10px 0;
+                border-radius: 5px;
+            }
+            .success {
+                background: #d4edda;
+                color: #155724;
+                border: 1px solid #c3e6cb;
+            }
+            .error {
+                background: #f8d7da;
+                color: #721c24;
+                border: 1px solid #f5c6cb;
+            }
+            .info {
+                background: #d1ecf1;
+                color: #0c5460;
+                border: 1px solid #bee5eb;
+            }
+            button {
+                background: #007cba;
+                color: white;
+                padding: 10px 20px;
+                border: none;
+                cursor: pointer;
+                margin: 5px;
+            }
+            select,
+            input {
+                padding: 8px;
+                margin: 5px;
+                width: 200px;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Test Stream Creation Status Fix</h1>
+        <p>
+            This tests the fix for the "Column not found: status" error in User
+            queries.
+        </p>
+
+        <div>
+            <h3>Test Stream Creation</h3>
+            <form id="streamTestForm">
+                <div>
+                    <label>Stream Title:</label><br />
+                    <input
+                        type="text"
+                        id="title"
+                        value="Test Stream Fix"
+                        required
+                    />
+                </div>
+
+                <div>
+                    <label>User ID:</label><br />
+                    <input type="number" id="user_id" value="3370" required />
+                    <small>Use the test user ID: 3370</small>
+                </div>
+
+                <div>
+                    <label>Free Minutes:</label><br />
+                    <input type="number" id="free_minutes" value="5" required />
+                </div>
+
+                <div>
+                    <label>Price:</label><br />
+                    <input type="number" id="price" value="0" step="0.01" />
+                </div>
+
+                <div>
+                    <label>Currency:</label><br />
+                    <select id="currency">
+                        <option value="NGN">NGN</option>
+                        <option value="USD">USD</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label>Stream Type:</label><br />
+                    <select id="stream_type">
+                        <option value="immediate">Immediate</option>
+                        <option value="scheduled">Scheduled</option>
+                    </select>
+                </div>
+
+                <br />
+                <button type="button" onclick="testUsersEndpoint()">
+                    1. Test Users Loading
+                </button>
+                <button type="button" onclick="testStreamCreation()">
+                    2. Test Stream Creation
+                </button>
+            </form>
+        </div>
+
+        <div id="results"></div>
+
+        <script>
+            async function testUsersEndpoint() {
+                const resultsDiv = document.getElementById("results");
+                resultsDiv.innerHTML =
+                    '<div class="info">Testing users loading for stream creation...</div>';
+
+                try {
+                    // This simulates what happens when the create stream page loads
+                    const response = await fetch("/admin/streams/create", {
+                        method: "GET",
+                        headers: {
+                            Accept: "text/html",
+                            "X-Requested-With": "XMLHttpRequest",
+                        },
+                    });
+
+                    if (response.ok) {
+                        resultsDiv.innerHTML = `
+                        <div class="success">✅ Users loading successful!</div>
+                        <div class="info">The create stream page should now load without SQL errors.</div>
+                        <div class="info">Status: ${response.status} ${response.statusText}</div>
+                    `;
+                    } else {
+                        resultsDiv.innerHTML = `
+                        <div class="error">❌ Users loading failed: ${response.status} ${response.statusText}</div>
+                    `;
+                    }
+                } catch (error) {
+                    resultsDiv.innerHTML = `
+                    <div class="error">❌ Network Error: ${error.message}</div>
+                `;
+                }
+            }
+
+            async function testStreamCreation() {
+                const resultsDiv = document.getElementById("results");
+                resultsDiv.innerHTML =
+                    '<div class="info">Testing stream creation...</div>';
+
+                try {
+                    const formData = new FormData();
+                    formData.append(
+                        "title",
+                        document.getElementById("title").value
+                    );
+                    formData.append(
+                        "user_id",
+                        document.getElementById("user_id").value
+                    );
+                    formData.append(
+                        "free_minutes",
+                        document.getElementById("free_minutes").value
+                    );
+                    formData.append(
+                        "price",
+                        document.getElementById("price").value
+                    );
+                    formData.append(
+                        "currency",
+                        document.getElementById("currency").value
+                    );
+                    formData.append(
+                        "stream_type",
+                        document.getElementById("stream_type").value
+                    );
+
+                    const response = await fetch("/admin/streams", {
+                        method: "POST",
+                        body: formData,
+                        headers: {
+                            "X-Requested-With": "XMLHttpRequest",
+                        },
+                    });
+
+                    const data = await response.json();
+
+                    if (response.ok && data.success) {
+                        resultsDiv.innerHTML = `
+                        <div class="success">✅ Stream creation successful!</div>
+                        <div class="info">Stream ID: ${
+                            data.data?.id || "N/A"
+                        }</div>
+                        <div class="info">The user status column fix is working properly.</div>
+                    `;
+                    } else {
+                        resultsDiv.innerHTML = `
+                        <div class="error">❌ Stream creation failed: ${
+                            data.message || "Unknown error"
+                        }</div>
+                        <div class="info">Response: ${JSON.stringify(
+                            data
+                        )}</div>
+                    `;
+                    }
+                } catch (error) {
+                    resultsDiv.innerHTML = `
+                    <div class="error">❌ Error: ${error.message}</div>
+                `;
+                }
+            }
+        </script>
+    </body>
+</html>

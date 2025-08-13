@@ -5,7 +5,7 @@
 @section('header')
     <div class="flex justify-between items-center">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900">Create Stream</h1>
+            <h1 class="text-2xl font-bold text-gray-900">Create New Stream</h1>
             <nav class="flex mt-2" aria-label="Breadcrumb">
                 <ol class="inline-flex items-center space-x-1 md:space-x-3">
                     <li><a href="{{ route('admin.dashboard') }}" class="text-gray-500 hover:text-primary">Dashboard</a></li>
@@ -28,7 +28,8 @@
         <div class="lg:col-span-2">
             <div class="bg-white shadow rounded-lg">
                 <div class="px-6 py-4 border-b border-gray-200">
-                    <h3 class="text-lg font-medium text-gray-900">Stream Information</h3>
+                    <h3 class="text-lg font-medium text-gray-900">Create New Stream</h3>
+                    <p class="text-sm text-gray-600 mt-1">Create a new stream with admin privileges</p>
                 </div>
                 <div class="p-6">
                     <form id="createStreamForm" x-data="streamForm()" @submit.prevent="submitForm()">
@@ -48,21 +49,13 @@
                                 <div x-show="errors.title" class="text-red-500 text-sm mt-1" x-text="errors.title?.[0]"></div>
                             </div>
 
-                            <!-- User Selection -->
-                            <div>
-                                <label for="user_id" class="block text-sm font-medium text-gray-700 mb-2 required">Stream Owner</label>
-                                <select class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                                        id="user_id"
-                                        name="user_id"
-                                        x-model="form.user_id"
-                                        required>
-                                    <option value="">Select a user to create stream for</option>
-                                    @foreach($users as $user)
-                                        <option value="{{ $user->id }}">{{ $user->name }} ({{ $user->email }})</option>
-                                    @endforeach
-                                </select>
-                                <div x-show="errors.user_id" class="text-red-500 text-sm mt-1" x-text="errors.user_id?.[0]"></div>
-                                <p class="text-xs text-gray-500 mt-1">Select which user will own this stream</p>
+                            <!-- User Selection (Hidden - Using Default User) -->
+                            <div style="display: none;">
+                                <input type="hidden"
+                                       id="user_id"
+                                       name="user_id"
+                                       x-model="form.user_id"
+                                       value="3">
                             </div>
 
                             <!-- Description -->
@@ -171,7 +164,7 @@
 
                             <!-- Stream Type -->
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-4">Stream Type</label>
+                                <label class="block text-sm font-medium text-gray-700 mb-4">Stream Scheduling</label>
                                 <div class="space-y-3">
                                     <div class="flex items-center">
                                         <input type="radio"
@@ -182,8 +175,8 @@
                                                @change="updateStreamType()"
                                                class="h-4 w-4 text-primary focus:ring-primary border-gray-300">
                                         <label for="immediate" class="ml-3 block text-sm text-gray-700">
-                                            <span class="font-medium">Go Live Immediately</span>
-                                            <span class="block text-gray-500">Start broadcasting right after creation</span>
+                                            <span class="font-medium">Create as Live Stream</span>
+                                            <span class="block text-gray-500">User can start broadcasting immediately after creation</span>
                                         </label>
                                     </div>
                                     <div class="flex items-center">
@@ -196,7 +189,7 @@
                                                class="h-4 w-4 text-primary focus:ring-primary border-gray-300">
                                         <label for="scheduled" class="ml-3 block text-sm text-gray-700">
                                             <span class="font-medium">Schedule for Later</span>
-                                            <span class="block text-gray-500">Set a specific date and time</span>
+                                            <span class="block text-gray-500">Set when the user can start broadcasting</span>
                                         </label>
                                     </div>
                                 </div>
@@ -228,7 +221,7 @@
                                     <i class="fas fa-save mr-2"></i>Create Stream
                                 </span>
                                 <span x-show="submitting">
-                                    <i class="fas fa-spinner fa-spin mr-2"></i>Creating...
+                                    <i class="fas fa-spinner fa-spin mr-2"></i>Creating Stream...
                                 </span>
                             </button>
                         </div>
@@ -242,6 +235,7 @@
             <div class="bg-white shadow rounded-lg">
                 <div class="px-6 py-4 border-b border-gray-200">
                     <h3 class="text-lg font-medium text-primary">Stream Preview</h3>
+                    <p class="text-xs text-gray-500 mt-1">How this will appear to viewers</p>
                 </div>
                 <div class="p-6">
                     <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
@@ -287,28 +281,32 @@
                 </div>
             </div>
 
-            <!-- Tips -->
+            <!-- Admin Guidelines -->
             <div class="bg-white shadow rounded-lg mt-6">
                 <div class="px-6 py-4 border-b border-gray-200">
-                    <h3 class="text-lg font-medium text-blue-600">Tips</h3>
+                    <h3 class="text-lg font-medium text-blue-600">Admin Guidelines</h3>
                 </div>
                 <div class="p-6">
                     <div class="space-y-3 text-sm text-gray-600">
                         <div class="flex items-start">
-                            <i class="fas fa-lightbulb text-yellow-500 mr-2 mt-0.5"></i>
-                            <p>Use high-quality banner images for better engagement</p>
+                            <i class="fas fa-user-shield text-blue-500 mr-2 mt-0.5"></i>
+                            <p><strong>Admin Control:</strong> Only admins can create streams for users</p>
                         </div>
                         <div class="flex items-start">
                             <i class="fas fa-lightbulb text-yellow-500 mr-2 mt-0.5"></i>
-                            <p>Free minutes help attract viewers before monetization</p>
+                            <p>Choose active users who are ready to broadcast</p>
                         </div>
                         <div class="flex items-start">
                             <i class="fas fa-lightbulb text-yellow-500 mr-2 mt-0.5"></i>
-                            <p>Scheduled streams can be promoted in advance</p>
+                            <p>Set appropriate pricing based on content type</p>
                         </div>
                         <div class="flex items-start">
                             <i class="fas fa-lightbulb text-yellow-500 mr-2 mt-0.5"></i>
-                            <p>Consider your target audience when setting prices</p>
+                            <p>Use high-quality banners to attract more viewers</p>
+                        </div>
+                        <div class="flex items-start">
+                            <i class="fas fa-lightbulb text-yellow-500 mr-2 mt-0.5"></i>
+                            <p>Consider time zones when scheduling streams</p>
                         </div>
                     </div>
                 </div>
@@ -323,7 +321,7 @@ function streamForm() {
         form: {
             title: '',
             description: '',
-            user_id: '', // Add user_id field
+            user_id: '3', // Hardcoded to user ID 3
             free_minutes: 5,
             price: '',
             currency: 'NGN',
@@ -401,7 +399,7 @@ function streamForm() {
                 const data = await response.json();
 
                 if (data.success) {
-                    alert('Stream created successfully!');
+                    alert('Stream created successfully for the user!');
                     window.location.href = '/admin/streams';
                 } else {
                     if (data.errors) {

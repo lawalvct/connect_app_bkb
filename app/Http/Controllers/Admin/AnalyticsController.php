@@ -9,6 +9,7 @@ use App\Models\Stream;
 use App\Models\UserSubscription;
 use App\Models\Ad;
 use App\Models\Story;
+use App\Models\Country;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -22,7 +23,7 @@ class AnalyticsController extends Controller
 
     public function index(Request $request)
     {
-        // Get date range (default last 30 days)
+        // Get date range (default last 30 days    )
         $startDate = $request->get('start_date', Carbon::now()->subDays(30)->format('Y-m-d'));
         $endDate = $request->get('end_date', Carbon::now()->format('Y-m-d'));
 
@@ -30,7 +31,7 @@ class AnalyticsController extends Controller
         $stats = [
             'total_users' => User::where('deleted_flag', 'N')->count(),
             'new_users_today' => User::where('deleted_flag', 'N')->whereDate('created_at', today())->count(),
-            'total_posts' => Post::where('deleted_flag', 'N')->count(),
+            'total_posts' => Post::count(),
             'total_streams' => Stream::count(),
             'active_subscriptions' => UserSubscription::active()->count(),
             'total_revenue' => UserSubscription::where('payment_status', 'completed')->sum('amount'),
@@ -56,8 +57,7 @@ class AnalyticsController extends Controller
         ];
 
         // Top Performing Content
-        $topPosts = Post::where('deleted_flag', 'N')
-            ->with('user:id,username,profile_picture')
+        $topPosts = Post::with('user:id,username,profile_picture')
             ->orderByDesc('views_count')
             ->limit(10)
             ->get(['id', 'user_id', 'content', 'views_count', 'likes_count', 'comments_count', 'created_at']);
@@ -72,9 +72,10 @@ class AnalyticsController extends Controller
 
         // Popular Countries
         $popularCountries = User::where('deleted_flag', 'N')
-            ->whereNotNull('country')
-            ->selectRaw('country, COUNT(*) as user_count')
-            ->groupBy('country')
+            ->whereNotNull('country_id')
+            ->join('countries', 'users.country_id', '=', 'countries.id')
+            ->selectRaw('countries.name as country, COUNT(*) as user_count')
+            ->groupBy('countries.id', 'countries.name')
             ->orderByDesc('user_count')
             ->limit(10)
             ->get();
@@ -147,9 +148,7 @@ class AnalyticsController extends Controller
 
         // Most Active Users (by posts)
         $activeUsers = User::where('deleted_flag', 'N')
-            ->withCount(['posts' => function($q) {
-                $q->where('deleted_flag', 'N');
-            }])
+            ->withCount('posts')
             ->orderByDesc('posts_count')
             ->limit(20)
             ->get(['id', 'username', 'profile_picture', 'created_at']);
@@ -173,15 +172,14 @@ class AnalyticsController extends Controller
 
         // Content Overview
         $contentStats = [
-            'total_posts' => Post::where('deleted_flag', 'N')->count(),
+            'total_posts' => Post::count(),
             'total_stories' => Story::count(),
             'total_streams' => Stream::count(),
-            'posts_today' => Post::where('deleted_flag', 'N')->whereDate('created_at', today())->count(),
+            'posts_today' => Post::whereDate('created_at', today())->count(),
         ];
 
         // Content Creation Trends
-        $contentTrends = Post::where('deleted_flag', 'N')
-            ->whereBetween('created_at', [Carbon::parse($startDate), Carbon::parse($endDate)->endOfDay()])
+        $contentTrends = Post::whereBetween('created_at', [Carbon::parse($startDate), Carbon::parse($endDate)->endOfDay()])
             ->selectRaw('DATE(created_at) as date, COUNT(*) as posts')
             ->groupBy('date')
             ->orderBy('date')
@@ -193,24 +191,23 @@ class AnalyticsController extends Controller
             'total_comments' => Post::sum('comments_count'),
             'total_shares' => Post::sum('shares_count'),
             'total_views' => Post::sum('views_count'),
-            'avg_engagement' => Post::where('deleted_flag', 'N')->avg(DB::raw('likes_count + comments_count + shares_count')),
+            'avg_engagement' => Post::avg(DB::raw('likes_count + comments_count + shares_count')),
         ];
 
         // Top Posts by Engagement
-        $topPosts = Post::where('deleted_flag', 'N')
-            ->with('user:id,username,profile_picture')
+        $topPosts = Post::with('user:id,username,profile_picture')
             ->selectRaw('*, (likes_count + comments_count + shares_count) as total_engagement')
             ->orderByDesc('total_engagement')
             ->limit(20)
             ->get();
 
         // Content Type Distribution
-        $contentTypes = Post::where('deleted_flag', 'N')
-            ->selectRaw('
+        $contentTypes = Post::selectRaw('
                 CASE
-                    WHEN file_url IS NOT NULL AND file_url LIKE "%.mp4%" THEN "Video"
-                    WHEN file_url IS NOT NULL THEN "Image"
-                    ELSE "Text"
+                    WHEN type = "video" THEN "Video"
+                    WHEN type = "image" THEN "Image"
+                    WHEN type = "text" THEN "Text"
+                    ELSE "Other"
                 END as content_type,
                 COUNT(*) as count
             ')
@@ -465,7 +462,7 @@ class AnalyticsController extends Controller
             fputcsv($file, ['Metric', 'Value']);
 
             fputcsv($file, ['Total Users', User::where('deleted_flag', 'N')->count()]);
-            fputcsv($file, ['Total Posts', Post::where('deleted_flag', 'N')->count()]);
+            fputcsv($file, ['Total Posts', Post::count()]);
             fputcsv($file, ['Total Revenue', UserSubscription::where('payment_status', 'completed')->sum('amount')]);
             fputcsv($file, ['Active Subscriptions', UserSubscription::active()->count()]);
 
