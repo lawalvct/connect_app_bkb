@@ -139,9 +139,10 @@ class AnalyticsController extends Controller
 
         // Top Countries
         $topCountries = User::where('deleted_flag', 'N')
-            ->whereNotNull('country')
-            ->selectRaw('country, COUNT(*) as user_count')
-            ->groupBy('country')
+            ->whereNotNull('country_id')
+            ->join('countries', 'users.country_id', '=', 'countries.id')
+            ->selectRaw('countries.name as country, COUNT(*) as user_count')
+            ->groupBy('countries.id', 'countries.name')
             ->orderByDesc('user_count')
             ->limit(20)
             ->get();
