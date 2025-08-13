@@ -591,30 +591,134 @@ class UserManagementController extends Controller
             }
 
             // For smaller datasets, process immediately
+            // Check if this is a direct download request (no email needed)
+            $directDownload = $request->get('direct_download', false) || $request->expectsJson() === false;
+
             // Increase memory limit for Excel exports
             ini_set('memory_limit', '256M');
             set_time_limit(300); // 5 minutes
 
             // Generate filename with timestamp
             $timestamp = now()->format('Y-m-d_H-i-s');
+            $filename = "users_export_{$timestamp}." . ($format === 'csv' ? 'csv' : 'xlsx');
 
-            if ($format === 'csv') {
-                // CSV Export using Laravel Excel
-                $filename = "users_export_{$timestamp}.csv";
-                Log::info("Exporting CSV immediately: {$filename}");
-                return Excel::download(new SimpleUsersExport($filters), $filename, \Maatwebsite\Excel\Excel::CSV, [
-                    'Content-Type' => 'text/csv',
-                    'Content-Disposition' => "attachment; filename=\"{$filename}\"",
-                ]);
-            } else {
-                // Excel Export (handle both 'excel' and 'xlsx')
-                $filename = "users_export_{$timestamp}.xlsx";
-                Log::info("Exporting Excel immediately: {$filename}");
+            Log::info("Processing immediate export: {$filename}, records: {$totalRecords}, directDownload: " . ($directDownload ? 'yes' : 'no'));
 
-                return Excel::download(new SimpleUsersExport($filters), $filename, \Maatwebsite\Excel\Excel::XLSX, [
-                    'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                    'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            // For direct download (browser requests), return file immediately
+            if ($directDownload) {
+                if ($format === 'csv') {
+                    Log::info("Direct CSV download: {$filename}");
+                    return Excel::download(new SimpleUsersExport($filters), $filename, \Maatwebsite\Excel\Excel::CSV, [
+                        'Content-Type' => 'text/csv',
+                        'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+                    ]);
+                } else {
+                    Log::info("Direct Excel download: {$filename}");
+                    return Excel::download(new SimpleUsersExport($filters), $filename, \Maatwebsite\Excel\Excel::XLSX, [
+                        'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                        'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+                    ]);
+                }
+            }
+
+            // For AJAX requests or when email notification is explicitly requested
+            try {
+                // Store the file in exports directory
+                if ($format === 'csv') {
+                    Excel::store(
+                        new SimpleUsersExport($filters),
+                        'exports/' . $filename,
+                        'public',
+                        \Maatwebsite\Excel\Excel::CSV
+                    );
+                } else {
+                    Excel::store(
+                        new SimpleUsersExport($filters),
+                        'exports/' . $filename,
+                        'public',
+                        \Maatwebsite\Excel\Excel::XLSX
+                    );
+                }
+
+                // Send email notification
+                $user = Auth::user();
+                if ($user && $user->email) {
+                    try {
+                        Log::info('Sending immediate export notification email', [
+                            'admin_email' => $user->email,
+                            'filename' => $filename,
+                            'total_records' => $totalRecords
+                        ]);
+
+                        Mail::to($user->email)->send(new \App\Mail\ExportReadyMail($filename, $format));
+
+                        Log::info('Export notification email sent successfully');
+
+                        if ($request->expectsJson()) {
+                            return response()->json([
+                                'success' => true,
+                                'message' => "Export completed successfully! Check your email for the download link. ({$totalRecords} records exported)",
+                                'filename' => $filename,
+                                'download_url' => url('storage/exports/' . $filename)
+                            ]);
+                        }
+
+                        return redirect()->back()->with('success', "Export completed successfully! Check your email for the download link. ({$totalRecords} records exported)");
+
+                    } catch (\Exception $emailError) {
+                        Log::error('Failed to send export notification email', [
+                            'error' => $emailError->getMessage(),
+                            'admin_email' => $user->email,
+                            'filename' => $filename
+                        ]);
+
+                        // Still provide download even if email fails
+                        if ($request->expectsJson()) {
+                            return response()->json([
+                                'success' => true,
+                                'message' => "Export completed but email notification failed. You can download directly.",
+                                'filename' => $filename,
+                                'download_url' => url('storage/exports/' . $filename),
+                                'email_error' => 'Email notification failed to send'
+                            ]);
+                        }
+
+                        return redirect()->back()->with('warning', "Export completed but email notification failed. Download directly: " . url('storage/exports/' . $filename));
+                    }
+                }
+
+                // Fallback if no user email
+                if ($request->expectsJson()) {
+                    return response()->json([
+                        'success' => true,
+                        'message' => "Export completed successfully!",
+                        'filename' => $filename,
+                        'download_url' => url('storage/exports/' . $filename)
+                    ]);
+                }
+
+                return redirect()->back()->with('success', "Export completed successfully! Download: " . url('storage/exports/' . $filename));
+
+            } catch (\Exception $e) {
+                Log::error('Export storage failed, falling back to direct download', [
+                    'error' => $e->getMessage(),
+                    'filename' => $filename
                 ]);
+
+                // Fallback to direct download
+                if ($format === 'csv') {
+                    Log::info("Fallback to direct CSV download: {$filename}");
+                    return Excel::download(new SimpleUsersExport($filters), $filename, \Maatwebsite\Excel\Excel::CSV, [
+                        'Content-Type' => 'text/csv',
+                        'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+                    ]);
+                } else {
+                    Log::info("Fallback to direct Excel download: {$filename}");
+                    return Excel::download(new SimpleUsersExport($filters), $filename, \Maatwebsite\Excel\Excel::XLSX, [
+                        'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                        'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+                    ]);
+                }
             }
 
         } catch (\Exception $e) {

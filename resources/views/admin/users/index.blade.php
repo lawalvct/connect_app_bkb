@@ -296,6 +296,9 @@
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 Contact
                             </th>
+                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Social Circles
+                            </th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 Country
                             </th>
@@ -305,9 +308,7 @@
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 Verification
                             </th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Social Circles
-                            </th>
+
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 Registration
                             </th>
@@ -354,6 +355,30 @@
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <div class="text-sm text-gray-900" x-text="user.email"></div>
                                     <div class="text-sm text-gray-500" x-text="user.phone || 'No phone'"></div>
+                                </td>
+
+                                <!-- Social Circles -->
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900">
+                                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                            <i class="fas fa-users mr-1"></i>
+                                            <span x-text="user.social_circles_count || 0"></span>
+                                        </span>
+                                    </div>
+                                    <div class="text-xs text-gray-500 mt-1" x-show="user.social_circles_names && user.social_circles_names.length > 0">
+                                        <template x-for="(circle, index) in user.social_circles_names?.slice(0, 2)" :key="index">
+                                            <span class="inline-block bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded mr-1 mb-1"
+                                                  x-text="circle"
+                                                  :style="user.social_circles_colors && user.social_circles_colors[circle] ?
+                                                    `background-color: ${user.social_circles_colors[circle]}20; color: ${user.social_circles_colors[circle]}` : ''"></span>
+                                        </template>
+                                        <span x-show="user.social_circles_names && user.social_circles_names.length > 2"
+                                              class="text-xs text-gray-400"
+                                              x-text="`+${user.social_circles_names.length - 2} more`"></span>
+                                    </div>
+                                    <div class="text-xs text-gray-400 italic" x-show="!user.social_circles_names || user.social_circles_names.length === 0">
+                                        No circles
+                                    </div>
                                 </td>
 
                                 <!-- Country -->
@@ -405,29 +430,7 @@
                                     </template>
                                 </td>
 
-                                <!-- Social Circles -->
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="text-sm text-gray-900">
-                                        <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                            <i class="fas fa-users mr-1"></i>
-                                            <span x-text="user.social_circles_count || 0"></span>
-                                        </span>
-                                    </div>
-                                    <div class="text-xs text-gray-500 mt-1" x-show="user.social_circles_names && user.social_circles_names.length > 0">
-                                        <template x-for="(circle, index) in user.social_circles_names?.slice(0, 2)" :key="index">
-                                            <span class="inline-block bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded mr-1 mb-1"
-                                                  x-text="circle"
-                                                  :style="user.social_circles_colors && user.social_circles_colors[circle] ?
-                                                    `background-color: ${user.social_circles_colors[circle]}20; color: ${user.social_circles_colors[circle]}` : ''"></span>
-                                        </template>
-                                        <span x-show="user.social_circles_names && user.social_circles_names.length > 2"
-                                              class="text-xs text-gray-400"
-                                              x-text="`+${user.social_circles_names.length - 2} more`"></span>
-                                    </div>
-                                    <div class="text-xs text-gray-400 italic" x-show="!user.social_circles_names || user.social_circles_names.length === 0">
-                                        No circles
-                                    </div>
-                                </td>
+
 
                                 <!-- Registration -->
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">

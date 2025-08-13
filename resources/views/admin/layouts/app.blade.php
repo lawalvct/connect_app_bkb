@@ -6,6 +6,15 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Admin Dashboard') - ConnectApp</title>
 
+    <!-- Preload important assets -->
+    <link rel="preload" href="{{ asset('images/connect_logo.png') }}" as="image" type="image/png" fetchpriority="high">
+    <link rel="preload" href="{{ asset('images/default-avatar.png') }}" as="image" type="image/png" fetchpriority="high">
+
+    <!-- DNS prefetch for external resources -->
+    <link rel="dns-prefetch" href="//cdn.tailwindcss.com">
+    <link rel="dns-prefetch" href="//unpkg.com">
+    <link rel="dns-prefetch" href="//cdnjs.cloudflare.com">
+
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -53,6 +62,33 @@
             scrollbar-width: thin;
             scrollbar-color: #A200302B transparent;
         }
+
+        /* Image loading optimization */
+        .preload-image {
+            background-color: #f3f4f6;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: 24px 24px;
+            transition: background-color 0.3s ease;
+        }
+
+        .preload-image img {
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .preload-image img.loaded {
+            opacity: 1;
+        }
+
+        /* Logo loading optimization */
+        .logo-container {
+            min-height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
     </style>
 
     @stack('styles')
@@ -64,8 +100,12 @@
          :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'">
 
         <!-- Sidebar Header -->
-        <div class="flex items-center justify-center h-16 bg-primary flex-shrink-0">
-            <img src="{{ asset('images/connect_logo.png') }}" alt="ConnectApp" class="h-10 w-auto">
+        <div class="flex items-center justify-center h-16 bg-primary flex-shrink-0 logo-container">
+            <img src="{{ asset('images/connect_logo.png') }}"
+                 alt="ConnectApp"
+                 class="h-10 w-auto"
+                 onload="this.classList.add('loaded')"
+                 loading="eager">
             <span class="ml-2 text-white text-xl font-bold">Admin</span>
         </div>
 
@@ -339,6 +379,56 @@
     <!-- Mobile Sidebar Overlay -->
     <div x-show="sidebarOpen" @click="sidebarOpen = false"
          class="fixed inset-0 bg-gray-600 bg-opacity-75 z-40 lg:hidden"></div>
+
+    <!-- Preload optimization script -->
+    <script>
+        // Enhanced image preloading with visual feedback
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check if preloaded images are cached
+            const preloadedImages = [
+                '{{ asset("images/connect_logo.png") }}',
+                '{{ asset("images/default-avatar.png") }}'
+            ];
+
+            preloadedImages.forEach(function(src) {
+                const img = new Image();
+                img.onload = function() {
+                    console.log('✅ Preloaded:', src);
+                };
+                img.onerror = function() {
+                    console.warn('❌ Failed to preload:', src);
+                };
+                img.src = src;
+            });
+
+            // Add loading class removal for better UX
+            const allImages = document.querySelectorAll('img');
+            allImages.forEach(function(img) {
+                if (img.complete) {
+                    img.classList.add('loaded');
+                } else {
+                    img.addEventListener('load', function() {
+                        this.classList.add('loaded');
+                    });
+                }
+            });
+        });
+
+        // Performance monitoring for preloaded resources
+        if (typeof performance !== 'undefined' && performance.getEntriesByType) {
+            window.addEventListener('load', function() {
+                setTimeout(function() {
+                    const entries = performance.getEntriesByType('resource');
+                    const preloadedResources = entries.filter(entry =>
+                        entry.name.includes('connect_logo.png') ||
+                        entry.name.includes('default-avatar.png')
+                    );
+
+                    console.log('🚀 Preloaded resources timing:', preloadedResources);
+                }, 1000);
+            });
+        }
+    </script>
 
     @stack('scripts')
 </body>

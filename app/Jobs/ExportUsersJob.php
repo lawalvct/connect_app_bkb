@@ -67,13 +67,31 @@ class ExportUsersJob implements ShouldQueue
             // Send email notification to admin
             if ($this->adminUser->email) {
                 try {
-                    Mail::to($this->adminUser->email)->send(new ExportReadyMail($this->filename, $this->format));
-                } catch (\Exception $e) {
-                    Log::warning('Failed to send export notification email', [
-                        'error' => $e->getMessage(),
-                        'admin_email' => $this->adminUser->email
+                    Log::info('Attempting to send export notification email', [
+                        'admin_email' => $this->adminUser->email,
+                        'filename' => $this->filename
                     ]);
+
+                    Mail::to($this->adminUser->email)->send(new ExportReadyMail($this->filename, $this->format));
+
+                    Log::info('Export notification email sent successfully', [
+                        'admin_email' => $this->adminUser->email,
+                        'filename' => $this->filename
+                    ]);
+
+                } catch (\Exception $e) {
+                    Log::error('Failed to send export notification email', [
+                        'error' => $e->getMessage(),
+                        'admin_email' => $this->adminUser->email,
+                        'trace' => $e->getTraceAsString()
+                    ]);
+
+                    // Don't fail the job if email fails, just log it
                 }
+            } else {
+                Log::warning('No admin email found for export notification', [
+                    'admin_user_id' => $this->adminUser->id
+                ]);
             }
 
             Log::info('User export completed successfully', [
