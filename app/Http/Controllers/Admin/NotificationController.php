@@ -31,24 +31,46 @@ class NotificationController extends Controller
         $request->validate([
             'title' => 'required|string|max:255',
             'body' => 'required|string',
-            'target_type' => 'required|in:all,specific,users',
+            'target_type' => 'required|in:all,specific,users,social_circles,countries',
             'user_ids' => 'required_if:target_type,users|array',
+            'social_circle_ids' => 'required_if:target_type,social_circles|array',
+            'country_ids' => 'required_if:target_type,countries|array',
             'data' => 'nullable|array'
         ]);
 
         try {
             $sent = 0;
             $failed = 0;
+            $users = collect();
 
-            if ($request->target_type === 'all') {
-                $users = User::whereHas('fcmTokens', function($q) {
-                    $q->where('is_active', true);
-                })->get();
-            } elseif ($request->target_type === 'users') {
-                $users = User::whereIn('id', $request->user_ids)
-                    ->whereHas('fcmTokens', function($q) {
+            switch ($request->target_type) {
+                case 'all':
+                    $users = User::whereHas('fcmTokens', function($q) {
                         $q->where('is_active', true);
                     })->get();
+                    break;
+
+                case 'users':
+                    $users = User::whereIn('id', $request->user_ids)
+                        ->whereHas('fcmTokens', function($q) {
+                            $q->where('is_active', true);
+                        })->get();
+                    break;
+
+                case 'social_circles':
+                    $users = User::whereHas('socialCircles', function($q) use ($request) {
+                        $q->whereIn('social_circles.id', $request->social_circle_ids);
+                    })->whereHas('fcmTokens', function($q) {
+                        $q->where('is_active', true);
+                    })->get();
+                    break;
+
+                case 'countries':
+                    $users = User::whereIn('country_id', $request->country_ids)
+                        ->whereHas('fcmTokens', function($q) {
+                            $q->where('is_active', true);
+                        })->get();
+                    break;
             }
 
             foreach ($users as $user) {
@@ -59,7 +81,8 @@ class NotificationController extends Controller
                         $token,
                         $request->title,
                         $request->body,
-                        $request->data ?? []
+                        $request->data ?? [],
+                        $user->id
                     );
 
                     if ($result) {
@@ -492,6 +515,81 @@ class NotificationController extends Controller
         return response()->json([
             'success' => true,
             'stats' => $stats
+        ]);
+    }
+
+    // Get social circles for targeting
+    public function getSocialCircles()
+    {
+        $circles = \App\Models\SocialCircle::select('id', 'name', 'description')
+            ->withCount('users')
+            ->orderBy('name')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'social_circles' => $circles
+        ]);
+    }
+
+    // Get countries for targeting
+    public function getCountries()
+    {
+        $countries = \App\Models\Country::select('id', 'name', 'code')
+            ->withCount('users')
+            ->orderBy('name')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'countries' => $countries
+        ]);
+    }
+
+    // Preview notification targets
+    public function previewTargets(Request $request)
+    {
+        $request->validate([
+            'target_type' => 'required|in:all,users,social_circles,countries',
+            'user_ids' => 'array',
+            'social_circle_ids' => 'array',
+            'country_ids' => 'array'
+        ]);
+
+        $count = 0;
+        $userQuery = User::whereHas('fcmTokens', function($q) {
+            $q->where('is_active', true);
+        });
+
+        switch ($request->target_type) {
+            case 'all':
+                $count = $userQuery->count();
+                break;
+
+            case 'users':
+                if ($request->user_ids) {
+                    $count = $userQuery->whereIn('id', $request->user_ids)->count();
+                }
+                break;
+
+            case 'social_circles':
+                if ($request->social_circle_ids) {
+                    $count = $userQuery->whereHas('socialCircles', function($q) use ($request) {
+                        $q->whereIn('social_circles.id', $request->social_circle_ids);
+                    })->count();
+                }
+                break;
+
+            case 'countries':
+                if ($request->country_ids) {
+                    $count = $userQuery->whereIn('country_id', $request->country_ids)->count();
+                }
+                break;
+        }
+
+        return response()->json([
+            'success' => true,
+            'target_count' => $count
         ]);
     }
 }

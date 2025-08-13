@@ -117,7 +117,13 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 // Push notifications
                 Route::prefix('push')->group(function () {
                     Route::post('/send', [NotificationController::class, 'sendPushNotification']);
+                    Route::post('/preview-targets', [NotificationController::class, 'previewTargets']);
                 });
+
+                // Get notification resources
+                Route::get('/stats', [NotificationController::class, 'getNotificationStats']);
+                Route::get('/social-circles', [NotificationController::class, 'getSocialCircles']);
+                Route::get('/countries', [NotificationController::class, 'getCountries']);
 
                 // Email templates
                 Route::prefix('email')->group(function () {

@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Push Notifications Test</title>
+        <script
+            src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"
+            defer
+        ></script>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link
+            rel="stylesheet"
+            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+        />
+    </head>
+    <body class="bg-gray-100 p-8">
+        <div class="max-w-4xl mx-auto">
+            <h1 class="text-3xl font-bold text-gray-900 mb-8">
+                <i class="fas fa-bell mr-3 text-blue-600"></i>
+                Enhanced Push Notifications System
+            </h1>
+
+            <!-- Feature Overview -->
+            <div
+                class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
+            >
+                <div class="bg-white rounded-lg shadow-md p-6 text-center">
+                    <i class="fas fa-users text-3xl text-blue-600 mb-3"></i>
+                    <h3 class="font-semibold text-gray-900">All Users</h3>
+                    <p class="text-sm text-gray-600 mt-2">
+                        Send to all users with active FCM tokens
+                    </p>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-md p-6 text-center">
+                    <i
+                        class="fas fa-user-friends text-3xl text-green-600 mb-3"
+                    ></i>
+                    <h3 class="font-semibold text-gray-900">Social Circles</h3>
+                    <p class="text-sm text-gray-600 mt-2">
+                        Target specific social circles
+                    </p>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-md p-6 text-center">
+                    <i class="fas fa-globe text-3xl text-purple-600 mb-3"></i>
+                    <h3 class="font-semibold text-gray-900">Countries</h3>
+                    <p class="text-sm text-gray-600 mt-2">
+                        Target users by country
+                    </p>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-md p-6 text-center">
+                    <i
+                        class="fas fa-user-check text-3xl text-orange-600 mb-3"
+                    ></i>
+                    <h3 class="font-semibold text-gray-900">Specific Users</h3>
+                    <p class="text-sm text-gray-600 mt-2">
+                        Send to selected individual users
+                    </p>
+                </div>
+            </div>
+
+            <!-- Implementation Summary -->
+            <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4">
+                    <i class="fas fa-cogs mr-2"></i>
+                    Implementation Summary
+                </h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h3 class="font-semibold text-gray-800 mb-3">
+                            Backend Enhancements
+                        </h3>
+                        <ul class="space-y-2 text-sm text-gray-600">
+                            <li>
+                                <i class="fas fa-check text-green-500 mr-2"></i
+                                >Enhanced NotificationController with new
+                                targeting options
+                            </li>
+                            <li>
+                                <i class="fas fa-check text-green-500 mr-2"></i
+                                >Added social circles and countries targeting
+                            </li>
+                            <li>
+                                <i class="fas fa-check text-green-500 mr-2"></i
+                                >Target preview functionality
+                            </li>
+                            <li>
+                                <i class="fas fa-check text-green-500 mr-2"></i
+                                >Firebase service integration
+                            </li>
+                            <li>
+                                <i class="fas fa-check text-green-500 mr-2"></i
+                                >Push notification logging
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div>
+                        <h3 class="font-semibold text-gray-800 mb-3">
+                            Frontend Features
+                        </h3>
+                        <ul class="space-y-2 text-sm text-gray-600">
+                            <li>
+                                <i class="fas fa-check text-green-500 mr-2"></i
+                                >Multi-target selection interface
+                            </li>
+                            <li>
+                                <i class="fas fa-check text-green-500 mr-2"></i
+                                >Real-time target count preview
+                            </li>
+                            <li>
+                                <i class="fas fa-check text-green-500 mr-2"></i
+                                >Social circles selection with user counts
+                            </li>
+                            <li>
+                                <i class="fas fa-check text-green-500 mr-2"></i
+                                >Countries selection with user counts
+                            </li>
+                            <li>
+                                <i class="fas fa-check text-green-500 mr-2"></i
+                                >Enhanced stats dashboard
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- API Endpoints -->
+            <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4">
+                    <i class="fas fa-code mr-2"></i>
+                    New API Endpoints
+                </h2>
+
+                <div class="overflow-x-auto">
+                    <table class="min-w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th
+                                    class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                >
+                                    Method
+                                </th>
+                                <th
+                                    class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                >
+                                    Endpoint
+                                </th>
+                                <th
+                                    class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                >
+                                    Purpose
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            <tr>
+                                <td
+                                    class="px-4 py-2 text-sm font-mono bg-green-50 text-green-800"
+                                >
+                                    POST
+                                </td>
+                                <td class="px-4 py-2 text-sm font-mono">
+                                    /admin/api/notifications/push/send
+                                </td>
+                                <td class="px-4 py-2 text-sm">
+                                    Enhanced with social circles & countries
+                                    targeting
+                                </td>
+                            </tr>
+                            <tr>
+                                <td
+                                    class="px-4 py-2 text-sm font-mono bg-blue-50 text-blue-800"
+                                >
+                                    GET
+                                </td>
+                                <td class="px-4 py-2 text-sm font-mono">
+                                    /admin/api/notifications/social-circles
+                                </td>
+                                <td class="px-4 py-2 text-sm">
+                                    Get social circles with user counts
+                                </td>
+                            </tr>
+                            <tr>
+                                <td
+                                    class="px-4 py-2 text-sm font-mono bg-blue-50 text-blue-800"
+                                >
+                                    GET
+                                </td>
+                                <td class="px-4 py-2 text-sm font-mono">
+                                    /admin/api/notifications/countries
+                                </td>
+                                <td class="px-4 py-2 text-sm">
+                                    Get countries with user counts
+                                </td>
+                            </tr>
+                            <tr>
+                                <td
+                                    class="px-4 py-2 text-sm font-mono bg-yellow-50 text-yellow-800"
+                                >
+                                    POST
+                                </td>
+                                <td class="px-4 py-2 text-sm font-mono">
+                                    /admin/api/notifications/push/preview-targets
+                                </td>
+                                <td class="px-4 py-2 text-sm">
+                                    Preview target user count before sending
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Configuration Requirements -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4">
+                    <i class="fas fa-wrench mr-2"></i>
+                    Configuration Requirements
+                </h2>
+
+                <div
+                    class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4"
+                >
+                    <div class="flex">
+                        <i
+                            class="fas fa-exclamation-triangle text-yellow-600 mr-2 mt-1"
+                        ></i>
+                        <div>
+                            <h3 class="font-semibold text-yellow-800">
+                                Firebase Setup Required
+                            </h3>
+                            <p class="text-yellow-700 text-sm mt-1">
+                                You need to configure Firebase server key in
+                                your .env file:
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div
+                    class="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm"
+                >
+                    <div class="mb-2"># Add to your .env file:</div>
+                    <div>
+                        FIREBASE_SERVER_KEY=your_actual_firebase_server_key_here
+                    </div>
+                    <div>FIREBASE_PROJECT_ID=connect-app-fbaca</div>
+                    <div>
+                        FIREBASE_DATABASE_URL=https://connect-app-fbaca.firebaseio.com
+                    </div>
+                </div>
+
+                <div
+                    class="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg"
+                >
+                    <h3 class="font-semibold text-blue-800 mb-2">
+                        To get your Firebase Server Key:
+                    </h3>
+                    <ol
+                        class="list-decimal list-inside text-blue-700 text-sm space-y-1"
+                    >
+                        <li>
+                            Go to Firebase Console → Your Project → Project
+                            Settings
+                        </li>
+                        <li>Click on "Cloud Messaging" tab</li>
+                        <li>
+                            Copy the "Server key" from the "Project credentials"
+                            section
+                        </li>
+                        <li>
+                            Update the FIREBASE_SERVER_KEY in your .env file
+                        </li>
+                    </ol>
+                </div>
+            </div>
+
+            <!-- Next Steps -->
+            <div
+                class="mt-8 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg p-6"
+            >
+                <h2 class="text-xl font-semibold mb-4">
+                    <i class="fas fa-rocket mr-2"></i>
+                    Next Steps
+                </h2>
+                <ol class="list-decimal list-inside space-y-2">
+                    <li>Add your Firebase server key to the .env file</li>
+                    <li>
+                        Test the notification system by visiting:
+                        <strong>/admin/notifications/push</strong>
+                    </li>
+                    <li>
+                        Create test FCM tokens for users (mobile app
+                        registration)
+                    </li>
+                    <li>Send test notifications to verify functionality</li>
+                    <li>Monitor notification logs and delivery rates</li>
+                </ol>
+            </div>
+        </div>
+    </body>
+</html>

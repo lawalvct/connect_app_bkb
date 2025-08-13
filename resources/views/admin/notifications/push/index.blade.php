@@ -65,6 +65,20 @@
                                        class="text-primary focus:ring-primary">
                                 <span class="ml-2 text-sm text-gray-700">Specific Users</span>
                             </label>
+                            <label class="flex items-center">
+                                <input type="radio"
+                                       x-model="form.target_type"
+                                       value="social_circles"
+                                       class="text-primary focus:ring-primary">
+                                <span class="ml-2 text-sm text-gray-700">Social Circles</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="radio"
+                                       x-model="form.target_type"
+                                       value="countries"
+                                       class="text-primary focus:ring-primary">
+                                <span class="ml-2 text-sm text-gray-700">Countries</span>
+                            </label>
                         </div>
                     </div>
 
@@ -125,6 +139,116 @@
                         </div>
                     </div>
 
+                    <!-- Social Circles Selection -->
+                    <div x-show="form.target_type === 'social_circles'" class="space-y-3">
+                        <label class="block text-sm font-medium text-gray-700">
+                            Select Social Circles
+                        </label>
+
+                        <!-- Social Circles List -->
+                        <div class="max-h-60 overflow-y-auto border border-gray-200 rounded-lg">
+                            <template x-for="circle in socialCircles" :key="circle.id">
+                                <div class="flex items-center justify-between p-3 border-b border-gray-100 last:border-b-0 hover:bg-gray-50">
+                                    <div class="flex items-center">
+                                        <input type="checkbox"
+                                               :id="'circle-' + circle.id"
+                                               :value="circle.id"
+                                               x-model="form.social_circle_ids"
+                                               class="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded">
+                                        <label :for="'circle-' + circle.id" class="ml-3 cursor-pointer">
+                                            <div class="text-sm font-medium text-gray-900" x-text="circle.name"></div>
+                                            <div class="text-xs text-gray-500">
+                                                <span x-text="circle.users_count || 0"></span> users
+                                                <span x-show="circle.description" class="ml-2" x-text="'• ' + circle.description"></span>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <!-- No social circles -->
+                            <div x-show="socialCircles.length === 0" class="p-6 text-center text-gray-500">
+                                <i class="fas fa-users text-2xl mb-2"></i>
+                                <p>No social circles available</p>
+                            </div>
+                        </div>
+
+                        <!-- Selected Count -->
+                        <div x-show="form.social_circle_ids.length > 0" class="text-sm text-gray-600">
+                            <i class="fas fa-check-circle text-green-500 mr-1"></i>
+                            <span x-text="form.social_circle_ids.length"></span> social circle(s) selected
+                        </div>
+                    </div>
+
+                    <!-- Countries Selection -->
+                    <div x-show="form.target_type === 'countries'" class="space-y-3">
+                        <label class="block text-sm font-medium text-gray-700">
+                            Select Countries
+                        </label>
+
+                        <!-- Countries List -->
+                        <div class="max-h-60 overflow-y-auto border border-gray-200 rounded-lg">
+                            <template x-for="country in countries" :key="country.id">
+                                <div class="flex items-center justify-between p-3 border-b border-gray-100 last:border-b-0 hover:bg-gray-50">
+                                    <div class="flex items-center">
+                                        <input type="checkbox"
+                                               :id="'country-' + country.id"
+                                               :value="country.id"
+                                               x-model="form.country_ids"
+                                               class="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded">
+                                        <label :for="'country-' + country.id" class="ml-3 cursor-pointer">
+                                            <div class="flex items-center">
+                                                <div class="text-sm font-medium text-gray-900" x-text="country.name"></div>
+                                                <span x-show="country.code"
+                                                      class="ml-2 px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded"
+                                                      x-text="country.code"></span>
+                                            </div>
+                                            <div class="text-xs text-gray-500">
+                                                <span x-text="country.users_count || 0"></span> users
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <!-- No countries -->
+                            <div x-show="countries.length === 0" class="p-6 text-center text-gray-500">
+                                <i class="fas fa-globe text-2xl mb-2"></i>
+                                <p>No countries available</p>
+                            </div>
+                        </div>
+
+                        <!-- Selected Count -->
+                        <div x-show="form.country_ids.length > 0" class="text-sm text-gray-600">
+                            <i class="fas fa-check-circle text-green-500 mr-1"></i>
+                            <span x-text="form.country_ids.length"></span> country(ies) selected
+                        </div>
+                    </div>
+
+                    <!-- Target Preview -->
+                    <div x-show="form.target_type !== 'all'" class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div class="flex items-center">
+                            <i class="fas fa-info-circle text-blue-500 mr-2"></i>
+                            <div>
+                                <div class="text-sm font-medium text-blue-900">Target Preview</div>
+                                <div class="text-sm text-blue-700" x-show="targetPreview.loading">
+                                    <i class="fas fa-spinner fa-spin mr-1"></i>
+                                    Calculating target users...
+                                </div>
+                                <div class="text-sm text-blue-700" x-show="!targetPreview.loading && targetPreview.count !== null">
+                                    This notification will be sent to approximately
+                                    <span class="font-semibold" x-text="targetPreview.count"></span> users with active tokens.
+                                </div>
+                            </div>
+                        </div>
+                        <button type="button"
+                                @click="previewTargets()"
+                                class="mt-2 text-sm text-blue-600 hover:text-blue-800">
+                            <i class="fas fa-refresh mr-1"></i>
+                            Refresh Preview
+                        </button>
+                    </div>
+
                     <!-- Additional Data -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -173,6 +297,14 @@
                     <div class="flex justify-between items-center">
                         <span class="text-sm text-gray-600">Sent Today</span>
                         <span class="text-lg font-semibold text-blue-600" x-text="stats.sent_today"></span>
+                    </div>
+                    <div class="flex justify-between items-center" x-show="socialCircles.length > 0">
+                        <span class="text-sm text-gray-600">Social Circles</span>
+                        <span class="text-lg font-semibold text-purple-600" x-text="socialCircles.length"></span>
+                    </div>
+                    <div class="flex justify-between items-center" x-show="countries.length > 0">
+                        <span class="text-sm text-gray-600">Countries</span>
+                        <span class="text-lg font-semibold text-orange-600" x-text="countries.length"></span>
                     </div>
                 </div>
             </div>
@@ -229,13 +361,21 @@ window.pushNotifications = function() {
             body: '',
             target_type: 'all',
             user_ids: [],
+            social_circle_ids: [],
+            country_ids: [],
             data: {}
         },
         sending: false,
         userSearch: '',
         searchResults: [],
         selectedUsers: [],
+        socialCircles: [],
+        countries: [],
         additionalDataText: '',
+        targetPreview: {
+            loading: false,
+            count: null
+        },
         stats: {
             total_users: 0,
             active_tokens: 0,
@@ -247,6 +387,35 @@ window.pushNotifications = function() {
 
         init() {
             this.loadStats();
+            this.loadSocialCircles();
+            this.loadCountries();
+
+            // Watch for target type changes to update preview
+            this.$watch('form.target_type', () => {
+                this.targetPreview.count = null;
+                if (this.form.target_type !== 'all') {
+                    this.previewTargets();
+                }
+            });
+
+            // Watch for changes in selections
+            this.$watch('form.social_circle_ids', () => {
+                if (this.form.target_type === 'social_circles') {
+                    this.previewTargets();
+                }
+            });
+
+            this.$watch('form.country_ids', () => {
+                if (this.form.target_type === 'countries') {
+                    this.previewTargets();
+                }
+            });
+
+            this.$watch('form.user_ids', () => {
+                if (this.form.target_type === 'users') {
+                    this.previewTargets();
+                }
+            });
         },
 
         async loadStats() {
@@ -258,6 +427,64 @@ window.pushNotifications = function() {
                 }
             } catch (error) {
                 console.error('Failed to load stats:', error);
+            }
+        },
+
+        async loadSocialCircles() {
+            try {
+                const response = await fetch('/admin/api/notifications/social-circles');
+                const data = await response.json();
+                if (data.success) {
+                    this.socialCircles = data.social_circles;
+                }
+            } catch (error) {
+                console.error('Failed to load social circles:', error);
+            }
+        },
+
+        async loadCountries() {
+            try {
+                const response = await fetch('/admin/api/notifications/countries');
+                const data = await response.json();
+                if (data.success) {
+                    this.countries = data.countries;
+                }
+            } catch (error) {
+                console.error('Failed to load countries:', error);
+            }
+        },
+
+        async previewTargets() {
+            if (this.form.target_type === 'all') {
+                this.targetPreview.count = this.stats.active_tokens;
+                return;
+            }
+
+            this.targetPreview.loading = true;
+
+            try {
+                const response = await fetch('/admin/api/notifications/push/preview-targets', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                    },
+                    body: JSON.stringify({
+                        target_type: this.form.target_type,
+                        user_ids: this.form.user_ids,
+                        social_circle_ids: this.form.social_circle_ids,
+                        country_ids: this.form.country_ids
+                    })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    this.targetPreview.count = data.target_count;
+                }
+            } catch (error) {
+                console.error('Failed to preview targets:', error);
+            } finally {
+                this.targetPreview.loading = false;
             }
         },
 
@@ -334,8 +561,19 @@ window.pushNotifications = function() {
                 return;
             }
 
+            // Validate target selection
             if (this.form.target_type === 'users' && this.form.user_ids.length === 0) {
                 this.showError('Please select at least one user');
+                return;
+            }
+
+            if (this.form.target_type === 'social_circles' && this.form.social_circle_ids.length === 0) {
+                this.showError('Please select at least one social circle');
+                return;
+            }
+
+            if (this.form.target_type === 'countries' && this.form.country_ids.length === 0) {
+                this.showError('Please select at least one country');
                 return;
             }
 
@@ -385,12 +623,15 @@ window.pushNotifications = function() {
                 body: '',
                 target_type: 'all',
                 user_ids: [],
+                social_circle_ids: [],
+                country_ids: [],
                 data: {}
             };
             this.additionalDataText = '';
             this.selectedUsers = [];
             this.userSearch = '';
             this.searchResults = [];
+            this.targetPreview.count = null;
         },
 
         showSuccess(msg) {

@@ -91,11 +91,4 @@ class PushNotificationLog extends Model
             default => 'bg-gray-100 text-gray-800'
         };
     }
-}space App\Models;
-
-use Illuminate\Database\Eloquent\Model;
-
-class PushNotificationLog extends Model
-{
-    //
 }

@@ -53,11 +53,18 @@ return [
 
 
     'stripe' => [
-    'key' => env('STRIPE_KEY'),
-    'secret' => env('STRIPE_SECRET'),
-    'webhook' => [
-        'secret' => env('STRIPE_WEBHOOK_SECRET'),
-        'tolerance' => env('STRIPE_WEBHOOK_TOLERANCE', 300),
+        'key' => env('STRIPE_KEY'),
+        'secret' => env('STRIPE_SECRET'),
+        'webhook' => [
+            'secret' => env('STRIPE_WEBHOOK_SECRET'),
+            'tolerance' => env('STRIPE_WEBHOOK_TOLERANCE', 300),
+        ],
     ],
-],
+
+    'firebase' => [
+        'server_key' => env('FIREBASE_SERVER_KEY'),
+        'project_id' => env('FIREBASE_PROJECT_ID'),
+        'credentials_path' => env('FIREBASE_CREDENTIALS_PATH'),
+        'database_url' => env('FIREBASE_DATABASE_URL'),
+    ],
 ];
