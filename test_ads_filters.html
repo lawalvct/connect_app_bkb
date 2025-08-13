@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Ads Filters Test</title>
+        <script
+            src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"
+            defer
+        ></script>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link
+            rel="stylesheet"
+            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+        />
+    </head>
+    <body class="bg-gray-100 p-8">
+        <div
+            x-data="{
+    filtersVisible: false,
+    filters: {
+        search: '',
+        type: '',
+        status: '',
+        admin_status: '',
+        payment_status: '',
+        country: '',
+        social_circle: '',
+        date_from: '',
+        date_to: ''
+    },
+    clearAllFilters() {
+        this.filters = {
+            search: '',
+            type: '',
+            status: '',
+            admin_status: '',
+            payment_status: '',
+            country: '',
+            social_circle: '',
+            date_from: '',
+            date_to: ''
+        };
+    }
+}"
+        >
+            <h1 class="text-2xl font-bold text-gray-900 mb-6">
+                Ads Filter Section Test
+            </h1>
+
+            <!-- Filters and Search -->
+            <div class="bg-white rounded-lg shadow-md mb-6">
+                <!-- Filter Header with Toggle -->
+                <div
+                    class="px-6 py-4 border-b border-gray-200 flex justify-between items-center cursor-pointer"
+                    @click="filtersVisible = !filtersVisible"
+                >
+                    <div class="flex items-center space-x-2">
+                        <i class="fas fa-filter text-gray-500"></i>
+                        <h3 class="text-lg font-medium text-gray-700">
+                            Filters
+                        </h3>
+                        <span
+                            class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
+                            x-show="Object.values(filters).some(val => val !== '')"
+                        >
+                            Filters Applied
+                        </span>
+                    </div>
+                    <div>
+                        <i
+                            class="fas"
+                            :class="filtersVisible ? 'fa-chevron-up' : 'fa-chevron-down'"
+                        ></i>
+                    </div>
+                </div>
+
+                <!-- Filter Content -->
+                <div class="p-6" x-show="filtersVisible" x-transition>
+                    <div class="grid grid-cols-1 md:grid-cols-7 gap-4">
+                        <!-- Search -->
+                        <div>
+                            <label
+                                for="search"
+                                class="block text-sm font-medium text-gray-700 mb-1"
+                                >Search Ads</label
+                            >
+                            <div class="relative">
+                                <input
+                                    type="text"
+                                    id="search"
+                                    x-model="filters.search"
+                                    placeholder="Search by name, description or user..."
+                                    class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                                />
+                                <div
+                                    class="absolute inset-y-0 left-0 pl-3 flex items-center"
+                                >
+                                    <i class="fas fa-search text-gray-400"></i>
+                                </div>
+                                <div
+                                    x-show="filters.search"
+                                    @click="filters.search = ''"
+                                    class="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer"
+                                >
+                                    <i
+                                        class="fas fa-times text-gray-400 hover:text-gray-600"
+                                    ></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Type Filter -->
+                        <div>
+                            <label
+                                for="type"
+                                class="block text-sm font-medium text-gray-700 mb-1"
+                                >Ad Type</label
+                            >
+                            <select
+                                id="type"
+                                x-model="filters.type"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                            >
+                                <option value="">All Types</option>
+                                <option value="banner">Image</option>
+                                <option value="video">Video</option>
+                            </select>
+                        </div>
+
+                        <!-- Status Filter -->
+                        <div>
+                            <label
+                                for="status"
+                                class="block text-sm font-medium text-gray-700 mb-1"
+                                >Status</label
+                            >
+                            <select
+                                id="status"
+                                x-model="filters.status"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                            >
+                                <option value="">All Status</option>
+                                <option value="draft">Draft</option>
+                                <option value="pending_review">
+                                    Pending Review
+                                </option>
+                                <option value="active">Active</option>
+                                <option value="paused">Paused</option>
+                                <option value="stopped">Stopped</option>
+                                <option value="rejected">Rejected</option>
+                            </select>
+                        </div>
+
+                        <!-- Admin Status Filter -->
+                        <div>
+                            <label
+                                for="admin_status"
+                                class="block text-sm font-medium text-gray-700 mb-1"
+                                >Admin Status</label
+                            >
+                            <select
+                                id="admin_status"
+                                x-model="filters.admin_status"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                            >
+                                <option value="">All Admin Status</option>
+                                <option value="pending">Pending Review</option>
+                                <option value="approved">Approved</option>
+                                <option value="rejected">Rejected</option>
+                            </select>
+                        </div>
+
+                        <!-- Payment Status Filter -->
+                        <div>
+                            <label
+                                for="payment_status"
+                                class="block text-sm font-medium text-gray-700 mb-1"
+                                >Payment Status</label
+                            >
+                            <select
+                                id="payment_status"
+                                x-model="filters.payment_status"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                            >
+                                <option value="">All Payments</option>
+                                <option value="completed">Paid</option>
+                                <option value="pending">Pending Payment</option>
+                                <option value="failed">Payment Failed</option>
+                            </select>
+                        </div>
+
+                        <!-- Country Filter -->
+                        <div>
+                            <label
+                                for="country"
+                                class="block text-sm font-medium text-gray-700 mb-1"
+                                >Target Country</label
+                            >
+                            <select
+                                id="country"
+                                x-model="filters.country"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                            >
+                                <option value="">All Countries</option>
+                                <option value="1">United States</option>
+                                <option value="2">Canada</option>
+                                <option value="3">United Kingdom</option>
+                            </select>
+                        </div>
+
+                        <!-- Social Circle Filter -->
+                        <div>
+                            <label
+                                for="social_circle"
+                                class="block text-sm font-medium text-gray-700 mb-1"
+                                >Target Social Circle</label
+                            >
+                            <select
+                                id="social_circle"
+                                x-model="filters.social_circle"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                            >
+                                <option value="">All Social Circles</option>
+                                <option value="1">Tech Enthusiasts</option>
+                                <option value="2">Fitness Community</option>
+                                <option value="3">Book Lovers</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Date Range Filter Row -->
+                    <div
+                        class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4"
+                    >
+                        <!-- Date From -->
+                        <div>
+                            <label
+                                for="date_from"
+                                class="block text-sm font-medium text-gray-700 mb-1"
+                                >Date From</label
+                            >
+                            <input
+                                type="date"
+                                id="date_from"
+                                x-model="filters.date_from"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                            />
+                        </div>
+
+                        <!-- Date To -->
+                        <div>
+                            <label
+                                for="date_to"
+                                class="block text-sm font-medium text-gray-700 mb-1"
+                                >Date To</label
+                            >
+                            <input
+                                type="date"
+                                id="date_to"
+                                x-model="filters.date_to"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                            />
+                        </div>
+                    </div>
+
+                    <!-- Clear Filters Button -->
+                    <div class="mt-4 flex justify-end">
+                        <button
+                            @click="clearAllFilters()"
+                            class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center"
+                        >
+                            <i class="fas fa-times mr-2"></i>
+                            Clear All Filters
+                        </button>
+                    </div>
+
+                    <!-- Quick Stats -->
+                    <div class="mt-6 grid grid-cols-2 md:grid-cols-8 gap-4">
+                        <div class="text-center p-3 bg-blue-50 rounded-md">
+                            <p class="text-sm text-blue-600">Total Ads</p>
+                            <p class="text-xl font-bold text-blue-900">1,234</p>
+                        </div>
+                        <div class="text-center p-3 bg-yellow-50 rounded-md">
+                            <p class="text-sm text-yellow-600">
+                                Pending Review
+                            </p>
+                            <p class="text-xl font-bold text-yellow-900">45</p>
+                        </div>
+                        <div class="text-center p-3 bg-green-50 rounded-md">
+                            <p class="text-sm text-green-600">Approved</p>
+                            <p class="text-xl font-bold text-green-900">856</p>
+                        </div>
+                        <div class="text-center p-3 bg-red-50 rounded-md">
+                            <p class="text-sm text-red-600">Rejected</p>
+                            <p class="text-xl font-bold text-red-900">67</p>
+                        </div>
+                        <div class="text-center p-3 bg-purple-50 rounded-md">
+                            <p class="text-sm text-purple-600">Active</p>
+                            <p class="text-xl font-bold text-purple-900">789</p>
+                        </div>
+                        <div class="text-center p-3 bg-indigo-50 rounded-md">
+                            <p class="text-sm text-indigo-600">With Payment</p>
+                            <p class="text-xl font-bold text-indigo-900">723</p>
+                        </div>
+                        <div class="text-center p-3 bg-pink-50 rounded-md">
+                            <p class="text-sm text-pink-600">Draft</p>
+                            <p class="text-xl font-bold text-pink-900">156</p>
+                        </div>
+                        <div class="text-center p-3 bg-emerald-50 rounded-md">
+                            <p class="text-sm text-emerald-600">Revenue</p>
+                            <p class="text-xl font-bold text-emerald-900">
+                                $12,450
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Demo Instructions -->
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h3 class="text-lg font-medium text-blue-900 mb-2">
+                    <i class="fas fa-info-circle mr-2"></i>
+                    Collapsible Filters Demo
+                </h3>
+                <ul class="text-blue-800 space-y-1">
+                    <li>
+                        <strong>Click the filter header</strong> to
+                        expand/collapse the filter section
+                    </li>
+                    <li>
+                        <strong>Filter indicator</strong> appears when any
+                        filter has a value
+                    </li>
+                    <li>
+                        <strong>Clear button</strong> resets all filters at once
+                    </li>
+                    <li>
+                        <strong>Try entering values</strong> in the fields to
+                        see the "Filters Applied" badge appear
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </body>
+</html>

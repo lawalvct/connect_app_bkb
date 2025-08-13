@@ -29,7 +29,23 @@
 
         <!-- Filters and Search -->
         <div class="bg-white rounded-lg shadow-md mb-6">
-            <div class="p-6">
+            <!-- Filter Header with Toggle -->
+            <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center cursor-pointer" @click="filtersVisible = !filtersVisible">
+                <div class="flex items-center space-x-2">
+                    <i class="fas fa-filter text-gray-500"></i>
+                    <h3 class="text-lg font-medium text-gray-700">Filters</h3>
+                    <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full"
+                          x-show="Object.values(filters).some(val => val !== '')">
+                        Filters Applied
+                    </span>
+                </div>
+                <div>
+                    <i class="fas" :class="filtersVisible ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+                </div>
+            </div>
+
+            <!-- Filter Content -->
+            <div class="p-6" x-show="filtersVisible" x-transition>
                 <div class="grid grid-cols-1 md:grid-cols-7 gap-4">
 
                     <!-- Search -->
@@ -192,13 +208,22 @@
                     <!-- Clear Filters -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Actions</label>
-                        <button @click="clearFilters()"
+                        <button @click="clearAllFilters()"
                                 class="w-full px-3 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 text-sm">
                             <i class="fas fa-times mr-1"></i>
                             Clear All Filters
                         </button>
                     </div>
 
+                </div>
+
+                <!-- Clear Filters Button -->
+                <div class="mt-4 flex justify-end">
+                    <button @click="clearAllFilters()"
+                            class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center">
+                        <i class="fas fa-times mr-2"></i>
+                        Clear All Filters
+                    </button>
                 </div>
 
                 <!-- Quick Actions -->
@@ -645,6 +670,7 @@
             rejectReason: '',
             countries: [],
             socialCircles: [],
+            filtersVisible: false, // Start with filters collapsed
             filters: {
                 search: '',
                 type: '',
@@ -767,7 +793,7 @@
                 return this.ads.data && this.ads.data.length > 0 && this.selectedAds.length === this.ads.data.length;
             },
 
-            clearFilters() {
+            clearAllFilters() {
                 this.filters = {
                     search: '',
                     type: '',

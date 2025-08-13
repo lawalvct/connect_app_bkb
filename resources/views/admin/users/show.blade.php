@@ -106,10 +106,10 @@
                             <div class="text-2xl font-bold text-blue-900">{{ $user->posts_count ?? 0 }}</div>
                             <div class="text-sm text-blue-600">Posts Created</div>
                         </div>
-                        <div class="text-center p-4 bg-green-50 rounded-lg">
+                        {{-- <div class="text-center p-4 bg-green-50 rounded-lg">
                             <div class="text-2xl font-bold text-green-900">0</div>
                             <div class="text-sm text-green-600">Streams</div>
-                        </div>
+                        </div> --}}
                         <div class="text-center p-4 bg-purple-50 rounded-lg">
                             <div class="text-2xl font-bold text-purple-900">{{ $user->socialCircles ? $user->socialCircles->count() : 0 }}</div>
                             <div class="text-sm text-purple-600">Social Circles</div>
