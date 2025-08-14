@@ -1117,7 +1117,7 @@
                                 <div>
                                     <label for="max_video_duration" class="flex items-center text-sm font-semibold text-gray-800 mb-3">
                                         <i class="fas fa-video text-primary mr-2"></i>
-                                        Max Video Duration (seconds)
+                                        Max Video Duration (in hour)
                                     </label>
                                     <input type="number" name="max_video_duration" id="max_video_duration" min="30" max="3600"
                                            value="{{ old('max_video_duration', $settings['limits']['max_video_duration']) }}"

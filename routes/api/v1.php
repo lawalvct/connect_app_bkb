@@ -21,6 +21,7 @@ use App\Http\Controllers\API\V1\AdminAdController;
 use App\Http\Controllers\API\V1\StreamController;
 use App\Http\Controllers\API\V1\StreamPaymentController;
 use App\Http\Controllers\API\V1\StreamChatMvpController;
+use App\Http\Controllers\API\V1\SettingsController;
 
 // Handle OPTIONS requests for CORS preflight (browser Postman compatibility)
 Route::options('{any}', function () {
@@ -198,6 +199,15 @@ Route::post('auth/{provider}/token', [AuthController::class, 'handleSocialLoginF
 Route::post('auth/{provider}/user-data', [AuthController::class, 'handleSocialLoginWithUserData']);
 Route::get('timezones', [UserController::class, 'getTimezones']);
 
+// Settings routes (Public)
+Route::prefix('settings')->group(function () {
+    // Public settings - no authentication required
+    Route::get('public', [SettingsController::class, 'getPublicSettings']);
+    Route::get('maintenance', [SettingsController::class, 'getMaintenanceStatus']);
+    Route::get('app-versions', [SettingsController::class, 'getAppVersions']);
+    Route::get('{key}', [SettingsController::class, 'getSetting']);
+});
+
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
     // Auth
@@ -240,6 +250,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('user/social-circles', [SocialCircleController::class, 'userSocialCircles']);
     Route::post('user/social-circles', [SocialCircleController::class, 'updateUserSocialCircles']);
     Route::get('user/{id}/social-circles', [SocialCircleController::class, 'getUserSocialCircles']);
+
+    // Settings routes (Authenticated)
+    Route::prefix('settings')->group(function () {
+        Route::get('all', [SettingsController::class, 'getAllSettings']);
+        Route::get('email', [SettingsController::class, 'getEmailSettings']);
+        Route::get('notifications', [SettingsController::class, 'getNotificationSettings']);
+        Route::get('payments', [SettingsController::class, 'getPaymentSettings']);
+        Route::get('apis', [SettingsController::class, 'getApiSettings']);
+        Route::get('features', [SettingsController::class, 'getFeatureSettings']);
+        Route::get('limits', [SettingsController::class, 'getLimitSettings']);
+    });
 
     // Posts
     Route::prefix('posts')->group(function () {

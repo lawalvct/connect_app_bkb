@@ -19,6 +19,7 @@ class RegisterStep3Request extends FormRequest
             'email' => 'required|email|exists:users,email',
             'birth_date' => 'required|date|before:today',
             'phone' => 'required|string|max:20',
+         
         ];
     }
 
