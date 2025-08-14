@@ -294,7 +294,7 @@
                     </button>
                     <div x-show="open" x-collapse class="ml-6 mt-2 space-y-2">
                         @if(auth('admin')->user()->hasRole('super_admin'))
-                        <a href="#" class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary">
+                        <a href="{{ route('admin.settings.index') }}" class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.settings*') ? 'bg-primary-light text-primary' : '' }}">
                             <span>System Settings</span>
                         </a>
                         @endif

@@ -16,6 +16,7 @@ use App\Http\Controllers\Admin\NotificationController;
 use App\Http\Controllers\Admin\AdminManagementController;
 use App\Http\Controllers\Admin\AnalyticsController;
 use App\Http\Controllers\Admin\ProfileController;
+use App\Http\Controllers\Admin\SettingsController;
 
 // Admin Authentication Routes
 Route::prefix('admin')->name('admin.')->group(function () {
@@ -352,6 +353,14 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::put('/notifications', [ProfileController::class, 'updateNotifications'])->name('notifications');
             Route::delete('/image', [ProfileController::class, 'deleteProfileImage'])->name('delete-image');
             Route::get('/activity', [ProfileController::class, 'activityLog'])->name('activity');
+        });
+
+        // System Settings (Super Admin Only)
+        Route::prefix('settings')->name('settings.')->group(function () {
+            Route::get('/', [SettingsController::class, 'index'])->name('index');
+            Route::post('/update', [SettingsController::class, 'update'])->name('update');
+            Route::post('/test-email', [SettingsController::class, 'testEmail'])->name('test-email');
+            Route::post('/delete-file', [SettingsController::class, 'deleteFile'])->name('delete-file');
         });
 
         // Logout

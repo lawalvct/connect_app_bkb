@@ -27,11 +27,19 @@ class Setting extends Model
     /**
      * Set setting value by slug
      */
-    public static function setValue($slug, $value)
+    public static function setValue($slug, $value, $name = null)
     {
+        // If no name provided, generate a human-readable name from slug
+        if (!$name) {
+            $name = ucwords(str_replace(['_', '-'], ' ', $slug));
+        }
+
         return self::updateOrCreate(
             ['slug' => $slug],
-            ['value' => $value]
+            [
+                'name' => $name,
+                'value' => $value
+            ]
         );
     }
 
