@@ -15,6 +15,7 @@ use App\Http\Controllers\Admin\RtmpController;
 use App\Http\Controllers\Admin\NotificationController;
 use App\Http\Controllers\Admin\AdminManagementController;
 use App\Http\Controllers\Admin\AnalyticsController;
+use App\Http\Controllers\Admin\ProfileController;
 
 // Admin Authentication Routes
 Route::prefix('admin')->name('admin.')->group(function () {
@@ -341,6 +342,16 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::get('/admins', [AdminManagementController::class, 'getAdmins'])->name('admins');
                 Route::patch('/bulk-status', [AdminManagementController::class, 'bulkUpdateStatus'])->name('bulk-status');
             });
+        });
+
+        // Profile Management
+        Route::prefix('profile')->name('profile.')->group(function () {
+            Route::get('/', [ProfileController::class, 'index'])->name('index');
+            Route::put('/update', [ProfileController::class, 'updateProfile'])->name('update');
+            Route::put('/password', [ProfileController::class, 'updatePassword'])->name('password');
+            Route::put('/notifications', [ProfileController::class, 'updateNotifications'])->name('notifications');
+            Route::delete('/image', [ProfileController::class, 'deleteProfileImage'])->name('delete-image');
+            Route::get('/activity', [ProfileController::class, 'activityLog'])->name('activity');
         });
 
         // Logout
