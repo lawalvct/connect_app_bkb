@@ -310,19 +310,6 @@
 
             </div>
         </nav>
-
-        <!-- Admin Info - Fixed at bottom -->
-        <div class="flex-shrink-0 p-4 border-t border-gray-200 bg-white">
-            <div class="flex items-center">
-                <div class="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-bold">
-                    {{ strtoupper(substr(auth('admin')->user()->name, 0, 1)) }}
-                </div>
-                <div class="ml-3 flex-1">
-                    <p class="text-sm font-medium text-gray-900">{{ auth('admin')->user()->name }}</p>
-                    <p class="text-xs text-gray-500">{{ auth('admin')->user()->getRoleDisplayName() }}</p>
-                </div>
-            </div>
-        </div>
     </div>
 
     <!-- Main Content -->
@@ -349,15 +336,33 @@
                             <i class="fas fa-bell text-xl"></i>
                         </button>
 
-                        <!-- Profile Dropdown -->
+                        <!-- Admin Profile Info -->
                         <div class="relative" x-data="{ open: false }">
                             <button @click="open = !open"
-                                    class="flex items-center p-2 text-gray-400 hover:text-gray-500 hover:bg-gray-100 rounded-lg">
-                                <i class="fas fa-user-circle text-xl"></i>
+                                    class="flex items-center space-x-3 p-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors duration-200">
+                                <!-- Admin Profile Image -->
+                                @if(auth('admin')->user()->profile_image)
+                                    <img src="{{ Storage::url(auth('admin')->user()->profile_image) }}"
+                                         alt="Profile Image"
+                                         class="w-8 h-8 rounded-full object-cover border-2 border-primary">
+                                @else
+                                    <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white font-bold text-sm">
+                                        {{ strtoupper(substr(auth('admin')->user()->name, 0, 1)) }}
+                                    </div>
+                                @endif
+
+                                <!-- Admin Info -->
+                                <div class="text-left hidden sm:block">
+                                    <p class="text-sm font-medium text-gray-900">{{ auth('admin')->user()->name }}</p>
+                                    <p class="text-xs text-gray-500">{{ auth('admin')->user()->getRoleDisplayName() }}</p>
+                                </div>
+
+                                <!-- Dropdown Icon -->
+                                <i class="fas fa-chevron-down text-xs text-gray-400"></i>
                             </button>
 
                             <div x-show="open" @click.away="open = false"
-                                 class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
+                                 class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 border border-gray-200">
                                 <a href="{{ route('admin.profile.index') }}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                                     <i class="fas fa-user w-4 mr-3"></i>
                                     Profile Settings

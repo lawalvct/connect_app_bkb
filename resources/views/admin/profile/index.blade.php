@@ -110,12 +110,12 @@
                         <i class="fas fa-bell mr-2"></i>
                         Notifications
                     </button>
-                    <button @click="activeTab = 'activity'"
+                    {{-- <button @click="activeTab = 'activity'"
                             :class="activeTab === 'activity' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
                             class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors duration-200">
                         <i class="fas fa-history mr-2"></i>
                         Activity Log
-                    </button>
+                    </button> --}}
                 </nav>
             </div>
 
@@ -316,7 +316,7 @@
                         </div>
 
                         <!-- Two-Factor Authentication -->
-                        <div class="bg-gray-50 rounded-xl p-6">
+                        {{-- <div class="bg-gray-50 rounded-xl p-6">
                             <div class="flex items-center justify-between mb-4">
                                 <div>
                                     <h3 class="text-lg font-medium text-gray-900">Two-Factor Authentication</h3>
@@ -332,10 +332,10 @@
                             <p class="text-sm text-gray-600">
                                 Your account is protected with OTP verification. You'll need to verify your identity with a one-time password sent to your email when logging in from a new device or after 24 hours.
                             </p>
-                        </div>
+                        </div> --}}
 
                         <!-- Account Information -->
-                        <div class="bg-gray-50 rounded-xl p-6">
+                        {{-- <div class="bg-gray-50 rounded-xl p-6">
                             <h3 class="text-lg font-medium text-gray-900 mb-4">Account Information</h3>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
@@ -362,7 +362,7 @@
                                     </span>
                                 </div>
                             </div>
-                        </div>
+                        </div> --}}
 
                     </div>
                 </div>
@@ -441,7 +441,7 @@
                 </div>
 
                 <!-- Activity Log Tab -->
-                <div x-show="activeTab === 'activity'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 transform translate-y-4" x-transition:enter-end="opacity-100 transform translate-y-0">
+                {{-- <div x-show="activeTab === 'activity'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 transform translate-y-4" x-transition:enter-end="opacity-100 transform translate-y-0">
                     <div class="space-y-6">
                         <div>
                             <h3 class="text-lg font-medium text-gray-900 mb-2">Recent Activity</h3>
@@ -478,7 +478,7 @@
                             </div>
                         </div>
                     </div>
-                </div>
+                </div> --}}
 
             </div>
         </div>
