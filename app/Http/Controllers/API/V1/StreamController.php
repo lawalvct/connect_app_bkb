@@ -278,10 +278,7 @@ class StreamController extends BaseController
     {
         try {
             $query = Stream::with(['user'])
-                ->where(function($q) {
-                    $q->where('deleted_flag', 'N')
-                      ->orWhereNull('deleted_flag');
-                })
+
                 ->where('status', 'live')
                 ->orderBy('created_at', 'desc');
 
@@ -296,7 +293,7 @@ class StreamController extends BaseController
                 'channel_name',  // Make sure this is included
                 'created_at',
                 'updated_at'
-            ])->get();
+            ])->paginate(1);
 
             // Transform the data to ensure channel_name is available
             $transformedStreams = $streams->map(function ($stream) {
@@ -366,6 +363,7 @@ class StreamController extends BaseController
      */
     public function viewers(Request $request, $id)
     {
+
         try {
             $stream = Stream::find($id);
 
@@ -374,7 +372,7 @@ class StreamController extends BaseController
             }
 
             $viewers = $stream->activeViewers()
-                ->with('user:id,username,name,profile_picture')
+                ->with('user:id,username,name,profile,profile_url')
                 ->orderBy('joined_at', 'desc')
                 ->get();
 
@@ -388,7 +386,7 @@ class StreamController extends BaseController
                             'id' => $viewer->user->id,
                             'username' => $viewer->user->username,
                             'name' => $viewer->user->name,
-                            'profile_picture' => $viewer->user->profile_picture,
+                            'profile_picture' => $viewer->user->profile_url.'/'.$viewer->user->profile,
                         ],
                         'joined_at' => $viewer->joined_at,
                     ];
@@ -648,5 +646,60 @@ class StreamController extends BaseController
                 'profile_picture' => $stream->user->profile_picture,
             ],
         ];
+    }
+
+
+    /**
+     * Check user's watch duration for a stream and enforce free_minutes for paid streams
+     */
+    public function checkWatchDuration(Request $request, $id)
+    {
+        $user = $request->user();
+        $stream = \App\Models\Stream::findOrFail($id);
+
+        // Only enforce for paid streams with free minutes
+        if (!$stream->is_paid || $stream->free_minutes <= 0) {
+            return response()->json([
+                'success' => true,
+                'can_watch' => true,
+                'message' => 'No restriction for this stream.'
+            ]);
+        }
+
+        // Find viewer record
+        $viewer = $stream->viewers()->where('user_id', $user->id)->first();
+        if (!$viewer) {
+            return response()->json([
+                'success' => false,
+                'can_watch' => false,
+                'message' => 'Viewer record not found.'
+            ], 404);
+        }
+
+        // Calculate minutes watched
+        $joinedAt = $viewer->joined_at;
+        $now = now();
+        $minutesWatched = $joinedAt ? $joinedAt->diffInMinutes($now) : 0;
+
+        // Check if user has paid (adjust this logic as needed)
+        $hasPaid = $stream->payments()->where('user_id', $user->id)->where('status', 'completed')->exists();
+
+        if ($minutesWatched >= $stream->free_minutes && !$hasPaid) {
+            return response()->json([
+                'success' => true,
+                'can_watch' => false,
+                'minutes_watched' => $minutesWatched,
+                'free_minutes' => $stream->free_minutes,
+                'message' => 'Free minutes used up. Please make payment to continue watching.'
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'can_watch' => true,
+            'minutes_watched' => $minutesWatched,
+            'free_minutes' => $stream->free_minutes,
+            'message' => 'You can continue watching.'
+        ]);
     }
 }

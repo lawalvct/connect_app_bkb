@@ -55,7 +55,7 @@ class StreamManagementController extends Controller
         $validator = Validator::make($request->all(), [
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'banner_image' => 'nullable|image|max:5120', // 5MB max
+            'banner_image' => 'nullable|image|max:10120', // 10MB max
             'free_minutes' => 'required|integer|min:0',
             'price' => 'required_if:free_minutes,0|nullable|numeric|min:0',
             'currency' => 'required|string|in:USD,NGN,EUR,GBP',
@@ -85,27 +85,33 @@ class StreamManagementController extends Controller
             }
 
             // Log admin action
-            Log::info('Admin creating stream for user', [
-                'admin_id' => auth('admin')->id(),
-                'admin_name' => auth('admin')->user()->name,
-                'user_id' => $user->id,
-                'user_name' => $user->name,
-                'stream_title' => $data['title']
-            ]);
+          // Log::info('Admin creating stream for user', [
+        //         'admin_id' => auth('admin')->id(),
+        //         'admin_name' => auth('admin')->user()->name,
+        //         'user_id' => $user->id,
+        //         'user_name' => $user->name,
+        //         'stream_title' => $data['title']
+        //     ]);
 
             $data['channel_name'] = 'admin_stream_' . time() . '_' . Str::random(8);
             $data['go_live_immediately'] = $request->stream_type === 'immediate';
 
             // Set payment status
-            $data['is_paid'] = $data['free_minutes'] == 0 && $data['price'] > 0;
+
+$data['is_paid'] = ($data['free_minutes'] > 0 && $data['price'] > 0);
 
             // Handle banner image upload
             if ($request->hasFile('banner_image')) {
                 $file = $request->file('banner_image');
-                $filename = 'stream_banners/' . time() . '_' . $file->getClientOriginalName();
-                Storage::disk('s3')->put($filename, file_get_contents($file));
+                $filename = 'streams/' . time() . '_' . $file->getClientOriginalName();
+                // Save to local storage (public/streams)
+                $file->move(public_path('streams'), basename($filename));
                 $data['banner_image'] = $filename;
-                $data['banner_image_url'] = config('filesystems.disks.s3.url') . '/' . $filename;
+                $data['banner_image_url'] = asset($filename);
+                // S3 upload commented out:
+                // Storage::disk('s3')->put($filename, file_get_contents($file));
+                // $data['banner_image'] = $filename;
+                // $data['banner_image_url'] = config('filesystems.disks.s3.url') . '/' . $filename;
             }
 
             // Set status based on stream type
