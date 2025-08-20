@@ -10,6 +10,7 @@ use App\Services\FirebaseService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class NotificationController extends Controller
 {
@@ -114,11 +115,74 @@ class NotificationController extends Controller
         }
     }
 
-    // Email Templates
-    public function emailTemplatesIndex()
+    // Email
+    public function emailIndex()
     {
         return view('admin.notifications.email.index');
     }
+
+    public function sendEmail(Request $request)
+    {
+        $request->validate([
+            'subject' => 'required|string|max:255',
+            'content' => 'required|string',
+            'target_type' => 'required|in:all,users,social_circles,countries',
+            'user_ids' => 'required_if:target_type,users|array',
+            'social_circle_ids' => 'required_if:target_type,social_circles|array',
+            'country_ids' => 'required_if:target_type,countries|array',
+        ]);
+
+        try {
+            $sent = 0;
+            $failed = 0;
+            $users = collect();
+
+            switch ($request->target_type) {
+                case 'all':
+                    $users = User::whereNotNull('email_verified_at')->get();
+                    break;
+                case 'users':
+                    $users = User::whereIn('id', $request->user_ids)->whereNotNull('email_verified_at')->get();
+                    break;
+                case 'social_circles':
+                    $users = User::whereHas('socialCircles', function($q) use ($request) {
+                        $q->whereIn('social_circles.id', $request->social_circle_ids);
+                    })->whereNotNull('email_verified_at')->get();
+                    break;
+                case 'countries':
+                    $users = User::whereIn('country_id', $request->country_ids)->whereNotNull('email_verified_at')->get();
+                    break;
+            }
+
+            foreach ($users as $user) {
+                try {
+                    Mail::html($request->content, function ($message) use ($user, $request) {
+                        $message->to($user->email)
+                                ->subject($request->subject);
+                    });
+                    $sent++;
+                } catch (\Exception $e) {
+                    Log::error("Failed to send email to {$user->email}: " . $e->getMessage());
+                    $failed++;
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => "Emails sent successfully. Sent: $sent, Failed: $failed",
+                'sent' => $sent,
+                'failed' => $failed
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Email sending error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to send emails: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
 
     public function getEmailTemplates(Request $request)
     {
