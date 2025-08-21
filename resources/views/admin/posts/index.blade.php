@@ -516,7 +516,15 @@
                     }
 
                     const data = await response.json();
-                    this.socialCircles = data.social_circles || [];
+
+                    // Handle both the new format and legacy format
+                    if (data && data.social_circles && Array.isArray(data.social_circles)) {
+                        this.socialCircles = data.social_circles;
+                    } else if (Array.isArray(data)) {
+                        this.socialCircles = data;
+                    } else {
+                        this.socialCircles = [];
+                    }
                 } catch (error) {
                     console.error('Failed to load social circles:', error);
                     this.socialCircles = [];
