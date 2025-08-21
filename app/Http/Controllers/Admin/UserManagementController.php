@@ -294,33 +294,23 @@ class UserManagementController extends Controller
                     $user->status = 'active';
                 }
 
-                // Add verification status
-                $latestVerification = $user->latestVerification;
-                if ($latestVerification) {
-                    $user->verification_status = $latestVerification->admin_status;
-                    $user->verification_id = $latestVerification->id;
-                    $user->verification_date = $latestVerification->updated_at ? $latestVerification->updated_at->format('Y-m-d') : null;
-                } else {
-                    $user->verification_status = 'none';
-                    $user->verification_id = null;
-                    $user->verification_date = null;
-                }
-
                 // Format social circles data
                 $user->social_circles_count = $user->social_circles_count ?? 0;
                 $user->social_circles_names = $user->socialCircles ? $user->socialCircles->pluck('name')->toArray() : [];
                 $user->social_circles_colors = $user->socialCircles ? $user->socialCircles->pluck('color', 'name')->toArray() : [];
 
-                // Format verification data
-                $user->verification_status = 'none';
-                $user->has_pending_verification = false;
-                $user->latest_verification = null;
-
-                if ($user->verifications && $user->verifications->count() > 0) {
-                    $latestVerification = $user->verifications->first();
-                    $user->latest_verification = $latestVerification;
-                    $user->verification_status = $latestVerification->status;
-                    $user->has_pending_verification = $latestVerification->status === 'pending';
+                // Add verification status - use the latestVerification relationship
+                $latestVerification = $user->latestVerification;
+                if ($latestVerification) {
+                    $user->verification_status = $latestVerification->admin_status;
+                    $user->verification_id = $latestVerification->id;
+                    $user->verification_date = $latestVerification->updated_at ? $latestVerification->updated_at->format('Y-m-d') : null;
+                    $user->has_pending_verification = $latestVerification->admin_status === 'pending';
+                } else {
+                    $user->verification_status = 'none';
+                    $user->verification_id = null;
+                    $user->verification_date = null;
+                    $user->has_pending_verification = false;
                 }
 
                 return $user;

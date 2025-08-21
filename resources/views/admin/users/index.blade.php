@@ -446,10 +446,11 @@
                                         </span>
                                     </template>
                                     <template x-if="user.verification_status === 'pending'">
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                        <button @click="openUserVerification(user)"
+                                                class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 hover:bg-yellow-200">
                                             <i class="fas fa-clock mr-1"></i>
                                             Pending
-                                        </span>
+                                        </button>
                                     </template>
                                     <template x-if="user.verification_status === 'rejected'">
                                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
@@ -692,6 +693,84 @@
             </div>
         </div>
 
+        <!-- User Verification Quick Modal -->
+        <div x-show="userVerificationModal"
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="opacity-0"
+             x-transition:enter-end="opacity-100"
+             x-transition:leave="transition ease-in duration-200"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0"
+             class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-[70]"
+             @click.self="userVerificationModal = false">
+
+            <div class="relative top-24 mx-auto p-5 border w-11/12 max-w-3xl shadow-lg rounded-md bg-white">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-medium text-gray-900">User Verification</h3>
+                    <button @click="userVerificationModal = false" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+
+                <template x-if="!userVerification">
+                    <div class="p-8 text-center">
+                        <i class="fas fa-spinner fa-spin text-2xl text-gray-400 mb-4"></i>
+                        <p class="text-gray-600">Loading verification...</p>
+                    </div>
+                </template>
+
+                <template x-if="userVerification">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <div class="flex items-center mb-3">
+                                <img class="h-10 w-10 rounded-full object-cover mr-3"
+                                     :src="userVerification.user.profile_picture || '/images/default-avatar.png'"
+                                     :alt="userVerification.user.name">
+                                <div>
+                                    <h4 class="font-medium text-gray-900" x-text="userVerification.user.name"></h4>
+                                    <p class="text-sm text-gray-500" x-text="userVerification.user.email"></p>
+                                </div>
+                            </div>
+                            <div class="space-y-2 text-sm">
+                                <p><span class="font-medium">ID Type:</span> <span x-text="userVerification.id_card_type.replace('_', ' ').toUpperCase()"></span></p>
+                                <p><span class="font-medium">Submitted:</span> <span x-text="formatDate(userVerification.submitted_at)"></span></p>
+                                <p><span class="font-medium">Status:</span>
+                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
+                                          :class="userVerification.admin_status === 'pending' ? 'bg-yellow-100 text-yellow-800' : (userVerification.admin_status === 'approved' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800')">
+                                        <i class="fas" :class="userVerification.admin_status === 'pending' ? 'fa-clock' : (userVerification.admin_status === 'approved' ? 'fa-check-circle' : 'fa-times-circle')"></i>
+                                        <span class="ml-1 capitalize" x-text="userVerification.admin_status"></span>
+                                    </span>
+                                </p>
+                            </div>
+
+                            <div class="flex space-x-2 mt-4" x-show="userVerification.admin_status === 'pending'">
+                                <button @click="approveUserVerification()"
+                                        class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm">
+                                    <i class="fas fa-check mr-1"></i>
+                                    Approve
+                                </button>
+                                <button @click="rejectUserVerification()"
+                                        class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm">
+                                    <i class="fas fa-times mr-1"></i>
+                                    Reject
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <p class="font-medium text-gray-900 mb-2">ID Card Image:</p>
+                            <div class="border rounded-lg overflow-hidden">
+                                <img :src="userVerification.id_card_image_url"
+                                     :alt="'ID Card for ' + userVerification.user.name"
+                                     class="w-full h-64 object-contain bg-gray-100 cursor-pointer"
+                                     @click="showImageModal(userVerification.id_card_image_url)">
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">Click image to view full size</p>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+
         <!-- Image Preview Modal -->
         <div x-show="showImagePreview"
              x-transition:enter="transition ease-out duration-300"
@@ -782,6 +861,8 @@
             previewImageUrl: '',
             selectedVerification: null,
             rejectReason: '',
+            userVerificationModal: false,
+            userVerification: null,
             filters: {
                 search: '',
                 status: '',
@@ -797,6 +878,77 @@
                 await this.fetchExportStatus();
                 // Start polling every 8 seconds
                 this.exportPollTimer = setInterval(() => this.fetchExportStatus(), 8000);
+            },
+
+            async openUserVerification(user) {
+                try {
+                    this.userVerificationModal = true;
+                    this.userVerification = null;
+                    const response = await fetch(`/admin/api/verifications/user/${user.id}/latest`, {
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                        }
+                    });
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    const data = await response.json();
+                    if (data.success) {
+                        this.userVerification = data.verification;
+                    } else {
+                        this.showError(data.message || 'No verification found');
+                        this.userVerificationModal = false;
+                    }
+                } catch (e) {
+                    this.showError('Failed to load verification');
+                    this.userVerificationModal = false;
+                }
+            },
+
+            async approveUserVerification() {
+                if (!this.userVerification) return;
+                if (!confirm('Approve this verification?')) return;
+                try {
+                    const response = await fetch(`/admin/api/verifications/${this.userVerification.id}/approve`, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                        }
+                    });
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    this.showSuccess('Verification approved');
+                    this.userVerificationModal = false;
+                    await this.loadUsers(this.pagination.current_page);
+                    await this.loadPendingVerificationsCount();
+                } catch (e) {
+                    this.showError('Failed to approve');
+                }
+            },
+
+            async rejectUserVerification() {
+                if (!this.userVerification) return;
+                const reason = prompt('Enter rejection reason:');
+                if (!reason) return;
+                try {
+                    const response = await fetch(`/admin/api/verifications/${this.userVerification.id}/reject`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                        },
+                        body: JSON.stringify({ reason })
+                    });
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    this.showSuccess('Verification rejected');
+                    this.userVerificationModal = false;
+                    await this.loadUsers(this.pagination.current_page);
+                    await this.loadPendingVerificationsCount();
+                } catch (e) {
+                    this.showError('Failed to reject');
+                }
             },
             async fetchExportStatus() {
                 try {

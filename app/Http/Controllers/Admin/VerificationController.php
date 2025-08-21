@@ -82,6 +82,50 @@ class VerificationController extends Controller
     }
 
     /**
+     * Get latest verification for a specific user
+     */
+    public function getUserLatest($userId)
+    {
+        try {
+            $verification = UserVerification::where('user_id', $userId)
+                ->orderByDesc('submitted_at')
+                ->with(['user:id,name,email,profile'])
+                ->first();
+
+            if (!$verification) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No verification found for this user'
+                ], 404);
+            }
+
+            return response()->json([
+                'success' => true,
+                'verification' => [
+                    'id' => $verification->id,
+                    'id_card_type' => $verification->id_card_type,
+                    'id_card_image_url' => $verification->id_card_image_url,
+                    'submitted_at' => $verification->submitted_at,
+                    'admin_status' => $verification->admin_status,
+                    'admin_reason' => $verification->admin_reason,
+                    'reviewed_at' => $verification->reviewed_at,
+                    'user' => [
+                        'id' => $verification->user->id,
+                        'name' => $verification->user->name,
+                        'email' => $verification->user->email,
+                        'profile_picture' => $verification->user->profile ? url('uploads/profiles/' . $verification->user->profile) : null,
+                    ]
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to load user verification'
+            ], 500);
+        }
+    }
+
+    /**
      * Approve a verification
      */
     public function approveVerification($id)

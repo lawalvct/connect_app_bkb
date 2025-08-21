@@ -53,6 +53,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::prefix('verifications')->group(function () {
                 Route::get('/pending-count', [\App\Http\Controllers\Admin\VerificationController::class, 'getPendingCount']);
                 Route::get('/pending', [\App\Http\Controllers\Admin\VerificationController::class, 'getPendingVerifications']);
+                Route::get('/user/{userId}/latest', [\App\Http\Controllers\Admin\VerificationController::class, 'getUserLatest']);
                 Route::post('/{verification}/approve', [\App\Http\Controllers\Admin\VerificationController::class, 'approveVerification']);
                 Route::post('/{verification}/reject', [\App\Http\Controllers\Admin\VerificationController::class, 'rejectVerification']);
             });
