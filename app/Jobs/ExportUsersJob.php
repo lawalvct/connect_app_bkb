@@ -11,6 +11,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Cache;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Mail\ExportReadyMail;
 
@@ -99,6 +100,16 @@ class ExportUsersJob implements ShouldQueue
                 'path' => 'storage/exports/' . $this->filename
             ]);
 
+            // Update cache with completion status for polling UI
+            $cacheKey = 'admin_export_users_status_' . $this->adminUser->id;
+            Cache::put($cacheKey, [
+                'status' => 'completed',
+                'format' => $this->format,
+                'filename' => $this->filename,
+                'download_url' => url('storage/exports/' . $this->filename),
+                'completed_at' => now()->toISOString(),
+            ], now()->addHours(6));
+
         } catch (\Exception $e) {
             Log::error('User export job failed', [
                 'error' => $e->getMessage(),
@@ -123,5 +134,14 @@ class ExportUsersJob implements ShouldQueue
             'format' => $this->format,
             'admin_user' => $this->adminUser->id
         ]);
+
+        // Set failure status in cache
+        $cacheKey = 'admin_export_users_status_' . $this->adminUser->id;
+        Cache::put($cacheKey, [
+            'status' => 'failed',
+            'format' => $this->format,
+            'error' => $exception->getMessage(),
+            'failed_at' => now()->toISOString(),
+        ], now()->addMinutes(30));
     }
 }

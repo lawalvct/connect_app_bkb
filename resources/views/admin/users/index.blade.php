@@ -4,7 +4,7 @@
 
 
 @section('content')
-    <div x-data="userManagement()" x-init="loadUsers(); loadSocialCircles(); loadCountries(); loadPendingVerificationsCount()">
+    <div x-data="userManagement()" x-init="loadUsers(); loadSocialCircles(); loadCountries(); loadPendingVerificationsCount(); initExportStatus()">
 
         <!-- Header with Export -->
         <div class="flex justify-between items-center mb-6">
@@ -12,7 +12,19 @@
                 <h2 class="text-xl font-semibold text-gray-900">User Management</h2>
                 <p class="text-gray-600">Manage all registered users</p>
             </div>
-            <div class="flex space-x-3">
+            <div class="flex space-x-3 items-center">
+                <!-- Latest Export Link -->
+                <div x-show="exportStatus && exportStatus.status === 'completed'" class="mr-2">
+                    <a :href="exportStatus.download_url"
+                       target="_blank"
+                       class="inline-flex items-center text-sm text-green-700 bg-green-50 hover:bg-green-100 border border-green-200 px-3 py-2 rounded-md">
+                        <i class="fas fa-file-download mr-2"></i>
+                        <span>
+                            Download latest export
+                            <span class="ml-1 text-xs text-green-600" x-text="exportStatus.format ? '(' + exportStatus.format.toUpperCase() + ')' : ''"></span>
+                        </span>
+                    </a>
+                </div>
                 <!-- Verification Button -->
                 <button @click="showVerificationModal = true; loadPendingVerifications()"
                         type="button"
@@ -759,6 +771,8 @@
             loading: false,
             selectedUsers: [],
             exportOpen: false,
+            exportStatus: null,
+            exportPollTimer: null,
             showVerificationModal: false,
             showImagePreview: false,
             showRejectReasonModal: false,
@@ -779,6 +793,28 @@
             },
             filtersVisible: false, // Start with filters collapsed
             searchTimeout: null,
+            async initExportStatus() {
+                await this.fetchExportStatus();
+                // Start polling every 8 seconds
+                this.exportPollTimer = setInterval(() => this.fetchExportStatus(), 8000);
+            },
+            async fetchExportStatus() {
+                try {
+                    const response = await fetch('/admin/users/export-status', {
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+                    if (!response.ok) return;
+                    const data = await response.json();
+                    if (data && data.success) {
+                        this.exportStatus = data.status;
+                    }
+                } catch (e) {
+                    // ignore
+                }
+            },
              async loadSocialCircles() {
                 console.log('Loading social circles...');
 
@@ -1259,6 +1295,8 @@
 
                     if (this.filters.search) params.append('search', this.filters.search);
                     if (this.filters.status) params.append('status', this.filters.status);
+                    if (this.filters.verification) params.append('verification', this.filters.verification);
+                    if (this.filters.country) params.append('country', this.filters.country);
                     if (this.filters.social_circles) params.append('social_circles', this.filters.social_circles);
                     if (this.filters.date_from) params.append('date_from', this.filters.date_from);
                     if (this.filters.date_to) params.append('date_to', this.filters.date_to);
@@ -1274,105 +1312,32 @@
                     toast.innerHTML = `
                         <div class="flex items-center">
                             <i class="fas fa-spinner fa-spin mr-2"></i>
-                            <span>Checking export size...</span>
+                            <span>Preparing ${format.toUpperCase()} export...</span>
                         </div>
                     `;
                     document.body.appendChild(toast);
 
-                    // Use fetch to check if export will be queued or immediate
-                    fetch(exportUrl, {
-                        method: 'GET',
-                        headers: {
-                            'Accept': 'application/json',
-                            'X-Requested-With': 'XMLHttpRequest',
-                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                        }
-                    })
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error(`HTTP error! status: ${response.status}`);
-                        }
+                    // Trigger direct download
+                    window.location.href = exportUrl;
 
-                        // Check if response is JSON (queued) or file download (immediate)
-                        const contentType = response.headers.get('content-type');
-                        if (contentType && contentType.includes('application/json')) {
-                            return response.json();
-                        } else {
-                            // For immediate download, trigger download via window.location
-                            window.location.href = exportUrl;
-                            return { immediate: true };
-                        }
-                    })
-                    .then(data => {
-                        // Remove loading toast
+                    // Remove loading toast after a short delay
+                    setTimeout(() => {
                         if (toast.parentNode) {
                             toast.remove();
                         }
 
-                        if (data.immediate) {
-                            // Show immediate download success
-                            const successToast = document.createElement('div');
-                            successToast.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 border border-green-600';
-                            successToast.innerHTML = `
-                                <div class="flex items-center">
-                                    <i class="fas fa-download mr-2"></i>
-                                    <span>${format.toUpperCase()} export download started!</span>
-                                </div>
-                            `;
-                            document.body.appendChild(successToast);
-                            setTimeout(() => successToast.remove(), 3000);
-                        } else if (data.queued) {
-                            // Show queued export message
-                            const queueToast = document.createElement('div');
-                            queueToast.className = 'fixed top-4 right-4 bg-orange-500 text-white px-6 py-4 rounded-lg shadow-lg z-50 border border-orange-600 max-w-md';
-                            queueToast.innerHTML = `
-                                <div class="flex items-start">
-                                    <i class="fas fa-clock mr-3 mt-1"></i>
-                                    <div>
-                                        <div class="font-semibold mb-1">Export Queued</div>
-                                        <div class="text-sm">
-                                            ${data.total_records} records found. <br>
-                                            You'll receive an email when ready!
-                                        </div>
-                                    </div>
-                                </div>
-                            `;
-                            document.body.appendChild(queueToast);
-                            setTimeout(() => queueToast.remove(), 8000);
-                        } else if (data.success) {
-                            // Regular success message
-                            const successToast = document.createElement('div');
-                            successToast.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 border border-green-600';
-                            successToast.innerHTML = `
-                                <div class="flex items-center">
-                                    <i class="fas fa-check mr-2"></i>
-                                    <span>${data.message}</span>
-                                </div>
-                            `;
-                            document.body.appendChild(successToast);
-                            setTimeout(() => successToast.remove(), 5000);
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Export error:', error);
-
-                        // Remove loading toast
-                        if (toast.parentNode) {
-                            toast.remove();
-                        }
-
-                        // Show error message
-                        const errorToast = document.createElement('div');
-                        errorToast.className = 'fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 border border-red-600';
-                        errorToast.innerHTML = `
+                        // Show success message
+                        const successToast = document.createElement('div');
+                        successToast.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 border border-green-600';
+                        successToast.innerHTML = `
                             <div class="flex items-center">
-                                <i class="fas fa-exclamation-triangle mr-2"></i>
-                                <span>Export failed: ${error.message}</span>
+                                <i class="fas fa-download mr-2"></i>
+                                <span>${format.toUpperCase()} export download started!</span>
                             </div>
                         `;
-                        document.body.appendChild(errorToast);
-                        setTimeout(() => errorToast.remove(), 5000);
-                    });
+                        document.body.appendChild(successToast);
+                        setTimeout(() => successToast.remove(), 3000);
+                    }, 1000);
 
                 } catch (error) {
                     console.error('Export error:', error);

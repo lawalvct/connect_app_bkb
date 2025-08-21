@@ -547,10 +547,17 @@
 
             async getViewerToken() {
                 try {
-                    const response = await fetch(`/api/streams/${this.streamId}/viewer-token`, {
+                    const response = await fetch(`/streams2/viewer-token`, {
+                        method: 'POST',
                         headers: {
-                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                        }
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            channel_name: this.channelName,
+                            uid: this.userId || null
+                        }),
+                        signal: this.requestController.signal
                     });
 
                     const data = await response.json();

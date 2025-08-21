@@ -24,6 +24,9 @@ class SimpleUsersExport implements FromCollection, WithHeadings, WithMapping, Sh
     {
         $query = User::query();
 
+        // Log the filters being applied
+        \Illuminate\Support\Facades\Log::info('SimpleUsersExport: Applying filters', $this->filters);
+
         // Apply same filters as getUsers
         if (!empty($this->filters['search'])) {
             $search = $this->filters['search'];
@@ -41,6 +44,38 @@ class SimpleUsersExport implements FromCollection, WithHeadings, WithMapping, Sh
                 $query->where('is_active', false);
             } elseif ($status === 'banned') {
                 $query->where('is_banned', true);
+            }
+        }
+
+        // Add verification filtering
+        if (!empty($this->filters['verification'])) {
+            $verification = $this->filters['verification'];
+            if ($verification === 'verified') {
+                // Users with approved verification
+                $query->whereHas('verifications', function($q) {
+                    $q->where('admin_status', 'approved');
+                });
+            } elseif ($verification === 'pending') {
+                // Users with pending verification
+                $query->whereHas('verifications', function($q) {
+                    $q->where('admin_status', 'pending');
+                });
+            } elseif ($verification === 'rejected') {
+                // Users with rejected verification
+                $query->whereHas('verifications', function($q) {
+                    $q->where('admin_status', 'rejected');
+                });
+            } elseif ($verification === 'none') {
+                // Users without any verification submission
+                $query->whereDoesntHave('verifications');
+            }
+        }
+
+        // Add country filtering
+        if (!empty($this->filters['country'])) {
+            $countryId = $this->filters['country'];
+            if (is_numeric($countryId)) {
+                $query->where('country_id', $countryId);
             }
         }
 
@@ -87,12 +122,17 @@ class SimpleUsersExport implements FromCollection, WithHeadings, WithMapping, Sh
             }
         }
 
-        return $query->select([
+        $users = $query->select([
             'id', 'name', 'email', 'phone', 'is_active', 'is_banned',
             'created_at', 'email_verified_at', 'updated_at'
         ])
         ->orderBy('created_at', 'desc')
         ->get();
+
+        // Log the number of records found
+        \Illuminate\Support\Facades\Log::info('SimpleUsersExport: Found ' . $users->count() . ' users with filters', $this->filters);
+
+        return $users;
     }
 
     /**

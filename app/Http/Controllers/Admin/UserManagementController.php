@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\UsersExport;
@@ -605,13 +606,19 @@ class UserManagementController extends Controller
                 return redirect()->back()->with('error', 'Invalid export format');
             }
 
-            // Prepare filters
+            // Prepare filters - collect all possible filter parameters
             $filters = [];
             if ($request->filled('search')) {
                 $filters['search'] = $request->get('search');
             }
             if ($request->filled('status')) {
                 $filters['status'] = $request->get('status');
+            }
+            if ($request->filled('verification')) {
+                $filters['verification'] = $request->get('verification');
+            }
+            if ($request->filled('country')) {
+                $filters['country'] = $request->get('country');
             }
             if ($request->filled('social_circles')) {
                 $filters['social_circles'] = $request->get('social_circles');
@@ -623,35 +630,16 @@ class UserManagementController extends Controller
                 $filters['date_to'] = $request->get('date_to');
             }
 
-            // Count total records to determine if we should queue the export
+            // Always process immediately - no queuing
+            $directDownload = true;
+
+            // Count total records for logging
             $query = User::query();
             $this->applyFilters($query, $filters);
             $totalRecords = $query->count();
 
             Log::info("Export request: format={$format}, totalRecords={$totalRecords}, filters=" . json_encode($filters));
-
-            // If dataset is large (>1000 records), use queue processing
-            if ($totalRecords > 1000) {
-                $user = Auth::user();
-
-                // Dispatch the export job
-                \App\Jobs\ExportUsersJob::dispatch($filters, $format, $user);
-
-                if ($request->expectsJson()) {
-                    return response()->json([
-                        'success' => true,
-                        'message' => "Export queued successfully! You will receive an email notification when your {$format} export ({$totalRecords} records) is ready for download.",
-                        'queued' => true,
-                        'total_records' => $totalRecords
-                    ]);
-                }
-
-                return redirect()->back()->with('success', "Export queued successfully! You will receive an email notification when your {$format} export ({$totalRecords} records) is ready for download.");
-            }
-
-            // For smaller datasets, process immediately
-            // Check if this is a direct download request (no email needed)
-            $directDownload = $request->get('direct_download', false) || $request->expectsJson() === false;
+            Log::info("Export filters applied: " . json_encode($filters));
 
             // Increase memory limit for Excel exports
             ini_set('memory_limit', '256M');
@@ -665,6 +653,41 @@ class UserManagementController extends Controller
 
             // For direct download (browser requests), return file immediately
             if ($directDownload) {
+                // Also store a copy and update cache so the UI can show a link
+                try {
+                    if ($format === 'csv') {
+                        Excel::store(
+                            new SimpleUsersExport($filters),
+                            'exports/' . $filename,
+                            'public',
+                            \Maatwebsite\Excel\Excel::CSV
+                        );
+                    } else {
+                        Excel::store(
+                            new SimpleUsersExport($filters),
+                            'exports/' . $filename,
+                            'public',
+                            \Maatwebsite\Excel\Excel::XLSX
+                        );
+                    }
+                    $currentAdmin = Auth::user();
+                    if ($currentAdmin) {
+                        $cacheKey = 'admin_export_users_status_' . $currentAdmin->id;
+                        Cache::put($cacheKey, [
+                            'status' => 'completed',
+                            'format' => $format,
+                            'total_records' => $totalRecords,
+                            'filename' => $filename,
+                            'download_url' => url('storage/exports/' . $filename),
+                            'completed_at' => now()->toISOString(),
+                        ], now()->addHours(6));
+                    }
+                } catch (\Exception $cacheStoreError) {
+                    Log::warning('Failed to pre-store export for cache status', [
+                        'error' => $cacheStoreError->getMessage(),
+                        'filename' => $filename,
+                    ]);
+                }
                 if ($format === 'csv') {
                     Log::info("Direct CSV download: {$filename}");
                     return Excel::download(new SimpleUsersExport($filters), $filename, \Maatwebsite\Excel\Excel::CSV, [
@@ -701,6 +724,18 @@ class UserManagementController extends Controller
 
                 // Send email notification
                 $user = Auth::user();
+                // Update cache status for polling UI
+                if ($user) {
+                    $cacheKey = 'admin_export_users_status_' . $user->id;
+                    Cache::put($cacheKey, [
+                        'status' => 'completed',
+                        'format' => $format,
+                        'total_records' => $totalRecords,
+                        'filename' => $filename,
+                        'download_url' => url('storage/exports/' . $filename),
+                        'completed_at' => now()->toISOString(),
+                    ], now()->addHours(6));
+                }
                 if ($user && $user->email) {
                     try {
                         Log::info('Sending immediate export notification email', [
@@ -793,6 +828,36 @@ class UserManagementController extends Controller
             }
 
             return redirect()->back()->with('error', 'Failed to export users: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get current admin user's last users export status and link.
+     */
+    public function getExportStatus(Request $request)
+    {
+        try {
+            $admin = Auth::user();
+            if (!$admin) {
+                return response()->json([
+                    'success' => false,
+                    'status' => 'unauthenticated'
+                ], 401);
+            }
+
+            $cacheKey = 'admin_export_users_status_' . $admin->id;
+            $status = Cache::get($cacheKey, null);
+
+            return response()->json([
+                'success' => true,
+                'status' => $status,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to get export status: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to get export status'
+            ], 500);
         }
     }
 

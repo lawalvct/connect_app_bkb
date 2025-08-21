@@ -450,7 +450,7 @@ Route::prefix('discover')->group(function () {
 
         // MVP Chat routes (no authentication required for testing)
         Route::post('/{id}/mvp-chat', [\App\Http\Controllers\API\V1\StreamChatMvpController::class, 'store']);
-        Route::get('/{id}/mvp-chats', [\App\Http\Controllers\API\V1\StreamChatMvpController::class, 'index']);
+        Route::get('/{id}/mvp-chats', [\App\Http\Controllers\API\V1\StreamChatMvpController::class, 'index']); // No auth middleware, public route
 
         // Authenticated stream routes
         Route::middleware('auth:sanctum')->group(function () {

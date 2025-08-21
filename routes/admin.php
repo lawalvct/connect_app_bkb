@@ -145,6 +145,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
                     Route::put('/templates/{id}/toggle', [NotificationController::class, 'toggleEmailTemplate']);
                     Route::delete('/templates/{id}', [NotificationController::class, 'deleteEmailTemplate']);
                     Route::get('/stats', [NotificationController::class, 'getEmailStats']);
+                    // Add send email notification endpoint
+                    Route::post('/send', [NotificationController::class, 'sendEmail']);
                 });
 
                 // SMS settings
@@ -229,6 +231,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::prefix('users')->name('users.')->group(function () {
             Route::get('/', [UserManagementController::class, 'index'])->name('index');
             Route::get('/export', [UserManagementController::class, 'export'])->name('export');
+            Route::get('/export-status', [UserManagementController::class, 'getExportStatus'])->name('export-status');
             Route::get('/{user}', [UserManagementController::class, 'show'])->name('show');
             Route::get('/{user}/edit', [UserManagementController::class, 'edit'])->name('edit');
             Route::patch('/{user}', [UserManagementController::class, 'update'])->name('update');

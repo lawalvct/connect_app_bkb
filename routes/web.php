@@ -377,3 +377,57 @@ Route::get('/debug/web-push-check', function () {
         'vapid_configured' => !empty(config('services.vapid.public_key')),
     ]);
 });
+
+
+
+
+
+
+Route::post('/streams2/viewer-token', function () {
+    try {
+        $channelName = request('channel_name');
+        $uid = request('uid', null);
+
+        if (!$channelName) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Channel name is required'
+            ], 400);
+        }
+
+        // Generate a random UID if not provided
+        if (!$uid) {
+            $uid = rand(100000, 999999);
+        }
+
+        // Initialize AgoraHelper
+        \App\Helpers\AgoraHelper::init();
+
+        // Generate token for viewer (subscriber role)
+        $token = \App\Helpers\AgoraHelper::generateRtcToken($channelName, (int)$uid, 3600, 'subscriber');
+
+        if (!$token) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to generate token'
+            ], 500);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'token' => $token,
+                'app_id' => \App\Helpers\AgoraHelper::getAppId(),
+                'channel_name' => $channelName,
+                'uid' => $uid,
+                'expires_in' => 3600
+            ]
+        ]);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Error generating token: ' . $e->getMessage()
+        ], 500);
+    }
+});
