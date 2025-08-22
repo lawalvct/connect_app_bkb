@@ -14,6 +14,20 @@ use Carbon\Carbon;
 class PostManagementController extends Controller
 {
     /**
+     * Get countries for filter dropdown
+     */
+    public function getCountries()
+    {
+        try {
+            $countries = \App\Models\Country::where('active', true)
+                ->orderBy('name')
+                ->get(['id', 'name', 'code']);
+            return response()->json(['countries' => $countries]);
+        } catch (\Exception $e) {
+            return response()->json(['countries' => []], 200);
+        }
+    }
+    /**
      * Display posts listing
      */
     public function index()
@@ -45,10 +59,11 @@ class PostManagementController extends Controller
     public function getPosts(Request $request)
     {
         try {
-            Log::info('PostManagement getPosts called with params: ', $request->all());
+           // Log::info('PostManagement getPosts called with params: ', $request->all());
 
             // Start with query
             $query = Post::query();
+
 
             // Apply filters
             if ($request->filled('search')) {
@@ -67,6 +82,14 @@ class PostManagementController extends Controller
                 if (is_numeric($socialCircleId)) {
                     $query->where('social_circle_id', $socialCircleId);
                 }
+            }
+
+            // Country filter (by user's country)
+            if ($request->filled('country')) {
+                $countryId = $request->get('country');
+                $query->whereHas('user', function($q) use ($countryId) {
+                    $q->where('country_id', $countryId);
+                });
             }
 
             if ($request->filled('type')) {
@@ -108,7 +131,8 @@ class PostManagementController extends Controller
 
             // Get paginated results with relationships
             $posts = $query->with([
-                    'user:id,name,email,avatar',
+                    'user:id,name,email,avatar,country_id',
+                    'user.country:id,name,code',
                     'socialCircle:id,name,color',
                     'media:id,post_id,type,file_path,thumbnail_path'
                 ])
@@ -145,7 +169,7 @@ class PostManagementController extends Controller
                 'total_comments' => Post::sum('comments_count'),
             ];
 
-            Log::info('PostManagement getPosts success - returning ' . $posts->count() . ' posts');
+           // Log::info('PostManagement getPosts success - returning ' . $posts->count() . ' posts');
 
             return response()->json([
                 'posts' => $posts,

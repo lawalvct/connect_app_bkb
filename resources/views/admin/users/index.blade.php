@@ -197,7 +197,7 @@
                             <option value="has_circles">With Circles</option>
                             <option value="no_circles">No Circles</option>
 
-                            @foreach(\App\Models\SocialCircle::all() as $circle)
+                            @foreach(\App\Models\SocialCircle::orderBy('order_by')->get() as $circle)
                                 <option value="{{ $circle->id }}">{{ $circle->name }}</option>
                             @endforeach
                         </select>

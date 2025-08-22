@@ -517,7 +517,7 @@ class AdManagementController extends Controller
     {
         try {
             $socialCircles = \App\Models\SocialCircle::select('id', 'name')
-                ->orderBy('name')
+                ->orderBy('order_by')
                 ->get();
 
             return response()->json($socialCircles);

@@ -62,6 +62,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('/posts', [\App\Http\Controllers\Admin\PostManagementController::class, 'getPosts']);
             Route::patch('/posts/{post}/status', [\App\Http\Controllers\Admin\PostManagementController::class, 'updateStatus']);
             Route::patch('/posts/bulk-status', [\App\Http\Controllers\Admin\PostManagementController::class, 'bulkUpdateStatus']);
+            Route::get('/countries', [\App\Http\Controllers\Admin\PostManagementController::class, 'getCountries']);
 
             // Story Management API
             Route::get('/stories', [StoryManagementController::class, 'getStories']);

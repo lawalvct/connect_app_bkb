@@ -17,8 +17,14 @@ class StoryManagementController extends Controller
 {
     public function index(Request $request)
     {
+        // Get countries for filter dropdown
+        $countries = \App\Models\Country::where('active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'code']);
+
         $stories = Story::with([
-            'user:id,name,username,email,profile,profile_url',
+            'user:id,name,username,email,profile,profile_url,country_id',
+            'user.country:id,name,code',
             'views.user:id,name',
             'replies.user:id,name'
         ])
@@ -41,11 +47,12 @@ class StoryManagementController extends Controller
         if ($request->ajax()) {
             return response()->json([
                 'stories' => $stories,
-                'stats' => $stats
+                'stats' => $stats,
+                'countries' => $countries
             ]);
         }
 
-        return view('admin.stories.index', compact('stories', 'stats'));
+        return view('admin.stories.index', compact('stories', 'stats', 'countries'));
     }
 
     public function show(Story $story)
@@ -88,7 +95,8 @@ class StoryManagementController extends Controller
     public function getStories(Request $request): JsonResponse
     {
         $query = Story::with([
-            'user:id,name,username,email,profile,profile_url'
+            'user:id,name,username,email,profile,profile_url,country_id',
+            'user.country:id,name,code'
         ])->withCount(['views', 'replies']);
 
         // Search functionality
@@ -119,10 +127,13 @@ class StoryManagementController extends Controller
             }
         }
 
-        // Filter by privacy - COMMENTED OUT
-        // if ($request->has('privacy') && !empty($request->privacy)) {
-        //     $query->where('privacy', $request->privacy);
-        // }
+        // Filter by country (by user's country)
+        if ($request->has('country') && !empty($request->country)) {
+            $countryId = $request->country;
+            $query->whereHas('user', function($q) use ($countryId) {
+                $q->where('country_id', $countryId);
+            });
+        }
 
         // Filter by date range
         if ($request->has('date_from') && !empty($request->date_from)) {

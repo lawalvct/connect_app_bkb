@@ -3,7 +3,7 @@
 @section('title', 'Stories Management')
 
 @section('content')
-<div x-data="storyManagement()" x-init="loadStories(); loadStats()">
+<div x-data="storyManagement()" x-init="loadStories(); loadStats(); loadCountries()">
     <!-- Page Header -->
     <div class="mb-6">
         <div class="flex justify-between items-center">
@@ -29,7 +29,7 @@
         <!-- Filters and Search -->
         <div class="bg-white rounded-lg shadow-md mb-6">
             <div class="p-6">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
 
                     <!-- Search -->
                     <div>
@@ -50,6 +50,20 @@
                                 <i class="fas fa-times text-gray-400 hover:text-gray-600"></i>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- Country Filter -->
+                    <div>
+                        <label for="country" class="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                        <select id="country"
+                                x-model="filters.country"
+                                @change="loadStories()"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary">
+                            <option value="">All Countries</option>
+                            <template x-for="country in countries" :key="country.id">
+                                <option :value="country.id" x-text="country.name"></option>
+                            </template>
+                        </select>
                     </div>
 
                     <!-- Type Filter -->
@@ -229,6 +243,9 @@
                                     Author
                                 </th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Country
+                                </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Type
                                 </th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -300,6 +317,10 @@
                                                 <div class="text-sm text-gray-500" x-text="story.user.username || story.user.email"></div>
                                             </div>
                                         </div>
+                                    </td>
+                                    <!-- Country Column -->
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <span class="text-sm text-gray-900" x-text="story.user.country ? story.user.country.name : 'N/A'"></span>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
@@ -487,14 +508,32 @@
             loading: false,
             selectedStories: [],
             showCleanupModal: false,
+            countries: [],
             filters: {
                 search: '',
+                country: '',
                 type: '',
                 status: '',
                 date_from: '',
                 date_to: ''
             },
             searchTimeout: null,
+            async loadCountries() {
+                try {
+                    const response = await fetch('/admin/api/countries', {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                        }
+                    });
+                    if (!response.ok) throw new Error('Failed to fetch countries');
+                    const data = await response.json();
+                    this.countries = data.countries || [];
+                } catch (e) {
+                    this.countries = [];
+                }
+            },
 
             async loadStories(page = 1) {
                 this.loading = true;

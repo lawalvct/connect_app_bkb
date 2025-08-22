@@ -26,7 +26,7 @@
 @endsection
 
 @section('content')
-    <div x-data="postManagement()" x-init="loadPosts(); loadSocialCircles()">
+    <div x-data="postManagement()" x-init="loadPosts(); loadSocialCircles(); loadCountries()">
 
         <!-- Filters and Search -->
         <div class="bg-white rounded-lg shadow-md mb-6">
@@ -69,6 +69,20 @@
                         </select>
                     </div>
 
+                    <!-- Country Filter -->
+                    <div>
+                        <label for="country" class="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                        <select id="country"
+                                x-model="filters.country"
+                                @change="loadPosts()"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary">
+                            <option value="">All Countries</option>
+                            <template x-for="country in countries" :key="country.id">
+                                <option :value="country.id" x-text="country.name"></option>
+                            </template>
+                        </select>
+                    </div>
+
                     <!-- Type Filter -->
                     <div>
                         <label for="type" class="block text-sm font-medium text-gray-700 mb-1">Post Type</label>
@@ -84,7 +98,13 @@
                         </select>
                     </div>
 
-                    <!-- Status Filter -->
+
+
+                </div>
+
+                <!-- Second Row - Date Range Filter -->
+                <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+ <!-- Status Filter -->
                     <div>
                         <label for="status" class="block text-sm font-medium text-gray-700 mb-1">Status</label>
                         <select id="status"
@@ -97,12 +117,6 @@
                             {{-- <option value="scheduled">Scheduled</option> --}}
                         </select>
                     </div>
-
-                </div>
-
-                <!-- Second Row - Date Range Filter -->
-                <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-
                     <!-- Date Range Filter -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Post Date Range</label>
@@ -131,7 +145,7 @@
                     </div>
 
                     <!-- Quick Date Range Presets -->
-                    <div>
+                    {{-- <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Quick Filters</label>
                         <div class="flex flex-wrap gap-2">
                             <button @click="setDateRange('today')"
@@ -151,7 +165,7 @@
                                 This Month
                             </button>
                         </div>
-                    </div>
+                    </div> --}}
 
                 </div>
 
@@ -235,6 +249,9 @@
                                     Social Circle
                                 </th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Country
+                                </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Type
                                 </th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -304,6 +321,13 @@
                                             <div class="w-4 h-4 rounded-full mr-2"
                                                  :style="'background-color: ' + (post.social_circle?.color || '#6B7280')"></div>
                                             <span class="text-sm text-gray-900" x-text="post.social_circle?.name || 'N/A'"></span>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="flex items-center">
+                                            <div class="w-4 h-4 rounded-full mr-2"
+                                                 :style="'background-color: ' + (post.country?.color || '#6B7280')"></div>
+                                            <span class="text-sm text-gray-900" x-text="post.user?.country?.name || 'N/A'"></span>
                                         </div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
@@ -441,18 +465,35 @@
             stats: {},
             pagination: {},
             socialCircles: [],
+            countries: [],
             loading: false,
             selectedPosts: [],
             filters: {
                 search: '',
                 social_circle: '',
+                country: '',
                 type: '',
                 status: '',
                 date_from: '',
                 date_to: ''
             },
             searchTimeout: null,
-
+            async loadCountries() {
+                try {
+                    const response = await fetch('/admin/api/countries', {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                        }
+                    });
+                    if (!response.ok) throw new Error('Failed to fetch countries');
+                    const data = await response.json();
+                    this.countries = data.countries || [];
+                } catch (e) {
+                    this.countries = [];
+                }
+            },
             async loadPosts(page = 1) {
                 this.loading = true;
                 try {

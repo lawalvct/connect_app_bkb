@@ -75,10 +75,10 @@ class StoryController extends Controller
                 case 'image':
                 case 'video':
                     if ($request->hasFile('file')) {
-                        $uploadResult = $this->mediaService->processUpload(
+                        // Store in public/uploads/stories/{user_id}/Y/m
+                        $uploadResult = $this->mediaService->processMedia(
                             $request->file('file'),
-                            "stories/{$user->id}/" . date('Y/m'),
-                            $data['type']
+                            "stories/{$user->id}/" . date('Y/m')
                         );
 
                         $storyData['content'] = $uploadResult['file_path'];
@@ -190,7 +190,7 @@ class StoryController extends Controller
         ]);
     }
 
-    
+
 
 
     /**
