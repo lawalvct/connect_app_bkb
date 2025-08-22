@@ -17,9 +17,14 @@ class PostReport extends Model
         'description',
         'status',
         'reviewed_by',
+        'reviewed_by_admin',
         'reviewed_at',
         'admin_notes'
     ];
+    public function reviewerAdmin()
+    {
+        return $this->belongsTo(\App\Models\Admin::class, 'reviewed_by_admin');
+    }
 
     protected $casts = [
         'reviewed_at' => 'datetime',

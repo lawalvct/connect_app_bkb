@@ -12,9 +12,15 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('streams', function (Blueprint $table) {
-            $table->integer('free_minutes')->default(0)->after('current_viewers');
-            $table->enum('stream_type', ['immediate', 'scheduled'])->default('immediate')->after('free_minutes');
-            $table->boolean('go_live_immediately')->default(true)->after('stream_type');
+            if (!Schema::hasColumn('streams', 'free_minutes')) {
+                $table->integer('free_minutes')->default(0)->after('current_viewers');
+            }
+            if (!Schema::hasColumn('streams', 'stream_type')) {
+                $table->enum('stream_type', ['immediate', 'scheduled'])->default('immediate')->after('free_minutes');
+            }
+            if (!Schema::hasColumn('streams', 'go_live_immediately')) {
+                $table->boolean('go_live_immediately')->default(true)->after('stream_type');
+            }
         });
     }
 

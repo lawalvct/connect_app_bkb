@@ -14,13 +14,48 @@ use Carbon\Carbon;
 
 class PostManagementController extends Controller
 {
+    /**
+     * Update the status of a post report (admin action)
+     */
+    public function updateReportStatus(Request $request, $reportId)
+    {
+        $request->validate([
+            'status' => 'required|string|in:pending,under_review,dismissed,action_taken,resolved',
+            'admin_notes' => 'nullable|string',
+        ]);
+
+        $report = \App\Models\PostReport::find($reportId);
+        if (!$report) {
+            return response()->json(['success' => false, 'message' => 'Report not found'], 404);
+        }
+
+
+    $report->status = $request->input('status');
+    $report->admin_notes = $request->input('admin_notes');
+    $report->reviewed_by_admin = auth('admin')->id();
+    $report->reviewed_at = now();
+    $report->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Report status updated successfully',
+            'report' => [
+                'id' => $report->id,
+                'status' => $report->status,
+                'status_text' => $report->status_text,
+                'admin_notes' => $report->admin_notes,
+                'reviewed_by' => $report->reviewed_by,
+                'reviewed_at' => $report->reviewed_at,
+            ]
+        ]);
+    }
 
     /**
      * Get post reports for admin reports view (AJAX)
      */
     public function getPostReports(Request $request)
     {
-        $status = $request->get('status', 'pending');
+       $status = $request->get('status', 'pending');
         $reason = $request->get('reason');
         $query = \App\Models\PostReport::with(['post', 'reporter'])
             ->orderBy('created_at', 'desc');
@@ -235,7 +270,7 @@ class PostManagementController extends Controller
             $socialCircles = SocialCircle::withoutGlobalScope('active')
                 ->where('is_active', true)
                 ->where('deleted_flag', 'N')
-                ->orderBy('name')
+                ->orderBy('order_by')
                 ->get(['id', 'name', 'color']);
 
             return response()->json([

@@ -42,6 +42,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::prefix('api')->group(function () {
             // Post Reports Management API
             Route::get('/post-reports', [\App\Http\Controllers\Admin\PostManagementController::class, 'getPostReports']);
+            Route::patch('/post-reports/{report}/status', [\App\Http\Controllers\Admin\PostManagementController::class, 'updateReportStatus']);
             Route::get('/dashboard-data', [DashboardController::class, 'getDashboardData']);
             Route::get('/dashboard-charts', [DashboardController::class, 'getChartData']);
             Route::get('/users', [UserManagementController::class, 'getUsers']);
