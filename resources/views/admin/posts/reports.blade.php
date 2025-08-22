@@ -130,40 +130,6 @@
                                             <span x-text="report.status_text"></span>
                                         </span>
                                     </td>
-    <!-- Report Action Modal -->
-    <div x-show="showReportModal"
-         x-transition:enter="transition ease-out duration-300"
-         x-transition:enter-start="opacity-0"
-         x-transition:enter-end="opacity-100"
-         x-transition:leave="transition ease-in duration-200"
-         x-transition:leave-start="opacity-100"
-         x-transition:leave-end="opacity-0"
-         class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50"
-         @click.self="showReportModal = false">
-        <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-lg shadow-lg rounded-md bg-white">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-gray-900">Review Report</h3>
-                <button @click="showReportModal = false" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
-            </div>
-            <template x-if="selectedReport">
-                <div>
-                    <div class="mb-4">
-                        <p><span class="font-semibold">Post ID:</span> <span x-text="selectedReport.post_id"></span></p>
-                        <p><span class="font-semibold">Reason:</span> <span x-text="selectedReport.reason_text"></span></p>
-                        <p><span class="font-semibold">Description:</span> <span x-text="selectedReport.description || '-' "></span></p>
-                        <p><span class="font-semibold">Reporter:</span> <span x-text="selectedReport.reporter_name"></span></p>
-                        <p><span class="font-semibold">Reported At:</span> <span x-text="selectedReport.created_at"></span></p>
-                    </div>
-                    <div class="flex flex-col gap-2">
-                        <button @click="takeReportAction('under_review')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md">Mark as Under Review</button>
-                        <button @click="takeReportAction('dismissed')" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md">Dismiss Report</button>
-                        <button @click="takeReportAction('resolved')" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md">Mark as Resolved</button>
-                        <button @click="showReportModal = false" class="mt-2 text-gray-500 hover:text-gray-700">Cancel</button>
-                    </div>
-                </div>
-            </template>
-        </div>
-    </div>
                                     <td class="px-6 py-4 whitespace-nowrap" x-text="report.created_at"></td>
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         <a :href="'/admin/posts/' + report.post_id" class="text-indigo-600 hover:text-indigo-900">View Post</a>
@@ -179,6 +145,41 @@
                         </tbody>
                     </table>
                 </div>
+            </div>
+        </div>
+
+        <!-- Report Action Modal -->
+        <div x-show="showReportModal"
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="opacity-0"
+             x-transition:enter-end="opacity-100"
+             x-transition:leave="transition ease-in duration-200"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0"
+             class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50"
+             @click.self="showReportModal = false">
+            <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-lg shadow-lg rounded-md bg-white">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-semibold text-gray-900">Review Report</h3>
+                    <button @click="showReportModal = false" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+                </div>
+                <template x-if="selectedReport">
+                    <div>
+                        <div class="mb-4">
+                            <p><span class="font-semibold">Post ID:</span> <span x-text="selectedReport.post_id"></span></p>
+                            <p><span class="font-semibold">Reason:</span> <span x-text="selectedReport.reason_text"></span></p>
+                            <p><span class="font-semibold">Description:</span> <span x-text="selectedReport.description || '-' "></span></p>
+                            <p><span class="font-semibold">Reporter:</span> <span x-text="selectedReport.reporter_name"></span></p>
+                            <p><span class="font-semibold">Reported At:</span> <span x-text="selectedReport.created_at"></span></p>
+                        </div>
+                        <div class="flex flex-col gap-2">
+                            <button @click="takeReportAction('under_review')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md">Mark as Under Review</button>
+                            <button @click="takeReportAction('dismissed')" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md">Dismiss Report</button>
+                            <button @click="takeReportAction('resolved')" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md">Mark as Resolved</button>
+                            <button @click="showReportModal = false" class="mt-2 text-gray-500 hover:text-gray-700">Cancel</button>
+                        </div>
+                    </div>
+                </template>
             </div>
         </div>
     </div>
