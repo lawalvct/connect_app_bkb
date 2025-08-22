@@ -150,9 +150,9 @@ Route::prefix('admin')->name('admin.')->group(function () {
                     Route::put('/templates/{id}/toggle', [NotificationController::class, 'toggleEmailTemplate']);
                     Route::delete('/templates/{id}', [NotificationController::class, 'deleteEmailTemplate']);
                     Route::get('/stats', [NotificationController::class, 'getEmailStats']);
-                    // Add send email notification endpoint
-                    Route::post('/send', [NotificationController::class, 'sendEmail']);
                 });
+    // Standalone route for sending email notification (for POST /admin/notifications/email/send)
+   // Route::post('notifications/email/send', [NotificationController::class, 'sendEmail']);
 
                 // SMS settings
                 Route::prefix('sms')->group(function () {
@@ -322,6 +322,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('/subscription', [NotificationController::class, 'subscriptionIndex'])->name('subscription.index');
             Route::get('/test-push', function() { return view('admin.test-push-notifications'); })->name('test-push');
             Route::get('/email', [NotificationController::class, 'emailIndex'])->name('email.index');
+            Route::post('/email/send', [NotificationController::class, 'sendEmail']);
             Route::get('/sms', [NotificationController::class, 'smsIndex'])->name('sms.index');
             Route::get('/logs', [NotificationController::class, 'logsIndex'])->name('logs.index');
         });

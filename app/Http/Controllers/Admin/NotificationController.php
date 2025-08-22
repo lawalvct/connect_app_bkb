@@ -125,11 +125,12 @@ class NotificationController extends Controller
     {
         $request->validate([
             'subject' => 'required|string|max:255',
-            'content' => 'required|string',
-            'target_type' => 'required|in:all,users,social_circles,countries',
-            'user_ids' => 'required_if:target_type,users|array',
-            'social_circle_ids' => 'required_if:target_type,social_circles|array',
-            'country_ids' => 'required_if:target_type,countries|array',
+            'body' => 'required|string',
+            'target_type' => 'required|in:all,selected,circle,country',
+            'users' => 'array',
+            'circle_id' => 'nullable|integer',
+            'country' => 'nullable|string',
+            'attachment' => 'nullable|file|max:10240', // 10MB max
         ]);
 
         try {
@@ -141,28 +142,33 @@ class NotificationController extends Controller
                 case 'all':
                     $users = User::whereNotNull('email_verified_at')->get();
                     break;
-                case 'users':
-                    $users = User::whereIn('id', $request->user_ids)->whereNotNull('email_verified_at')->get();
+                case 'selected':
+                    $users = User::whereIn('id', $request->users ?? [])->whereNotNull('email_verified_at')->get();
                     break;
-                case 'social_circles':
-                    $users = User::whereHas('socialCircles', function($q) use ($request) {
-                        $q->whereIn('social_circles.id', $request->social_circle_ids);
-                    })->whereNotNull('email_verified_at')->get();
+                case 'circle':
+                    $users = User::where('social_circle_id', $request->circle_id)->whereNotNull('email_verified_at')->get();
                     break;
-                case 'countries':
-                    $users = User::whereIn('country_id', $request->country_ids)->whereNotNull('email_verified_at')->get();
+                case 'country':
+                    $users = User::where('country_id', $request->country)->whereNotNull('email_verified_at')->get();
                     break;
             }
 
             foreach ($users as $user) {
                 try {
-                    Mail::html($request->content, function ($message) use ($user, $request) {
+                    \Mail::send([], [], function ($message) use ($user, $request) {
                         $message->to($user->email)
-                                ->subject($request->subject);
+                            ->subject($request->subject)
+                            ->html($request->body);
+                        if ($request->hasFile('attachment')) {
+                            $message->attach($request->file('attachment')->getRealPath(), [
+                                'as' => $request->file('attachment')->getClientOriginalName(),
+                                'mime' => $request->file('attachment')->getMimeType(),
+                            ]);
+                        }
                     });
                     $sent++;
                 } catch (\Exception $e) {
-                    Log::error("Failed to send email to {$user->email}: " . $e->getMessage());
+                    \Log::error("Failed to send email to {$user->email}: " . $e->getMessage());
                     $failed++;
                 }
             }
@@ -173,9 +179,8 @@ class NotificationController extends Controller
                 'sent' => $sent,
                 'failed' => $failed
             ]);
-
         } catch (\Exception $e) {
-            Log::error('Email sending error: ' . $e->getMessage());
+            \Log::error('Email sending error: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to send emails: ' . $e->getMessage()

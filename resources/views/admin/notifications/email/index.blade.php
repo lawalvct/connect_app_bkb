@@ -90,8 +90,8 @@
                     <label class="block text-sm font-medium text-gray-700">Select Country</label>
                     <select x-model="form.country" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm">
                         <option value="">Select a country</option>
-                        <template x-for="country in countries" :key="country">
-                            <option :value="country" x-text="country"></option>
+                        <template x-for="country in countries" :key="country.id">
+                            <option :value="country.id" x-text="country.name"></option>
                         </template>
                     </select>
                 </div>
