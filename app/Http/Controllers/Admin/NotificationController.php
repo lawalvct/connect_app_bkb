@@ -9,8 +9,8 @@ use App\Models\User;
 use App\Services\FirebaseService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
 
 class NotificationController extends Controller
 {
@@ -153,37 +153,43 @@ class NotificationController extends Controller
                     break;
             }
 
+            $attachmentPath = null;
+            $attachmentName = null;
+            $attachmentMime = null;
+            if ($request->hasFile('attachment')) {
+                $attachmentPath = $request->file('attachment')->getRealPath();
+                $attachmentName = $request->file('attachment')->getClientOriginalName();
+                $attachmentMime = $request->file('attachment')->getMimeType();
+            }
+
             foreach ($users as $user) {
                 try {
-                    \Mail::send([], [], function ($message) use ($user, $request) {
-                        $message->to($user->email)
-                            ->subject($request->subject)
-                            ->html($request->body);
-                        if ($request->hasFile('attachment')) {
-                            $message->attach($request->file('attachment')->getRealPath(), [
-                                'as' => $request->file('attachment')->getClientOriginalName(),
-                                'mime' => $request->file('attachment')->getMimeType(),
-                            ]);
-                        }
-                    });
+                    \App\Jobs\SendAdminNotificationEmail::dispatch(
+                        $user,
+                        $request->subject,
+                        $request->body,
+                        $attachmentPath,
+                        $attachmentName,
+                        $attachmentMime
+                    );
                     $sent++;
                 } catch (\Exception $e) {
-                    \Log::error("Failed to send email to {$user->email}: " . $e->getMessage());
+                    Log::error("Failed to queue email to {$user->email}: " . $e->getMessage());
                     $failed++;
                 }
             }
 
             return response()->json([
                 'success' => true,
-                'message' => "Emails sent successfully. Sent: $sent, Failed: $failed",
+                'message' => "Emails queued for sending. Queued: $sent, Failed to queue: $failed",
                 'sent' => $sent,
                 'failed' => $failed
             ]);
         } catch (\Exception $e) {
-            \Log::error('Email sending error: ' . $e->getMessage());
+            Log::error('Email queueing error: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to send emails: ' . $e->getMessage()
+                'message' => 'Failed to queue emails: ' . $e->getMessage()
             ], 500);
         }
     }
