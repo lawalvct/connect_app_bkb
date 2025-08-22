@@ -83,18 +83,24 @@ class NotificationController extends Controller
                 $tokens = $user->fcmTokens()->where('is_active', true)->pluck('fcm_token');
 
                 foreach ($tokens as $token) {
-                    $result = $this->firebaseService->sendNotification(
-                        $token,
-                        $request->title,
-                        $request->body,
-                        $request->data ?? [],
-                        $user->id
-                    );
+                    try {
+                        $result = $this->firebaseService->sendNotification(
+                            $token,
+                            $request->title,
+                            $request->body,
+                            $request->data ?? [],
+                            $user->id
+                        );
 
-                    if ($result) {
-                        $sent++;
-                    } else {
+                        if ($result) {
+                            $sent++;
+                        } else {
+                            $failed++;
+                            Log::error('Push notification failed for token: ' . $token . ' (user_id: ' . $user->id . ')');
+                        }
+                    } catch (\Exception $e) {
                         $failed++;
+                        Log::error('Push notification exception for token: ' . $token . ' (user_id: ' . $user->id . '): ' . $e->getMessage());
                     }
                 }
             }
