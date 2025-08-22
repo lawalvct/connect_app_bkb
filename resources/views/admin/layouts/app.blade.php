@@ -218,7 +218,7 @@
                         @if(auth('admin')->user()->hasPermission('manage_email_templates'))
                         <a href="{{ route('admin.notifications.email.index') }}"
                            class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.notifications.email*') ? 'bg-primary-light text-primary' : '' }}">
-                            <span>Email Templates</span>
+                            <span>Email Notification</span>
                         </a>
                         @endif
                         @if(auth('admin')->user()->hasPermission('view_notification_logs'))

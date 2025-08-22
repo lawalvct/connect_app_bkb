@@ -7,7 +7,7 @@
 @section('content')
 <div x-data="emailNotificationManager()" x-init="init()">
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
-        <div class="p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between">
+        {{-- <div class="p-6 flex flex-col sm:flex-row sm:items-center sm:justify-between">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900">Send Email Notification</h1>
                 <p class="mt-1 text-sm text-gray-600">Send email notifications to all users, selected users, social circles, or countries.</p>
@@ -20,7 +20,7 @@
                     New Email
                 </button>
             </div>
-        </div>
+        </div> --}}
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -108,6 +108,15 @@
                     <textarea x-model="form.body" rows="8" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm" placeholder="Enter email body (HTML supported)" required></textarea>
                 </div>
 
+                <!-- Attachment -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Attachment</label>
+                    <input type="file" @change="handleFileUpload($event)" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm" />
+                    <template x-if="form.attachment">
+                        <div class="mt-2 text-xs text-gray-600">Selected: <span x-text="form.attachment.name"></span></div>
+                    </template>
+                </div>
+
                 <!-- Send Button -->
                 <div class="flex justify-end pt-4 border-t border-gray-200">
                     <button type="submit" :disabled="sending" class="px-6 py-2 bg-primary text-white rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
@@ -180,7 +189,12 @@ window.emailNotificationManager = function() {
             circle_id: '',
             country: '',
             subject: '',
-            body: ''
+            body: '',
+            attachment: null
+        },
+        handleFileUpload(e) {
+            const file = e.target.files[0];
+            this.form.attachment = file || null;
         },
 
         init() {
@@ -261,25 +275,28 @@ window.emailNotificationManager = function() {
         async sendEmail() {
             this.sending = true;
             try {
-                let payload = {
-                    target_type: this.form.target_type,
-                    subject: this.form.subject,
-                    body: this.form.body
-                };
+                const formData = new FormData();
+                formData.append('target_type', this.form.target_type);
+                formData.append('subject', this.form.subject);
+                formData.append('body', this.form.body);
                 if (this.form.target_type === 'selected') {
-                    payload.users = this.form.users.map(u => u.id);
+                    this.form.users.forEach((u, idx) => {
+                        formData.append(`users[${idx}]`, u.id);
+                    });
                 } else if (this.form.target_type === 'circle') {
-                    payload.circle_id = this.form.circle_id;
+                    formData.append('circle_id', this.form.circle_id);
                 } else if (this.form.target_type === 'country') {
-                    payload.country = this.form.country;
+                    formData.append('country', this.form.country);
+                }
+                if (this.form.attachment) {
+                    formData.append('attachment', this.form.attachment);
                 }
                 const res = await fetch('/admin/notifications/email/send', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
                     },
-                    body: JSON.stringify(payload)
+                    body: formData
                 });
                 const data = await res.json();
                 if (data.success) {
