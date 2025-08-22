@@ -27,7 +27,7 @@
                     </div>
                 </div>
                 <div class="p-4" x-show="filtersVisible" x-transition>
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
                         <!-- Search -->
                         <div>
                             <label for="search" class="block text-sm font-medium text-gray-700 mb-1">Search</label>
@@ -40,6 +40,21 @@
                                     <i class="fas fa-times text-gray-400 hover:text-gray-600"></i>
                                 </div>
                             </div>
+                        </div>
+                        <!-- Reason Filter -->
+                        <div>
+                            <label for="reason" class="block text-sm font-medium text-gray-700 mb-1">Reason</label>
+                            <select id="reason" x-model="filters.reason" @change="loadReports()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary">
+                                <option value="">All Reasons</option>
+                                <option value="spam">Spam</option>
+                                <option value="misinformation">Misinformation</option>
+                                <option value="harassment">Harassment</option>
+                                <option value="violence">Violence</option>
+                                <option value="hate_speech">Hate Speech</option>
+                                <option value="nudity">Nudity or Sexual Content</option>
+                                <option value="not_interested">Not Interested</option>
+                                <option value="other">Other</option>
+                            </select>
                         </div>
                         <!-- Status Filter -->
                         <div>
@@ -109,10 +124,46 @@
                                     <td class="px-6 py-4 whitespace-nowrap" x-text="report.description"></td>
                                     <td class="px-6 py-4 whitespace-nowrap" x-text="report.reporter_name"></td>
                                     <td class="px-6 py-4 whitespace-nowrap">
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" :class="getStatusBadge(report.status)">
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer"
+                                              :class="getStatusBadge(report.status)"
+                                              @click.stop="report.status === 'pending' && openReportModal(report)">
                                             <span x-text="report.status_text"></span>
                                         </span>
                                     </td>
+    <!-- Report Action Modal -->
+    <div x-show="showReportModal"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50"
+         @click.self="showReportModal = false">
+        <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-lg shadow-lg rounded-md bg-white">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">Review Report</h3>
+                <button @click="showReportModal = false" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times"></i></button>
+            </div>
+            <template x-if="selectedReport">
+                <div>
+                    <div class="mb-4">
+                        <p><span class="font-semibold">Post ID:</span> <span x-text="selectedReport.post_id"></span></p>
+                        <p><span class="font-semibold">Reason:</span> <span x-text="selectedReport.reason_text"></span></p>
+                        <p><span class="font-semibold">Description:</span> <span x-text="selectedReport.description || '-' "></span></p>
+                        <p><span class="font-semibold">Reporter:</span> <span x-text="selectedReport.reporter_name"></span></p>
+                        <p><span class="font-semibold">Reported At:</span> <span x-text="selectedReport.created_at"></span></p>
+                    </div>
+                    <div class="flex flex-col gap-2">
+                        <button @click="takeReportAction('under_review')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md">Mark as Under Review</button>
+                        <button @click="takeReportAction('dismissed')" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md">Dismiss Report</button>
+                        <button @click="takeReportAction('resolved')" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md">Mark as Resolved</button>
+                        <button @click="showReportModal = false" class="mt-2 text-gray-500 hover:text-gray-700">Cancel</button>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
                                     <td class="px-6 py-4 whitespace-nowrap" x-text="report.created_at"></td>
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         <a :href="'/admin/posts/' + report.post_id" class="text-indigo-600 hover:text-indigo-900">View Post</a>
@@ -141,12 +192,15 @@ function reportManagement() {
         countries: [],
         filters: {
             search: '',
+            reason: '',
             status: '',
             country: '',
             date_from: '',
             date_to: ''
         },
         filtersVisible: true,
+        showReportModal: false,
+        selectedReport: null,
         async loadCountries() {
             try {
                 const response = await fetch('/admin/api/countries', { headers: { 'Accept': 'application/json' } });
@@ -161,6 +215,7 @@ function reportManagement() {
                 let url = '/admin/api/post-reports?';
                 const params = [];
                 if (this.filters.status) params.push('status=' + encodeURIComponent(this.filters.status));
+                if (this.filters.reason) params.push('reason=' + encodeURIComponent(this.filters.reason));
                 if (this.filters.search) params.push('search=' + encodeURIComponent(this.filters.search));
                 if (this.filters.country) params.push('country=' + encodeURIComponent(this.filters.country));
                 if (this.filters.date_from) params.push('date_from=' + encodeURIComponent(this.filters.date_from));
@@ -173,8 +228,37 @@ function reportManagement() {
                 this.reports = [];
             }
         },
+        openReportModal(report) {
+            this.selectedReport = report;
+            this.showReportModal = true;
+        },
+        async takeReportAction(action) {
+            if (!this.selectedReport) return;
+            let confirmMsg = '';
+            if (action === 'under_review') confirmMsg = 'Mark this report as Under Review?';
+            if (action === 'dismissed') confirmMsg = 'Dismiss this report?';
+            if (action === 'resolved') confirmMsg = 'Mark this report as Resolved?';
+            if (!confirm(confirmMsg)) return;
+            try {
+                const response = await fetch(`/admin/api/post-reports/${this.selectedReport.id}/status`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    },
+                    body: JSON.stringify({ status: action })
+                });
+                if (!response.ok) throw new Error('Failed to update report status');
+                this.showSuccess('Report status updated');
+                this.showReportModal = false;
+                this.selectedReport = null;
+                await this.loadReports();
+            } catch (e) {
+                this.showError('Failed to update report status');
+            }
+        },
         clearFilters() {
-            this.filters = { search: '', status: '', country: '', date_from: '', date_to: '' };
+            this.filters = { search: '', reason: '', status: '', country: '', date_from: '', date_to: '' };
             this.loadReports();
         },
         getStatusBadge(status) {
@@ -186,6 +270,20 @@ function reportManagement() {
                 'resolved': 'bg-green-100 text-green-800'
             };
             return badges[status] || 'bg-gray-100 text-gray-800';
+        },
+        showSuccess(message) {
+            const toast = document.createElement('div');
+            toast.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-md shadow-lg z-50';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        },
+        showError(message) {
+            const toast = document.createElement('div');
+            toast.className = 'fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-md shadow-lg z-50';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
         }
     }
 }

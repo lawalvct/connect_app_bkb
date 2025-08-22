@@ -21,10 +21,14 @@ class PostManagementController extends Controller
     public function getPostReports(Request $request)
     {
         $status = $request->get('status', 'pending');
+        $reason = $request->get('reason');
         $query = \App\Models\PostReport::with(['post', 'reporter'])
             ->orderBy('created_at', 'desc');
         if ($status) {
             $query->where('status', $status);
+        }
+        if ($reason) {
+            $query->where('reason', $reason);
         }
         $reports = $query->get()->map(function ($report) {
             return [
