@@ -9,6 +9,12 @@
             <p class="text-gray-600">Manage all user posts and content</p>
         </div>
         <div class="flex space-x-3">
+            <a href="/admin/posts/reports" id="reports-btn"
+               class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center">
+                <i class="fas fa-flag mr-2"></i>
+                Reports
+                <span id="pending-reports-count" class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-white text-yellow-700" style="display:none"></span>
+            </a>
             <button type="button"
                     onclick="exportPosts()"
                     class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
@@ -458,6 +464,21 @@
 @endsection
 
 @push('scripts')
+<script>
+// Fetch pending reports count and update badge
+document.addEventListener('DOMContentLoaded', function() {
+    fetch('/admin/api/post-reports?status=pending', { headers: { 'Accept': 'application/json' } })
+        .then(res => res.json())
+        .then(data => {
+            const count = data.total || (data.reports ? data.reports.length : 0);
+            const badge = document.getElementById('pending-reports-count');
+            if (badge && count > 0) {
+                badge.textContent = count;
+                badge.style.display = '';
+            }
+        });
+});
+</script>
 <script>
     function postManagement() {
         return {

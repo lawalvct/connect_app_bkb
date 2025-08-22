@@ -40,6 +40,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
         // API Routes for AJAX requests
         Route::prefix('api')->group(function () {
+            // Post Reports Management API
+            Route::get('/post-reports', [\App\Http\Controllers\Admin\PostManagementController::class, 'getPostReports']);
             Route::get('/dashboard-data', [DashboardController::class, 'getDashboardData']);
             Route::get('/dashboard-charts', [DashboardController::class, 'getChartData']);
             Route::get('/users', [UserManagementController::class, 'getUsers']);
@@ -246,6 +248,9 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::prefix('posts')->name('posts.')->group(function () {
             Route::get('/', [\App\Http\Controllers\Admin\PostManagementController::class, 'index'])->name('index');
             Route::get('/export', [\App\Http\Controllers\Admin\PostManagementController::class, 'export'])->name('export');
+            Route::get('/reports', function() {
+                return view('admin.posts.reports');
+            })->name('reports');
             Route::get('/{post}', [\App\Http\Controllers\Admin\PostManagementController::class, 'show'])->name('show');
             Route::delete('/{post}', [\App\Http\Controllers\Admin\PostManagementController::class, 'destroy'])->name('destroy');
         });

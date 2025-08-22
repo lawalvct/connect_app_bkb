@@ -11,8 +11,39 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 
+
 class PostManagementController extends Controller
 {
+
+    /**
+     * Get post reports for admin reports view (AJAX)
+     */
+    public function getPostReports(Request $request)
+    {
+        $status = $request->get('status', 'pending');
+        $query = \App\Models\PostReport::with(['post', 'reporter'])
+            ->orderBy('created_at', 'desc');
+        if ($status) {
+            $query->where('status', $status);
+        }
+        $reports = $query->get()->map(function ($report) {
+            return [
+                'id' => $report->id,
+                'post_id' => $report->post_id,
+                'reason' => $report->reason,
+                'reason_text' => $report->reason_text,
+                'status' => $report->status,
+                'status_text' => $report->status_text,
+                'description' => $report->description,
+                'reporter_name' => $report->reporter ? $report->reporter->name : 'N/A',
+                'created_at' => $report->created_at ? $report->created_at->format('Y-m-d H:i') : '',
+            ];
+        });
+        return response()->json([
+            'reports' => $reports,
+            'total' => $reports->count(),
+        ]);
+    }
     /**
      * Get countries for filter dropdown
      */
