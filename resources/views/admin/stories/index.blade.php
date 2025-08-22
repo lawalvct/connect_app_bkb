@@ -300,8 +300,8 @@
                                                 </div>
                                             </div>
                                             <div class="min-w-0 flex-1">
-                                                <p class="text-sm font-medium text-gray-900 truncate" x-text="story.caption || story.content || 'No caption'"></p>
-                                                <p class="text-xs text-gray-500" x-text="'ID: ' + story.id"></p>
+                                                {{-- <p class="text-sm font-medium text-gray-900 truncate" x-text="story.caption || story.content || 'No caption'"></p>
+                                                <p class="text-xs text-gray-500" x-text="'ID: ' + story.id"></p> --}}
                                             </div>
                                         </div>
                                     </td>
