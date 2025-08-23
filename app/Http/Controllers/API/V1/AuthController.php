@@ -217,18 +217,37 @@ private function addDefaultProfileUploads(User $user)
     public function login(LoginRequest $request)
     {
         try {
-            // Attempt login
-            $user = $this->authService->attemptLogin(
-                $request->email,
-                $request->password,
-                $request->remember_me ?? false
-            );
+            // Validate credentials
+            $credentials = $request->only('email', 'password');
+            $remember = $request->input('remember_me', false);
+            if (!Auth::attempt($credentials, $remember)) {
+                throw new AuthenticationException('Invalid credentials', 401);
+            }
+            $user = Auth::user();
 
-            if (!$user) {
-                return $this->sendError('Invalid credentials', null, 401);
+            // Save device_token to user_fcm_tokens if provided
+            if ($request->filled('device_token')) {
+                $fcmToken = $request['device_token'];
+                $deviceId = $request['device_id'] ?? null;
+                $platform = $request['platform'] ?? null;
+                $appVersion = $request['app_version'] ?? null;
+                \App\Models\UserFcmToken::updateOrCreate(
+                    [
+                        'user_id' => $user->id,
+                        'fcm_token' => $fcmToken,
+                    ],
+                    [
+                        'device_id' => $deviceId,
+                        'platform' => $platform,
+                        'app_version' => $appVersion,
+                        'is_active' => true,
+                        'last_used_at' => now(),
+                    ]
+                );
             }
 
-            $token = $this->authService->createToken($user, $request->remember_me ?? false);
+            // Generate token
+            $token = $this->authService->createToken($user);
 
             return $this->sendResponse('Login successful', [
                 'user' => new UserResource($user),
@@ -239,11 +258,42 @@ private function addDefaultProfileUploads(User $user)
         } catch (\Exception $e) {
             return $this->sendError('Login failed: ' . $e->getMessage(), null, 500);
         }
-    }    /**     * Send forgot password OTP
+    }
+
+    /**
+     * Update device token for push notifications (for use after login)
      *
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
+    public function updateDeviceToken(Request $request)
+    {
+        $request->validate([
+            'device_token' => 'required|string',
+            'device_id' => 'nullable|string',
+            'platform' => 'nullable|string',
+            'app_version' => 'nullable|string',
+        ]);
+        $user = $request->user();
+        $fcmToken = $request->input('device_token');
+        $deviceId = $request->input('device_id');
+        $platform = $request->input('platform');
+        $appVersion = $request->input('app_version');
+        \App\Models\UserFcmToken::updateOrCreate(
+            [
+                'user_id' => $user->id,
+                'fcm_token' => $fcmToken,
+            ],
+            [
+                'device_id' => $deviceId,
+                'platform' => $platform,
+                'app_version' => $appVersion,
+                'is_active' => true,
+                'last_used_at' => now(),
+            ]
+        );
+        return response()->json(['success' => true, 'message' => 'Device token updated successfully']);
+    }
     public function forgotPassword(Request $request)
     {
         $validator = Validator::make($request->all(), [

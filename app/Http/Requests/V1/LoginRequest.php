@@ -25,12 +25,15 @@ class LoginRequest extends FormRequest
      */
     public function rules()
     {
-        return [
-            'email' => 'required|string|email',
-            'password' => 'required|string',
-            'remember_me' => 'boolean',
-            'device_token' => 'nullable|string',
-        ];
+          return [
+        'email' => 'required|string|email',
+        'password' => 'required|string',
+        'remember_me' => 'boolean',
+        'device_token' => 'nullable|string',
+        'device_id' => 'nullable|string',
+        'platform' => 'nullable|string',
+        'app_version' => 'nullable|string',
+    ];
     }
 
     /**
