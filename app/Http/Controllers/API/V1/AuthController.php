@@ -154,22 +154,20 @@ public function register(RegisterRequest $request)
             Mail::to($user->email)->queue(new WelcomeEmail($user));
             Mail::to($user->email)->queue(new VerificationEmail($user, $otp));
 
-            // Create admin notification for all admins
-            $admins = Admin::all();
-            foreach ($admins as $admin) {
-                AdminNotification::createForAdmin($admin->id, [
-                    'title' => 'New User Registration',
-                    'message' => 'A new user has registered: ' . $user->name . ' (' . $user->email . ')',
-                    'type' => 'user_registration',
-                    'data' => [
-                        'user_id' => $user->id,
-                        'user_name' => $user->name,
-                        'user_email' => $user->email,
-                    ],
-                    'action_url' => null,
-                    'icon' => 'user-plus',
-                ]);
-            }
+            // Create a global admin notification (admin_id = null)
+            AdminNotification::createForAllAdmins([
+                'title' => 'New User Registration',
+                'message' => 'A new user has registered: ' . $user->name . ' (' . $user->email . ')',
+                'type' => 'user_registration',
+                'data' => [
+                    'user_id' => $user->id,
+                    'user_name' => $user->name,
+                    'user_email' => $user->email,
+                ],
+                // Set action_url to user management page if type is user_registration
+                'action_url' => url('/admin/users?search=' . urlencode($user->email)),
+                'icon' => 'user-plus',
+            ]);
 
         } catch (\Exception $mailException) {
             // Log the email error but don't fail the registration
