@@ -332,9 +332,69 @@
                     <!-- Right side buttons -->
                     <div class="flex items-center space-x-4">
                         <!-- Notifications -->
-                        <button class="p-2 text-gray-400 hover:text-gray-500 hover:bg-gray-100 rounded-lg">
-                            <i class="fas fa-bell text-xl"></i>
-                        </button>
+                        <div class="relative" x-data="{ showNotifications: false }">
+                            <button class="p-2 text-gray-400 hover:text-gray-500 hover:bg-gray-100 rounded-lg focus:outline-none relative"
+                                    @click="showNotifications = !showNotifications">
+                                <i class="fas fa-bell text-xl"></i>
+                                <!-- Notification Badge -->
+                                <span class="absolute -top-1 -right-1 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white bg-red-600 rounded-full border-2 border-white shadow" style="min-width: 1.5em; min-height: 1.5em;">3</span>
+                            </button>
+                            <!-- Notification Modal -->
+                            <div x-show="showNotifications" x-cloak
+                                 class="fixed inset-0 z-50 flex items-start justify-end"
+                                 style="background: rgba(31, 41, 55, 0.3);"
+                                 @click.away="showNotifications = false">
+                                <div class="mt-20 mr-8 w-96 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden"
+                                     @click.stop>
+                                    <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-primary">
+                                        <h3 class="text-lg font-semibold text-white">Notifications</h3>
+                                        <button class="text-white hover:text-gray-200 focus:outline-none" @click="showNotifications = false">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                    <div class="p-6 space-y-4 max-h-96 overflow-y-auto">
+                                        <!-- Dummy notification content with links -->
+                                        <a href="#" class="flex items-start space-x-3 hover:bg-gray-50 rounded-lg p-2 transition">
+                                            <div class="flex-shrink-0">
+                                                <span class="inline-flex items-center justify-center h-10 w-10 rounded-full bg-primary-light">
+                                                    <i class="fas fa-bell text-primary"></i>
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <p class="text-sm font-medium text-gray-900">New Feature Released</p>
+                                                <p class="text-xs text-gray-500">Check out the new analytics dashboard for more insights.</p>
+                                                <span class="text-xs text-gray-400">2 hours ago</span>
+                                            </div>
+                                        </a>
+                                        <a href="#" class="flex items-start space-x-3 hover:bg-gray-50 rounded-lg p-2 transition">
+                                            <div class="flex-shrink-0">
+                                                <span class="inline-flex items-center justify-center h-10 w-10 rounded-full bg-primary-light">
+                                                    <i class="fas fa-user-plus text-primary"></i>
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <p class="text-sm font-medium text-gray-900">New User Registered</p>
+                                                <p class="text-xs text-gray-500">A new admin has joined the platform.</p>
+                                                <span class="text-xs text-gray-400">5 hours ago</span>
+                                            </div>
+                                        </a>
+                                        <a href="#" class="flex items-start space-x-3 hover:bg-gray-50 rounded-lg p-2 transition">
+                                            <div class="flex-shrink-0">
+                                                <span class="inline-flex items-center justify-center h-10 w-10 rounded-full bg-primary-light">
+                                                    <i class="fas fa-exclamation-triangle text-yellow-500"></i>
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <p class="text-sm font-medium text-gray-900">System Alert</p>
+                                                <p class="text-xs text-gray-500">Scheduled maintenance tonight at 11:00 PM.</p>
+                                                <span class="text-xs text-gray-400">1 day ago</span>
+                                            </div>
+                                        </a>
+                                        <!-- Add more dummy notifications as needed -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
                         <!-- Admin Profile Info -->
                         <div class="relative" x-data="{ open: false }">
