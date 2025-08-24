@@ -110,11 +110,11 @@
                                     <div class="relative">
                                         @if(isset($media['type']) && str_starts_with($media['type'], 'video'))
                                             <video controls class="w-full h-48 object-cover rounded-lg">
-                                                <source src="{{ $media['file_path'] ?? $media }}" type="{{ $media['type'] ?? 'video/mp4' }}">
+                                                <source src="{{ $media['url'] ?? '' }}" type="{{ $media['type'] ?? 'video/mp4' }}">
                                                 Your browser does not support the video tag.
                                             </video>
                                         @else
-                                            <img src="{{ $media['file_path'] ?? $media }}"
+                                            <img src="{{ $media['url'] ?? '' }}"
                                                  alt="Ad Media {{ $index + 1 }}"
                                                  class="w-full h-48 object-cover rounded-lg">
                                         @endif
