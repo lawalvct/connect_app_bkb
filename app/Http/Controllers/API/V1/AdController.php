@@ -433,6 +433,7 @@ public function store(Request $request)
             'media_files' => 'nullable|array',
             'media_files.*' => 'file|mimes:jpeg,png,jpg,gif,mp4,avi,mov|max:20480', // 20MB max
             'target_countries' => 'nullable|array',
+            'ad_placement' => 'nullable|array',
             'target_countries.*' => 'integer|exists:countries,id',
         ]);
 
@@ -445,6 +446,7 @@ public function store(Request $request)
             'call_to_action' => $validated['call_to_action'],
             'destination_url' => $validated['destination_url'] ?? null,
             'target_social_circles' => $validated['target_social_circles'],
+            'ad_placement' => $validated['ad_placement'] ?? null,
             'start_date' => $validated['start_date'],
             'end_date' => $validated['end_date'],
             'target_audience' => $validated['target_audience'],
