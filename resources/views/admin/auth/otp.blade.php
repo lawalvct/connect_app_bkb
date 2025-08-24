@@ -144,6 +144,13 @@
                 init() {
                     console.log('OTP Form initialized');
                     this.startCountdown();
+                    // Focus the first OTP input field on page load
+                    setTimeout(() => {
+                        const otpInputs = document.querySelectorAll('input[type="text"][name^="otp_"]');
+                        if (otpInputs.length > 0) {
+                            otpInputs[0].focus();
+                        }
+                    }, 100);
                 },
 
                 startCountdown() {
