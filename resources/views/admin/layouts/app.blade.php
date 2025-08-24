@@ -333,6 +333,53 @@
                     <div class="flex items-center space-x-4">
                         <!-- Notifications -->
                         <div class="relative" x-data="{ showNotifications: false }">
+    <!-- Pusher JS for real-time notifications -->
+    <script src="https://js.pusher.com/7.2/pusher.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Enable pusher logging - remove in production
+            Pusher.logToConsole = true;
+            var pusher = new Pusher("{{ env('PUSHER_APP_KEY') }}", {
+                cluster: "{{ env('PUSHER_APP_CLUSTER') }}",
+                encrypted: true
+            });
+            console.log('Pusher initialized');
+            var channel = pusher.subscribe('admin-notifications');
+            channel.bind('pusher:subscription_succeeded', function() {
+                console.log('Subscribed to admin-notifications channel');
+            });
+            channel.bind('new-notification', function(data) {
+                console.log('Received new-notification event:', data);
+                             // Find notification badge and increment
+                var badge = document.querySelector('.fa-bell').parentElement.querySelector('span');
+                if (badge) {
+                    let count = parseInt(badge.textContent) || 0;
+                    badge.textContent = count + 1;
+                    badge.style.display = '';
+                }
+                // Prepend new notification to the modal list
+                var container = document.querySelector('.p-6.space-y-4.max-h-96.overflow-y-auto');
+                if (container) {
+                    var a = document.createElement('a');
+                    a.href = data.action_url || '#';
+                    a.className = 'flex items-start space-x-3 hover:bg-gray-50 rounded-lg p-2 transition';
+                    a.innerHTML = `
+                        <div class=\"flex-shrink-0\">
+                            <span class=\"inline-flex items-center justify-center h-10 w-10 rounded-full bg-primary-light\">
+                                <i class=\"fas fa-${data.icon || 'bell'} text-primary\"></i>
+                            </span>
+                        </div>
+                        <div>
+                            <p class=\"text-sm font-medium text-gray-900\">${data.title}</p>
+                            <p class=\"text-xs text-gray-500\">${data.message}</p>
+                            <span class=\"text-xs text-gray-400\">just now</span>
+                        </div>
+                    `;
+                    container.prepend(a);
+                }
+            });
+        });
+    </script>
                             @php
                                 use App\Models\AdminNotification;
                                 $admin = auth('admin')->user();
