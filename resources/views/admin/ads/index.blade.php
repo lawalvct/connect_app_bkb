@@ -383,14 +383,14 @@
                                         <div class="flex items-center">
                                             <!-- Ad Media Preview -->
                                             <div class="flex-shrink-0 h-12 w-12">
-                                                <template x-if="ad.media_files && ad.media_files.length > 0">
-                                                    <img :src="getMediaThumbnail(ad.media_files[0])"
+                                                <template x-if="ad.media_files && ad.media_files.length > 0 && ad.media_files[0].url">
+                                                    <img :src="ad.media_files[0].url"
                                                          :alt="ad.ad_name"
-                                                         class="h-12 w-12 rounded-lg object-cover">
+                                                         class="h-12 w-12 rounded-lg object-cover border border-gray-200" />
                                                 </template>
-                                                <template x-if="!ad.media_files || ad.media_files.length === 0">
+                                                <template x-if="!ad.media_files || ad.media_files.length === 0 || !ad.media_files[0].url">
                                                     <div class="h-12 w-12 rounded-lg bg-gray-200 flex items-center justify-center">
-                                                        <i class="fas fa-ad text-gray-400"></i>
+                                                        <i class="fas fa-image text-gray-400 text-xl"></i>
                                                     </div>
                                                 </template>
                                             </div>
