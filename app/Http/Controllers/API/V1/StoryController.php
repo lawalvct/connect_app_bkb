@@ -130,7 +130,55 @@ class StoryController extends Controller
      *     @OA\Response(response=200, description="Stories feed retrieved successfully")
      * )
      */
+
+   // this is just to list all stories - for development purpose
     public function feed(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+
+            // Get connected users with active stories
+           // $connectedUserIds = $this->getConnectedUserIds($user->id);
+
+            $usersWithStories = User::
+                whereHas('activeStories', function ($query) use ($user) {
+                    $query->visibleTo($user->id);
+                })
+                ->with(['activeStories' => function ($query) use ($user) {
+                    $query->visibleTo($user->id)->orderBy('created_at', 'desc');
+                }])
+                ->get();
+
+            // Add current user's stories at the beginning if they have any
+            $currentUserStories = $user->activeStories()->orderBy('created_at', 'desc')->get();
+            if ($currentUserStories->isNotEmpty()) {
+                $usersWithStories->prepend($user->load(['activeStories' => function ($query) {
+                    $query->orderBy('created_at', 'desc');
+                }]));
+            }
+
+            return response()->json([
+                'status' => 1,
+                'message' => 'Stories feed retrieved successfully',
+                'data' => UserStoriesResource::collection($usersWithStories)
+            ], $this->successStatus);
+
+        } catch (\Exception $e) {
+            Log::error('Stories feed retrieval failed', [
+                'user_id' => $request->user()->id,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to retrieve stories feed'
+            ], 500);
+        }
+    }
+
+
+    // this is what i will later use in production
+    public function feedConnected(Request $request): JsonResponse
     {
         try {
             $user = $request->user();
