@@ -766,9 +766,10 @@ function deviceManagement() {
 }
 
 function testNotifications() {
+
     return {
         testData: {
-            title: 'Test Admin Notification',
+            title: 'Test Admin Notification333',
             body: 'This is a test notification for admin panel'
         },
         sending: false,

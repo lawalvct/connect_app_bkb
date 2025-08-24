@@ -431,3 +431,9 @@ Route::post('/streams2/viewer-token', function () {
         ], 500);
     }
 });
+
+
+// Simple login & push test page
+Route::get('/login-push-test', function () {
+    return view('login-push-test');
+});

@@ -40,7 +40,7 @@ class PostController extends BaseController
             $perPage = $request->get('per_page', 20);
 
             // Get user's social circles
-            $userCircles = $user->socialCircles()->pluck('social_circles.id');
+         //   $userCircles = $user->socialCircles()->pluck('social_circles.id');
 
             $posts = Post::with([
                 'user:id,name,username,profile,profile_url',
@@ -51,7 +51,7 @@ class PostController extends BaseController
                     $query->where('user_id', $user->id);
                 }
             ])
-            ->whereIn('social_circle_id', $userCircles)
+          //  ->whereIn('social_circle_id', $userCircles)
             ->published()
             ->latest('published_at')
             ->paginate($perPage);

@@ -48,6 +48,21 @@
             <div class="p-6" x-show="filtersVisible" x-transition>
                 <div class="grid grid-cols-1 md:grid-cols-7 gap-4">
 
+                    <!-- Ad Placement Filter -->
+                    <div>
+                        <label for="placement" class="block text-sm font-medium text-gray-700 mb-1">Ad Placement</label>
+                        <select id="placement"
+                                x-model="filters.placement"
+                                @change="loadAds()"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary">
+                            <option value="">All Placements</option>
+                            <option value="feeds">Feeds</option>
+                            <option value="live_stream">Live Stream</option>
+                            <option value="discovery">Discovery</option>
+                            <option value="random">Random</option>
+                        </select>
+                    </div>
+
                     <!-- Search -->
                     <div>
                         <label for="search" class="block text-sm font-medium text-gray-700 mb-1">Search Ads</label>
@@ -152,9 +167,9 @@
                                 @change="loadAds()"
                                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary">
                             <option value="">All Social Circles</option>
-                            <template x-for="circle in socialCircles" :key="circle.id">
-                                <option :value="circle.id" x-text="circle.name"></option>
-                            </template>
+                            @foreach (\App\Models\SocialCircle::orderBy('order_by')->get() as $circle)
+                                <option value="{{ $circle->id }}">{{ $circle->name }}</option>
+                            @endforeach
                         </select>
                     </div>
 
@@ -217,14 +232,6 @@
 
                 </div>
 
-                <!-- Clear Filters Button -->
-                <div class="mt-4 flex justify-end">
-                    <button @click="clearAllFilters()"
-                            class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center">
-                        <i class="fas fa-times mr-2"></i>
-                        Clear All Filters
-                    </button>
-                </div>
 
                 <!-- Quick Actions -->
                 <div class="mt-4 flex justify-end items-center">
