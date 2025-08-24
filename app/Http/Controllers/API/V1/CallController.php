@@ -106,7 +106,7 @@ class CallController extends BaseController
                 Log::info('Starting CallInitiated Pusher broadcast', [
                     'conversation_id' => $conversation->id,
                     'call_id' => $call->id,
-                    'channel' => 'private-conversation.' . $conversation->id
+                    'channel' => 'conversation.' . $conversation->id
                 ]);
 
                 // Get Pusher configuration

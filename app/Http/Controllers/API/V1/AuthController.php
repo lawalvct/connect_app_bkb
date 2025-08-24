@@ -169,6 +169,33 @@ public function register(RegisterRequest $request)
                 'icon' => 'user-plus',
             ]);
 
+// Send pusher notification to admin channel
+try {
+    $pusher = new \Pusher\Pusher(
+        env('PUSHER_APP_KEY'),
+        env('PUSHER_APP_SECRET'),
+        env('PUSHER_APP_ID'),
+        [
+            'cluster' => env('PUSHER_APP_CLUSTER'),
+            'useTLS' => true
+        ]
+    );
+    $pusher->trigger('admin-notifications', 'new-notification', [
+        'title' => 'New User Registration',
+        'message' => 'A new user has registered: ' . $user->name . ' (' . $user->email . ')',
+        'type' => 'user_registration',
+        'user_id' => $user->id,
+        'user_name' => $user->name,
+        'user_email' => $user->email,
+        'action_url' => url('/admin/users/' . $user->id),
+        'icon' => 'user-plus',
+        'created_at' => now()->toDateTimeString(),
+    ]);
+} catch (\Exception $e) {
+    \Log::error('Failed to send Pusher notification: ' . $e->getMessage());
+}
+
+
         } catch (\Exception $mailException) {
             // Log the email error but don't fail the registration
             \Log::error('Failed to queue registration emails or create admin notification: ' . $mailException->getMessage());

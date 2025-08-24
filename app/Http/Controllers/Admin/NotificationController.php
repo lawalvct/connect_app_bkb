@@ -587,6 +587,23 @@ class NotificationController extends Controller
         ]);
     }
 
+    /**
+     * Mark all notifications as read for the current admin (including global notifications)
+     */
+    public function markAllRead(Request $request)
+    {
+        $admin = auth('admin')->user();
+        if (!$admin) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+        // Mark all notifications for this admin and global as read
+        AdminNotification::forAdmin($admin->id)->where('is_read', false)->update([
+            'is_read' => true,
+            'read_at' => now(),
+        ]);
+        return response()->json(['success' => true]);
+    }
+
     // General notification stats
     public function getNotificationStats()
     {

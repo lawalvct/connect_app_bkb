@@ -378,4 +378,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         // Logout
         Route::post('/logout', [AuthController::class, 'logout'])->name('auth.logout');
     });
+
+    //Route [admin.notifications.markAllRead] not defined.
+    Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllRead'])->name('notifications.markAllRead');
 });

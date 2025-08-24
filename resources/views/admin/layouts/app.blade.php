@@ -337,13 +337,30 @@
                                 use App\Models\AdminNotification;
                                 $admin = auth('admin')->user();
                                 $notifications = AdminNotification::forAdmin($admin->id)
+                                    ->where('is_read', false)
                                     ->orderByDesc('created_at')
-                                    ->limit(15)
+                                    ->limit(20)
                                     ->get();
                                 $unreadCount = $notifications->where('is_read', false)->count();
                             @endphp
-                            <button class="p-2 text-gray-400 hover:text-gray-500 hover:bg-gray-100 rounded-lg focus:outline-none relative"
-                                    @click="showNotifications = !showNotifications">
+                <button class="p-2 text-gray-400 hover:text-gray-500 hover:bg-gray-100 rounded-lg focus:outline-none relative"
+                    @click="showNotifications = !showNotifications; if (!showNotifications) { return; } window.markAllAdminNotificationsRead();">
+                            <script>
+                                window.markAllAdminNotificationsRead = function() {
+                                    fetch("{{ route('admin.notifications.markAllRead') }}", {
+                                        method: 'POST',
+                                        headers: {
+                                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                            'Accept': 'application/json',
+                                        },
+                                    }).then(response => {
+                                        if (response.ok) {
+                                            // Optionally reload or update notification badge/UI
+                                         //   window.location.reload();
+                                        }
+                                    });
+                                }
+                            </script>
                                 <i class="fas fa-bell text-xl"></i>
                                 @if($unreadCount > 0)
                                     <span class="absolute -top-1 -right-1 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white bg-red-600 rounded-full border-2 border-white shadow" style="min-width: 1.5em; min-height: 1.5em;">{{$unreadCount}}</span>
