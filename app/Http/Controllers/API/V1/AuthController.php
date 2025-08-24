@@ -72,9 +72,9 @@ public function register(RegisterRequest $request)
         // }
 
         // Check for suspicious email
-        // if (!$this->emailValidationService->isValidEmail($request->email)) {
-        //     return $this->sendError('Invalid or suspicious email address.', null, 400);
-        // }
+        if (!$this->emailValidationService->isValidEmail($request->email)) {
+            return $this->sendError('Invalid or suspicious email address.', null, 400);
+        }
 
         // Prepare registration data
         $registrationData = $request->validated();
@@ -165,7 +165,7 @@ public function register(RegisterRequest $request)
                     'user_email' => $user->email,
                 ],
                 // Set action_url to user management page if type is user_registration
-                'action_url' => url('/admin/users?search=' . urlencode($user->email)),
+                'action_url' => url('/admin/users/' . $user->id),
                 'icon' => 'user-plus',
             ]);
 
