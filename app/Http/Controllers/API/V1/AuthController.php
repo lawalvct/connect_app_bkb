@@ -16,6 +16,8 @@ use Laravel\Socialite\Facades\Socialite;
 use App\Mail\WelcomeEmail;
 use App\Mail\VerificationEmail;
 use App\Models\User;
+use App\Models\AdminNotification;
+use App\Models\Admin;
 use App\Models\UserProfileUpload;
 use Illuminate\Support\Facades\Auth;
 use App\Services\EmailValidationService;
@@ -145,14 +147,33 @@ public function register(RegisterRequest $request)
         $user->email_otp_expires_at = now()->addHours(1); // OTP expires in 1 hour
         $user->save();
 
+
         // Queue emails instead of sending them immediately
         try {
             // The emails will be sent in the background
             Mail::to($user->email)->queue(new WelcomeEmail($user));
             Mail::to($user->email)->queue(new VerificationEmail($user, $otp));
+
+            // Create admin notification for all admins
+            $admins = Admin::all();
+            foreach ($admins as $admin) {
+                AdminNotification::createForAdmin($admin->id, [
+                    'title' => 'New User Registration',
+                    'message' => 'A new user has registered: ' . $user->name . ' (' . $user->email . ')',
+                    'type' => 'user_registration',
+                    'data' => [
+                        'user_id' => $user->id,
+                        'user_name' => $user->name,
+                        'user_email' => $user->email,
+                    ],
+                    'action_url' => null,
+                    'icon' => 'user-plus',
+                ]);
+            }
+
         } catch (\Exception $mailException) {
             // Log the email error but don't fail the registration
-            \Log::error('Failed to queue registration emails: ' . $mailException->getMessage());
+            \Log::error('Failed to queue registration emails or create admin notification: ' . $mailException->getMessage());
         }
 
         $token = $this->authService->createToken($user);
