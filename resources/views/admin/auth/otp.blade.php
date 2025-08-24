@@ -205,10 +205,13 @@
                     this.digits[index].value = value;
                     console.log('Current OTP:', this.getFullOtp());
 
-                    if (value && index < 5) {
-                        // Move to next input
-                        const nextInput = event.target.parentElement.children[index + 1];
-                        if (nextInput) nextInput.focus();
+                    // Move to next input if a digit is entered
+                    if (value.length === 1 && index < 5) {
+                        // Find all input fields inside the parent (OTP fields container)
+                        const otpInputs = event.target.parentElement.querySelectorAll('input[type="text"]');
+                        if (otpInputs && otpInputs[index + 1]) {
+                            otpInputs[index + 1].focus();
+                        }
                     }
                 },
 
