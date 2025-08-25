@@ -195,7 +195,7 @@
                 </a>
                 @endif
 
-                <!-- Notifications -->
+                <!-- Notifications (sidebar menu, no badge here) -->
                 @if(auth('admin')->user()->canSendNotifications())
                 <div x-data="{ open: {{ request()->routeIs('admin.notifications*') ? 'true' : 'false' }} }">
                     <button @click="open = !open"
@@ -350,12 +350,20 @@
             });
             channel.bind('new-notification', function(data) {
                 console.log('Received new-notification event:', data);
-                             // Find notification badge and increment
-                var badge = document.querySelector('.fa-bell').parentElement.querySelector('span');
-                if (badge) {
-                    let count = parseInt(badge.textContent) || 0;
-                    badge.textContent = count + 1;
-                    badge.style.display = '';
+                // Only update the badge beside the profile image (top nav)
+                // The top nav bell is inside a button with class 'p-2' and has a badge span
+                var navBellBtn = document.querySelector('header .p-2.relative, header .p-2.rounded-lg');
+                if (!navBellBtn) {
+                    // fallback: find the first .fa-bell with .text-xl (top nav), not .w-6 (sidebar)
+                    var bellIcon = document.querySelector('header .fa-bell.text-xl');
+                    if (bellIcon) navBellBtn = bellIcon.parentElement;
+                }
+                if (navBellBtn) {
+                    var badge = navBellBtn.querySelector('span');
+                    if (badge && typeof data.unread_count !== 'undefined') {
+                        badge.textContent = data.unread_count;
+                        badge.style.display = data.unread_count > 0 ? '' : 'none';
+                    }
                 }
                 // Prepend new notification to the modal list
                 var container = document.querySelector('.p-6.space-y-4.max-h-96.overflow-y-auto');

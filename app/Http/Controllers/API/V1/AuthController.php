@@ -171,6 +171,7 @@ public function register(RegisterRequest $request)
 
 // Send pusher notification to admin channel
 try {
+    $unreadCount = AdminNotification::where('type', 'user_registration')->where('is_read', false)->count();
     $pusher = new \Pusher\Pusher(
         env('PUSHER_APP_KEY'),
         env('PUSHER_APP_SECRET'),
@@ -190,6 +191,7 @@ try {
         'action_url' => url('/admin/users/' . $user->id),
         'icon' => 'user-plus',
         'created_at' => now()->toDateTimeString(),
+        'unread_count' => $unreadCount,
     ]);
 } catch (\Exception $e) {
     \Log::error('Failed to send Pusher notification: ' . $e->getMessage());
