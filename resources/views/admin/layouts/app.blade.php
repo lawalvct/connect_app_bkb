@@ -417,9 +417,10 @@
                                 }
                             </script>
                                 <i class="fas fa-bell text-xl"></i>
-                                @if($unreadCount > 0)
-                                    <span class="absolute -top-1 -right-1 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white bg-red-600 rounded-full border-2 border-white shadow" style="min-width: 1.5em; min-height: 1.5em;">{{$unreadCount}}</span>
-                                @endif
+                                <span class="absolute -top-1 -right-1 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white bg-red-600 rounded-full border-2 border-white shadow"
+                                    style="min-width: 1.5em; min-height: 1.5em;{{ $unreadCount > 0 ? '' : 'display:none;' }}">
+                                    {{$unreadCount}}
+                                </span>
                             </button>
                             <!-- Notification Modal -->
                             <div x-show="showNotifications" x-cloak
