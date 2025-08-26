@@ -54,7 +54,8 @@ class SocialCircleController extends Controller
         $data = $request->all();
         $data['created_by'] = auth('admin')->id();
 
-        // Handle logo upload
+        // Ensure order_by is never null
+        $data['order_by'] = $request->filled('order_by') ? (int)$request->order_by : 0;        // Handle logo upload
         if ($request->hasFile('logo')) {
             $logoFile = $request->file('logo');
             $logoName = time() . '_' . $logoFile->getClientOriginalName();
@@ -130,7 +131,8 @@ class SocialCircleController extends Controller
         $data = $request->all();
         $data['updated_by'] = auth('admin')->id();
 
-        // Handle logo upload
+        // Ensure order_by is never null
+        $data['order_by'] = $request->filled('order_by') ? (int)$request->order_by : 0;        // Handle logo upload
         if ($request->hasFile('logo')) {
             // Delete old logo if exists
             if ($socialCircle->logo && $socialCircle->logo_url) {
@@ -211,9 +213,7 @@ class SocialCircleController extends Controller
         $socialCircle->update([
             'is_active' => $request->is_active,
             'updated_by' => auth('admin')->id()
-        ]);
-
-        return response()->json([
+        ]);        return response()->json([
             'success' => true,
             'message' => 'Social circle status updated successfully',
             'data' => $socialCircle
@@ -283,10 +283,10 @@ class SocialCircleController extends Controller
      */
     public function getSocialCircles(Request $request)
     {
-        // Use withoutGlobalScope to see all social circles in admin, but still filter deleted ones
+                // Use withoutGlobalScope to see all social circles in admin, but still filter deleted ones
         $query = SocialCircle::withoutGlobalScope('active')
             ->where('deleted_flag', 'N')
-            ->withCount('users');
+            ->withCount(['users', 'posts']);
 
         // Apply search filter
         if ($request->filled('search')) {

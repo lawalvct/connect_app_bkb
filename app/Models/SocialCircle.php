@@ -138,7 +138,7 @@ class SocialCircle extends Model
      */
     public function posts()
     {
-        return $this->hasMany(\App\Models\Post::class, 'social_id');
+        return $this->hasMany(\App\Models\Post::class, 'social_circle_id');
     }
 
     // Relationship for ads

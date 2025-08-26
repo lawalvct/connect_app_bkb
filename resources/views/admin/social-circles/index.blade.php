@@ -126,7 +126,7 @@
 
                     <!-- Member Count Range -->
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Member Count Range</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">User Count Range</label>
                         <div class="grid grid-cols-2 gap-2">
                             <div>
                                 <input type="number"
