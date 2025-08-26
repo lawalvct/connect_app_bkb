@@ -876,8 +876,8 @@
             searchTimeout: null,
             async initExportStatus() {
                 await this.fetchExportStatus();
-                // Start polling every 8 seconds
-                this.exportPollTimer = setInterval(() => this.fetchExportStatus(), 8000);
+                // Start polling every 10 seconds
+              //  this.exportPollTimer = setInterval(() => this.fetchExportStatus(), 10000);
             },
 
             async openUserVerification(user) {

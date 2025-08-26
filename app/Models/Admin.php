@@ -241,6 +241,16 @@ class Admin extends Authenticatable
     }
 
     /**
+     * Check if admin can manage system data (countries, social circles)
+     */
+    public function canManageSystem(): bool
+    {
+        return $this->hasRole(self::ROLE_SUPER_ADMIN) ||
+               $this->hasRole(self::ROLE_ADMIN) ||
+               $this->hasPermission('manage_system');
+    }
+
+    /**
      * Get role display name
      */
     public function getRoleDisplayName(): string

@@ -281,6 +281,30 @@
                 </div>
                 @endif
 
+                <!-- System Management -->
+                @if(auth('admin')->user()->canManageSystem() || auth('admin')->user()->hasRole('super_admin'))
+                <div x-data="{ open: {{ request()->routeIs('admin.social-circles*') || request()->routeIs('admin.countries*') ? 'true' : 'false' }} }">
+                    <button @click="open = !open"
+                            class="w-full flex items-center justify-between px-4 py-3 text-gray-700 rounded-lg hover:bg-primary-light hover:text-primary transition-colors duration-200">
+                        <div class="flex items-center">
+                            <i class="fas fa-globe-americas w-6"></i>
+                            <span class="ml-3">System Mang.</span>
+                        </div>
+                        <i class="fas fa-chevron-down transform transition-transform duration-200" :class="open ? 'rotate-180' : ''"></i>
+                    </button>
+                    <div x-show="open" x-collapse class="ml-6 mt-2 space-y-2">
+                        <a href="{{ route('admin.social-circles.index') }}"
+                           class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.social-circles*') ? 'bg-primary-light text-primary' : '' }}">
+                            <span>Social Circles</span>
+                        </a>
+                        <a href="{{ route('admin.countries.index') }}"
+                           class="flex items-center px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-primary-light hover:text-primary {{ request()->routeIs('admin.countries*') ? 'bg-primary-light text-primary' : '' }}">
+                            <span>Countries</span>
+                        </a>
+                    </div>
+                </div>
+                @endif
+
                 <!-- Settings -->
                 @if(auth('admin')->user()->hasRole('super_admin') || auth('admin')->user()->canManageAdmins())
                 <div x-data="{ open: {{ request()->routeIs('admin.admins*') ? 'true' : 'false' }} }">

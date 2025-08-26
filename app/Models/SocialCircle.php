@@ -41,6 +41,15 @@ class SocialCircle extends Model
     ];
 
     /**
+     * The accessors to append to the model's array form.
+     *
+     * @var array
+     */
+    protected $appends = [
+        'logo_full_url'
+    ];
+
+    /**
      * The "booted" method of the model.
      *
      * @return void
@@ -64,9 +73,13 @@ class SocialCircle extends Model
             return null;
         }
 
-        // Using asset() for local storage or full URL for external storage
-        $base = $this->logo_url ? url($this->logo_url) : '';
-        return $base ? "{$base}/{$this->logo}" : asset("storage/{$this->logo}");
+        // If logo_url is set (like 'uploads/logo/'), combine it with logo filename
+        if ($this->logo_url) {
+            return asset($this->logo_url . '/' . $this->logo);
+        }
+
+        // Default to storage path
+        return asset("storage/social-circles/{$this->logo}");
     }
 
     /**
@@ -125,7 +138,7 @@ class SocialCircle extends Model
      */
     public function posts()
     {
-        return $this->hasMany(Post::class, 'social_id');
+        return $this->hasMany(\App\Models\Post::class, 'social_id');
     }
 
     // Relationship for ads

@@ -17,6 +17,8 @@ use App\Http\Controllers\Admin\AdminManagementController;
 use App\Http\Controllers\Admin\AnalyticsController;
 use App\Http\Controllers\Admin\ProfileController;
 use App\Http\Controllers\Admin\SettingsController;
+use App\Http\Controllers\Admin\SocialCircleController;
+use App\Http\Controllers\Admin\CountryController;
 
 // Admin Authentication Routes
 Route::prefix('admin')->name('admin.')->group(function () {
@@ -78,8 +80,14 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('/ads/stats', [AdManagementController::class, 'getStats']);
             Route::post('/ads/bulk-approve', [AdManagementController::class, 'bulkApprove']);
             Route::post('/ads/bulk-reject', [AdManagementController::class, 'bulkReject']);
-            Route::get('/countries', [AdManagementController::class, 'getCountries']);
-            Route::get('/social-circles', [AdManagementController::class, 'getSocialCircles']);
+            Route::get('/ads/countries', [AdManagementController::class, 'getCountries']);
+            Route::get('/ads/social-circles', [AdManagementController::class, 'getSocialCircles']);
+
+            // System Management API
+            Route::prefix('system')->group(function () {
+                Route::get('/social-circles', [SocialCircleController::class, 'getSocialCircles']);
+                Route::get('/countries', [CountryController::class, 'getCountries']);
+            });
 
             // Subscription Management API
             Route::get('/subscriptions', [SubscriptionManagementController::class, 'getSubscriptions']);
@@ -314,6 +322,31 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('/{stream}/cameras', [StreamManagementController::class, 'cameraManagement'])->name('cameras');
             Route::put('/{stream}', [StreamManagementController::class, 'update'])->name('update');
             Route::delete('/{stream}', [StreamManagementController::class, 'destroy'])->name('destroy');
+        });
+
+        // System Management
+        Route::prefix('social-circles')->name('social-circles.')->group(function () {
+            Route::get('/', [SocialCircleController::class, 'index'])->name('index');
+            Route::get('/create', [SocialCircleController::class, 'create'])->name('create');
+            Route::get('/export', [SocialCircleController::class, 'export'])->name('export');
+            Route::post('/', [SocialCircleController::class, 'store'])->name('store');
+            Route::get('/{socialCircle}', [SocialCircleController::class, 'show'])->name('show');
+            Route::get('/{socialCircle}/edit', [SocialCircleController::class, 'edit'])->name('edit');
+            Route::put('/{socialCircle}', [SocialCircleController::class, 'update'])->name('update');
+            Route::delete('/{socialCircle}', [SocialCircleController::class, 'destroy'])->name('destroy');
+            Route::patch('/{socialCircle}/status', [SocialCircleController::class, 'updateStatus'])->name('update-status');
+        });
+
+        Route::prefix('countries')->name('countries.')->group(function () {
+            Route::get('/', [CountryController::class, 'index'])->name('index');
+            Route::get('/create', [CountryController::class, 'create'])->name('create');
+            Route::get('/export', [CountryController::class, 'export'])->name('export');
+            Route::post('/', [CountryController::class, 'store'])->name('store');
+            Route::get('/{country}', [CountryController::class, 'show'])->name('show');
+            Route::get('/{country}/edit', [CountryController::class, 'edit'])->name('edit');
+            Route::put('/{country}', [CountryController::class, 'update'])->name('update');
+            Route::delete('/{country}', [CountryController::class, 'destroy'])->name('destroy');
+            Route::patch('/{country}/status', [CountryController::class, 'updateStatus'])->name('update-status');
         });
 
         // Notification Management
