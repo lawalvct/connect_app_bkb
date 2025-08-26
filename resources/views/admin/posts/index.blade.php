@@ -123,6 +123,20 @@
                             {{-- <option value="scheduled">Scheduled</option> --}}
                         </select>
                     </div>
+                    <!-- Sort By Filter -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Sort By</label>
+                        <select x-model="filters.sort_by"
+                                @change="loadPosts()"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary">
+                            <option value="latest">Latest Posts</option>
+                            <option value="updated_at">Recently Updated</option>
+                            <option value="published_at">Published Date</option>
+                            <option value="likes">Most Liked</option>
+                            <option value="comments">Most Commented</option>
+                            <option value="user">Author Name</option>
+                        </select>
+                    </div>
                     <!-- Date Range Filter -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Post Date Range</label>
@@ -312,9 +326,9 @@
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         <div class="flex items-center">
                                             <div class="flex-shrink-0 h-10 w-10">
-                                                <img :src="post.user?.avatar || '/images/default-avatar.png'"
+                                                <img :src="post.user?.avatar_url || '/images/default-avatar.png'"
                                                      :alt="post.user?.name"
-                                                     class="h-10 w-10 rounded-full">
+                                                     class="h-10 w-10 rounded-full object-cover">
                                             </div>
                                             <div class="ml-4">
                                                 <div class="text-sm font-medium text-gray-900" x-text="post.user?.name || 'Unknown'"></div>
@@ -496,7 +510,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 type: '',
                 status: '',
                 date_from: '',
-                date_to: ''
+                date_to: '',
+                sort_by: 'latest',
+                sort_order: 'desc'
             },
             searchTimeout: null,
             async loadCountries() {
@@ -689,10 +705,33 @@ document.addEventListener('DOMContentLoaded', function() {
             },
 
             getMediaThumbnail(media) {
-                if (media.thumbnail_path) {
-                    return media.thumbnail_path;
+                // Prioritize URL fields over path fields
+                let mediaUrl = null;
+
+                if (media.thumbnail_url) {
+                    mediaUrl = media.thumbnail_url;
+                } else if (media.file_url) {
+                    mediaUrl = media.file_url;
+                } else if (media.thumbnail_path) {
+                    mediaUrl = media.thumbnail_path;
+                } else if (media.file_path) {
+                    mediaUrl = media.file_path;
+                } else {
+                    return '/images/placeholder.jpg';
                 }
-                return media.file_path || '/images/placeholder.jpg';
+
+                // If the URL is already absolute, return it
+                if (mediaUrl.startsWith('http://') || mediaUrl.startsWith('https://')) {
+                    return mediaUrl;
+                }
+
+                // If the URL starts with a slash, it's absolute path - ensure it doesn't get admin prefix
+                if (mediaUrl.startsWith('/')) {
+                    return mediaUrl;
+                }
+
+                // If it's a relative path, make it absolute from root
+                return '/' + mediaUrl;
             },
 
             async updatePostStatus(postId, status) {

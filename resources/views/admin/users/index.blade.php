@@ -362,7 +362,7 @@
                                             <div class="text-sm font-medium text-gray-900" x-text="user.name"></div>
                                             <div class="text-sm text-gray-500">
                                                 ID: <span x-text="user.id"></span>
-                                                <span x-show="user.email_verified_at" class="ml-2">
+                                                <span x-show="user.is_verified" class="ml-2">
                                                     <i class="fas fa-check-circle text-green-500" title="Verified"></i>
                                                 </span>
                                             </div>

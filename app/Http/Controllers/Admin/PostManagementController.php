@@ -128,6 +128,7 @@ class PostManagementController extends Controller
      */
     public function getPosts(Request $request)
     {
+
         try {
            // Log::info('PostManagement getPosts called with params: ', $request->all());
 
@@ -199,21 +200,92 @@ class PostManagementController extends Controller
                 }
             }
 
+            // Handle sorting options - prioritize latest posts
+            $sortBy = $request->get('sort_by', 'latest'); // Default to latest posts
+            $sortOrder = $request->get('sort_order', 'desc');
+
+            switch ($sortBy) {
+                case 'latest':
+                case 'created_at':
+                    $query->orderBy('created_at', 'desc')
+                          ->orderBy('id', 'desc'); // Secondary sort for posts created at exact same time
+                    break;
+                case 'updated_at':
+                    $query->orderBy('updated_at', 'desc')
+                          ->orderBy('created_at', 'desc');
+                    break;
+                case 'published_at':
+                    $query->orderBy('published_at', 'desc')
+                          ->orderBy('created_at', 'desc');
+                    break;
+                case 'likes':
+                    $query->orderBy('likes_count', $sortOrder)
+                          ->orderBy('created_at', 'desc');
+                    break;
+                case 'comments':
+                    $query->orderBy('comments_count', $sortOrder)
+                          ->orderBy('created_at', 'desc');
+                    break;
+                case 'user':
+                    $query->join('users', 'posts.user_id', '=', 'users.id')
+                          ->orderBy('users.name', $sortOrder)
+                          ->orderBy('posts.created_at', 'desc')
+                          ->select('posts.*'); // Ensure we only select post fields
+                    break;
+                default:
+                    // Always fall back to latest posts first
+                    $query->orderBy('created_at', 'desc')
+                          ->orderBy('id', 'desc');
+                    break;
+            }
+
+            // Add cursor-based pagination support for better performance with large datasets
+            $perPage = min($request->get('per_page', 20), 100); // Limit max per page
+
+            // If last_post_id is provided, get posts after that ID (for infinite scroll)
+            if ($request->filled('last_post_id')) {
+                $lastPostId = $request->get('last_post_id');
+                $lastPost = Post::find($lastPostId);
+
+                if ($lastPost) {
+                    // Get posts created before the last post's timestamp, or same timestamp but lower ID
+                    $query->where(function($q) use ($lastPost) {
+                        $q->where('created_at', '<', $lastPost->created_at)
+                          ->orWhere(function($q2) use ($lastPost) {
+                              $q2->where('created_at', '=', $lastPost->created_at)
+                                 ->where('id', '<', $lastPost->id);
+                          });
+                    });
+                }
+            }
+
             // Get paginated results with relationships
             $posts = $query->with([
-                    'user:id,name,email,avatar,country_id',
+                    'user:id,name,email,avatar,profile,country_id',
                     'user.country:id,name,code',
                     'socialCircle:id,name,color',
-                    'media:id,post_id,type,file_path,thumbnail_path'
+                    'media:id,post_id,type,file_url,thumbnail_url,file_path,thumbnail_path'
                 ])
                 ->withCount(['likes', 'comments', 'reports'])
-                ->orderBy('created_at', 'desc')
-                ->paginate(20);
+                ->paginate($perPage);
 
-            // Add formatted data
-            $posts->getCollection()->transform(function ($post) {
+
+            // Add formatted data and track last post info
+            $lastPostId = null;
+            $lastPostCreatedAt = null;
+
+            $posts->getCollection()->transform(function ($post) use (&$lastPostId, &$lastPostCreatedAt) {
                 $post->created_at_human = $post->created_at->diffForHumans();
                 $post->content_preview = Str::limit($post->content, 100);
+
+                // Track the last post for cursor pagination
+                $lastPostId = $post->id;
+                $lastPostCreatedAt = $post->created_at->toISOString();
+
+                // Ensure user avatar URL is available
+                if ($post->user) {
+                    $post->user->avatar_url = $post->user->getAvatarUrlAttribute();
+                }
 
                 // Determine status
                 if ($post->scheduled_at && $post->scheduled_at->isFuture()) {
@@ -227,7 +299,8 @@ class PostManagementController extends Controller
                 return $post;
             });
 
-            // Get stats
+            // Get stats - optimized to use filters when possible
+            $baseQuery = Post::query();
             $stats = [
                 'total' => Post::count(),
                 'published' => Post::where('is_published', true)->count(),
@@ -242,8 +315,19 @@ class PostManagementController extends Controller
            // Log::info('PostManagement getPosts success - returning ' . $posts->count() . ' posts');
 
             return response()->json([
+                'success' => true,
                 'posts' => $posts,
-                'stats' => $stats
+                'stats' => $stats,
+                'meta' => [
+                    'sort_by' => $request->get('sort_by', 'latest'),
+                    'sort_order' => $request->get('sort_order', 'desc'),
+                    'last_post_id' => $lastPostId,
+                    'last_post_created_at' => $lastPostCreatedAt,
+                    'has_more' => $posts->hasMorePages(),
+                    'current_page' => $posts->currentPage(),
+                    'per_page' => $posts->perPage(),
+                    'total' => $posts->total()
+                ]
             ]);
 
         } catch (\Exception $e) {
