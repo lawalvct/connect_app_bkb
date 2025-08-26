@@ -227,6 +227,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Profile Images Management
         Route::get('profile/images', [ProfileController::class, 'getProfileImages']);
+        Route::post('profile/picture', [ProfileController::class, 'updateProfilePicture']);
         Route::get('profile/images/{imageId}', [ProfileController::class, 'getProfileImageById']);
         Route::post('profile/images/set-main', [ProfileController::class, 'setMainProfileImage']);
         Route::delete('profile/images', [ProfileController::class, 'deleteProfileImage']);

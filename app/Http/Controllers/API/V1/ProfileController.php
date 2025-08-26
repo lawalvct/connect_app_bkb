@@ -1263,7 +1263,7 @@ class ProfileController extends BaseController
 //verifyMe function here
 public function verifyMe(Request $request)
 {
-   
+
     //user will provide id card type and id card image for admin to verify
     $validator = Validator::make($request->all(), [
         'id_card_type' => 'required|string|in:national_id,passport,drivers_license,voters_card,international_passport',
@@ -1355,5 +1355,64 @@ public function verifyMe(Request $request)
         }
     }
 
+
+    public function updateProfilePicture(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'profile_picture' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:50120', // 50MB max
+        ]);
+
+        if ($validator->fails()) {
+            return $this->sendError('Validation error', $validator->errors(), 422);
+        }
+
+        try {
+            $user = $request->user();
+            $file = $request->file('profile_picture');
+
+            // Create uploads/profiles directory if it doesn't exist
+            $uploadPath = public_path('uploads/profiles');
+            if (!file_exists($uploadPath)) {
+                mkdir($uploadPath, 0755, true);
+            }
+
+            // Delete old profile image if it exists
+            if ($user->profile) {
+                $oldImagePath = public_path('uploads/profiles/' . $user->profile);
+                if (file_exists($oldImagePath)) {
+                    unlink($oldImagePath);
+                }
+            }
+
+            // Generate unique filename
+            $extension = $file->getClientOriginalExtension();
+            $filename = time() . '_' . uniqid() . '.' . $extension;
+
+            // Move file to uploads/profiles directory
+            $file->move($uploadPath, $filename);
+
+            // Update user profile fields
+            $user->profile = $filename;
+            $user->profile_url = 'uploads/profiles';
+            $user->save();
+
+            // Generate full URL for response
+            $fullUrl = url('uploads/profiles/' . $filename);
+
+            return $this->sendResponse('Profile picture updated successfully', [
+                'user' => $user->fresh(),
+                'profile_image_url' => $fullUrl
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to update profile picture', [
+                'user_id' => $request->user()->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return $this->sendError('Failed to update profile picture', $e->getMessage(), 500);
+        }
+    }
 
 }
