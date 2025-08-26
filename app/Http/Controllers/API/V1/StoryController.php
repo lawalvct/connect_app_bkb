@@ -75,14 +75,19 @@ class StoryController extends Controller
                 case 'image':
                 case 'video':
                     if ($request->hasFile('file')) {
-                        // Store in public/uploads/stories/{user_id}/Y/m
-                        $uploadResult = $this->mediaService->processMedia(
+                        // Process media locally
+                        $uploadResult = $this->processMediaLocal(
                             $request->file('file'),
-                            "stories/{$user->id}/" . date('Y/m')
+                            $user->id
                         );
 
                         $storyData['content'] = $uploadResult['file_path'];
                         $storyData['file_url'] = $uploadResult['file_url'];
+                        $storyData['file_size'] = $uploadResult['file_size'];
+                        $storyData['mime_type'] = $uploadResult['mime_type'];
+                        $storyData['width'] = $uploadResult['width'] ?? null;
+                        $storyData['height'] = $uploadResult['height'] ?? null;
+                        $storyData['duration'] = $uploadResult['duration'] ?? null;
                     }
 
                     if (!empty($data['caption'])) {
@@ -799,6 +804,84 @@ class StoryController extends Controller
                 'error' => $e->getMessage()
             ]);
             return [];
+        }
+    }
+
+    /**
+     * Process media file locally for stories
+     */
+    protected function processMediaLocal($file, $userId): array
+    {
+        try {
+            // Create uploads/stories directory if it doesn't exist
+            $uploadPath = public_path('uploads/stories');
+            if (!file_exists($uploadPath)) {
+                mkdir($uploadPath, 0755, true);
+            }
+
+            // Get file info
+            $originalName = $file->getClientOriginalName();
+            $extension = strtolower($file->getClientOriginalExtension());
+            $mimeType = $file->getMimeType();
+            $fileSize = $file->getSize();
+
+            // Generate unique filename
+            $filename = time() . '_' . uniqid() . '.' . $extension;
+
+            // Determine file type
+            $imageTypes = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+            $videoTypes = ['mp4', 'mov', 'avi', 'wmv', 'flv', 'webm'];
+
+            if (in_array($extension, $imageTypes)) {
+                $type = 'image';
+            } elseif (in_array($extension, $videoTypes)) {
+                $type = 'video';
+            } else {
+                $type = 'file';
+            }
+
+            // Move file to uploads/stories
+            $file->move($uploadPath, $filename);
+
+            // Generate relative path and full URL
+            $relativePath = 'uploads/stories/' . $filename;
+            $fullUrl = url($relativePath);
+
+            $result = [
+                'type' => $type,
+                'file_path' => $relativePath,
+                'file_url' => $fullUrl,
+                'original_name' => $originalName,
+                'file_size' => $fileSize,
+                'mime_type' => $mimeType
+            ];
+
+            // For images, try to get dimensions
+            if ($type === 'image') {
+                try {
+                    $imagePath = $uploadPath . '/' . $filename;
+                    $imageSize = getimagesize($imagePath);
+                    if ($imageSize) {
+                        $result['width'] = $imageSize[0];
+                        $result['height'] = $imageSize[1];
+                    }
+                } catch (\Exception $e) {
+                    Log::warning('Could not get image dimensions', ['file' => $filename, 'error' => $e->getMessage()]);
+                }
+            }
+
+            // For videos, you could add duration extraction here if needed
+            // This would require additional packages like FFMpeg
+
+            return $result;
+
+        } catch (\Exception $e) {
+            Log::error('Story media processing failed', [
+                'file' => $originalName ?? 'unknown',
+                'user_id' => $userId,
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
         }
     }
 }
