@@ -17,6 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 
 class PostController extends BaseController
@@ -151,6 +152,7 @@ class PostController extends BaseController
      */
     public function store(StorePostRequest $request): JsonResponse
     {
+
         DB::beginTransaction();
 
         try {
@@ -171,9 +173,9 @@ class PostController extends BaseController
             // Process and upload media files
             if ($request->hasFile('media')) {
                 foreach ($request->file('media') as $index => $file) {
-                    $mediaData = $this->mediaService->processMedia($file, $post->id);
+                    $mediaData = $this->processMediaLocal($file, $post->id);
 
-                    $post->media()->create([
+                    $mediaRecord = $post->media()->create([
                         'type' => $mediaData['type'],
                         'file_path' => $mediaData['file_path'],
                         'file_url' => $mediaData['file_url'],
@@ -183,9 +185,6 @@ class PostController extends BaseController
                         'width' => $mediaData['width'] ?? null,
                         'height' => $mediaData['height'] ?? null,
                         'duration' => $mediaData['duration'] ?? null,
-                        'thumbnail_path' => $mediaData['thumbnail_path'] ?? null,
-                        'thumbnail_url' => $mediaData['thumbnail_url'] ?? null,
-                        'compressed_versions' => $mediaData['compressed_versions'] ?? null,
                         'order' => $index + 1,
                     ]);
                 }
@@ -204,18 +203,27 @@ class PostController extends BaseController
 
             DB::commit();
 
-            // Load relationships for response
-            $post->load([
+            // Get the post with all relationships fresh from database
+            $post = Post::with([
                 'user:id,name,username,profile,profile_url',
                 'socialCircle:id,name,color',
                 'media',
                 'taggedUsers:id,name,username'
-            ]);
+            ])->find($post->id);
+
+            // Add avatar URL for user
+            if ($post->user) {
+                $post->user->avatar_url = $post->user->getAvatarUrlAttribute();
+            }
 
             return response()->json([
                 'status' => 1,
-                'message' => $request->scheduled_at ? 'Post scheduled successfully' : 'Post created successfully',
-                'data' => $post
+                'message' => $post->scheduled_at ? 'Post scheduled successfully' : 'Post created successfully',
+                'data' => [
+                    'post' => $post,
+                    'media_count' => $post->media->count(),
+                    'tagged_users_count' => $post->taggedUsers->count(),
+                ]
             ], $this->successStatus);
 
         } catch (\Exception $e) {
@@ -244,11 +252,16 @@ class PostController extends BaseController
             $post->load([
                 'user:id,name,username,profile,profile_url',
                 'socialCircle:id,name,color',
-                'media',
+                'media:id,post_id,type,file_url,file_path,original_name,file_size,mime_type,width,height,duration',
                 'taggedUsers:id,name,username',
                 'comments.user:id,name,username,profile,profile_url',
                 'comments.replies.user:id,name,username,profile,profile_url'
             ]);
+
+            // Add avatar URL for user
+            if ($post->user) {
+                $post->user->avatar_url = $post->user->getAvatarUrlAttribute();
+            }
 
             // Add user interaction data
             $post->reaction_counts = $post->getReactionCounts();
@@ -258,7 +271,15 @@ class PostController extends BaseController
             return response()->json([
                 'status' => 1,
                 'message' => 'Post retrieved successfully',
-                'data' => $post
+                'data' => [
+                    'post' => $post,
+                    'stats' => [
+                        'views' => $post->views_count ?? 0,
+                        'likes' => $post->likes_count ?? 0,
+                        'comments' => $post->comments_count ?? 0,
+                        'shares' => $post->shares_count ?? 0,
+                    ]
+                ]
             ], $this->successStatus);
 
         } catch (\Exception $e) {
@@ -718,4 +739,79 @@ class PostController extends BaseController
                                     Log::warning('View recording failed', ['post_id' => $post->id, 'error' => $e->getMessage()]);
                                 }
                             }
-                        }
+
+    /**
+     * Process media file locally (simplified for old project)
+     */
+    protected function processMediaLocal($file, $postId): array
+    {
+        try {
+            // Create uploads/posts directory if it doesn't exist
+            $uploadPath = public_path('uploads/posts');
+            if (!file_exists($uploadPath)) {
+                mkdir($uploadPath, 0755, true);
+            }
+
+            // Get file info
+            $originalName = $file->getClientOriginalName();
+            $extension = strtolower($file->getClientOriginalExtension());
+            $mimeType = $file->getMimeType();
+            $fileSize = $file->getSize();
+
+            // Generate unique filename
+            $filename = time() . '_' . uniqid() . '.' . $extension;
+
+            // Determine file type
+            $imageTypes = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+            $videoTypes = ['mp4', 'mov', 'avi', 'wmv', 'flv', 'webm'];
+
+            if (in_array($extension, $imageTypes)) {
+                $type = 'image';
+            } elseif (in_array($extension, $videoTypes)) {
+                $type = 'video';
+            } else {
+                $type = 'file';
+            }
+
+            // Move file to uploads/posts
+            $file->move($uploadPath, $filename);
+
+            // Generate relative path and full URL
+            $relativePath = 'uploads/posts/' . $filename;
+            $fullUrl = url($relativePath);
+
+            $result = [
+                'type' => $type,
+                'file_path' => $relativePath,
+                'file_url' => $fullUrl,
+                'original_name' => $originalName,
+                'file_size' => $fileSize,
+                'mime_type' => $mimeType
+            ];
+
+            // For images, try to get dimensions
+            if ($type === 'image') {
+                try {
+                    $imagePath = $uploadPath . '/' . $filename;
+                    $imageSize = getimagesize($imagePath);
+                    if ($imageSize) {
+                        $result['width'] = $imageSize[0];
+                        $result['height'] = $imageSize[1];
+                    }
+                } catch (\Exception $e) {
+                    Log::warning('Could not get image dimensions', ['file' => $filename, 'error' => $e->getMessage()]);
+                }
+            }
+
+            return $result;
+
+        } catch (\Exception $e) {
+            Log::error('Media processing failed', [
+                'file' => $originalName ?? 'unknown',
+                'post_id' => $postId,
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
+        }
+    }
+}
