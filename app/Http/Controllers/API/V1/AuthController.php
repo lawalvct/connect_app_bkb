@@ -172,16 +172,9 @@ public function register(RegisterRequest $request)
 // Send pusher notification to admin channel
 try {
     $unreadCount = AdminNotification::where('type', 'user_registration')->where('is_read', false)->count();
-    $pusher = new \Pusher\Pusher(
-        env('PUSHER_APP_KEY'),
-        env('PUSHER_APP_SECRET'),
-        env('PUSHER_APP_ID'),
-        [
-            'cluster' => env('PUSHER_APP_CLUSTER'),
-            'useTLS' => true
-        ]
-    );
-    $pusher->trigger('admin-notifications', 'new-notification', [
+
+    // Use Laravel's broadcasting system instead of manual Pusher instantiation
+    broadcast(new \App\Events\AdminNotificationEvent([
         'title' => 'New User Registration',
         'message' => 'A new user has registered: ' . $user->name . ' (' . $user->email . ')',
         'type' => 'user_registration',
@@ -192,9 +185,9 @@ try {
         'icon' => 'user-plus',
         'created_at' => now()->toDateTimeString(),
         'unread_count' => $unreadCount,
-    ]);
+    ]));
 } catch (\Exception $e) {
-    \Log::error('Failed to send Pusher notification: ' . $e->getMessage());
+    \Log::error('Failed to send broadcast notification: ' . $e->getMessage());
 }
 
 
@@ -221,29 +214,57 @@ try {
  */
 private function addDefaultProfileUploads(User $user)
 {
-    // Define the default avatars - 2 images and 2 videos
-    $defaultUploads = [
-        [
-            'file_name' => 'public',
-            'file_url' => 'https://avatar.iran.liara.run/',
-            'file_type' => 'image'
-        ],
-        [
-            'file_name' => 'public',
-            'file_url' => 'https://avatar.iran.liara.run/',
-            'file_type' => 'image'
-        ],
-        [
-            'file_name' => 'public',
-            'file_url' => 'https://avatar.iran.liara.run/',
-            'file_type' => 'image'
-        ],
-        [
-            'file_name' => 'public',
-            'file_url' => 'https://avatar.iran.liara.run/',
-            'file_type' => 'image'
-        ]
-    ];
+    // Define the default avatars based on user gender
+    $defaultUploads = [];
+
+    if ($user->gender === 'female') {
+        $defaultUploads = [
+            [
+                'file_name' => 'female1.png',
+                'file_url' => url('uploads/profiles/'),
+                'file_type' => 'image'
+            ],
+            [
+                'file_name' => 'female2.png',
+                'file_url' => url('uploads/profiles/'),
+                'file_type' => 'image'
+            ],
+            [
+                'file_name' => 'female3.png',
+                'file_url' => url('uploads/profiles/'),
+                'file_type' => 'image'
+            ],
+            [
+                'file_name' => 'female4.png',
+                'file_url' => url('uploads/profiles/'),
+                'file_type' => 'image'
+            ]
+        ];
+    } else {
+        // Default to male images for male gender or any other gender/null
+        $defaultUploads = [
+            [
+                'file_name' => 'male1.png',
+                'file_url' => url('uploads/profiles/'),
+                'file_type' => 'image'
+            ],
+            [
+                'file_name' => 'male2.png',
+                'file_url' => url('uploads/profiles/'),
+                'file_type' => 'image'
+            ],
+            [
+                'file_name' => 'male3.png',
+                'file_url' => url('uploads/profiles/'),
+                'file_type' => 'image'
+            ],
+            [
+                'file_name' => 'male4.png',
+                'file_url' => url('uploads/profiles/'),
+                'file_type' => 'image'
+            ]
+        ];
+    }
 
     // Insert the records
     foreach ($defaultUploads as $upload) {
@@ -252,7 +273,7 @@ private function addDefaultProfileUploads(User $user)
     }
 
     // Log the addition of default profile uploads
-    \Log::info('Added default profile uploads for user ID: ' . $user->id);
+    \Log::info('Added default profile uploads for user ID: ' . $user->id . ' with gender: ' . ($user->gender ?? 'unknown'));
 }
 
 

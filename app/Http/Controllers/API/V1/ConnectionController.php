@@ -187,7 +187,7 @@ class ConnectionController extends Controller
     public function getUsersBySocialCircle(Request $request)
 {
     $validator = Validator::make($request->all(), [
-        'social_id' => 'required|array',
+        'social_id' => 'nullable|array',
         'social_id.*' => 'integer',
         'country_id' => 'nullable|integer',
         'last_id' => 'nullable|integer',
