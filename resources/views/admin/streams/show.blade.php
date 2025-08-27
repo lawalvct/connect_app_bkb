@@ -60,9 +60,9 @@
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div class="lg:col-span-2">
                     <div class="flex items-start space-x-4">
-                        @if($stream->banner_image)
+                        @if($stream->banner_image_url)
                         <div class="relative">
-                            <img src="{{ Storage::disk('public')->url($stream->banner_image) }}"
+                            <img src="{{ $stream->banner_image_url }}"
                                  alt="{{ $stream->title }}"
                                  class="w-32 h-20 object-cover rounded-lg">
                             @if($stream->status === 'live')
