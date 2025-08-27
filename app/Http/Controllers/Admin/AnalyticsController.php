@@ -57,7 +57,7 @@ class AnalyticsController extends Controller
         ];
 
         // Top Performing Content
-        $topPosts = Post::with('user:id,username,profile_picture')
+        $topPosts = Post::with('user:id,username,profile')
             ->orderByDesc('views_count')
             ->limit(10)
             ->get(['id', 'user_id', 'content', 'views_count', 'likes_count', 'comments_count', 'created_at']);
@@ -152,7 +152,7 @@ class AnalyticsController extends Controller
             ->withCount('posts')
             ->orderByDesc('posts_count')
             ->limit(20)
-            ->get(['id', 'username', 'profile_picture', 'created_at']);
+            ->get(['id', 'username', 'profile', 'created_at']);
 
         return view('admin.analytics.users', compact(
             'demographics',
@@ -196,7 +196,7 @@ class AnalyticsController extends Controller
         ];
 
         // Top Posts by Engagement
-        $topPosts = Post::with('user:id,username,profile_picture')
+        $topPosts = Post::with('user:id,username,profile')
             ->selectRaw('*, (likes_count + comments_count + shares_count) as total_engagement')
             ->orderByDesc('total_engagement')
             ->limit(20)
@@ -277,7 +277,7 @@ class AnalyticsController extends Controller
 
         // Top Revenue Generating Users
         $topUsers = UserSubscription::where('payment_status', 'completed')
-            ->with('user:id,username,profile_picture')
+            ->with('user:id,username,profile')
             ->selectRaw('user_id, SUM(amount) as total_spent, COUNT(*) as subscription_count')
             ->groupBy('user_id')
             ->orderByDesc('total_spent')
@@ -397,7 +397,7 @@ class AnalyticsController extends Controller
             ->get();
 
         // Top Streamers
-        $topStreamers = Stream::with('user:id,username,profile_picture')
+        $topStreamers = Stream::with('user:id,username,profile')
             ->selectRaw('user_id, COUNT(*) as stream_count, SUM(max_viewers) as total_viewers, AVG(max_viewers) as avg_viewers')
             ->groupBy('user_id')
             ->orderByDesc('total_viewers')

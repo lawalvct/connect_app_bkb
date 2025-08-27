@@ -280,7 +280,7 @@ class UserManagementController extends Controller
                 $user->connections_count = \App\Helpers\UserRequestsHelper::getConnectionCount($user->id);
 
                 // Add profile picture using the same logic as UserResource
-                $user->profile_picture = $this->getProfileUrl($user);
+                $user->profile_url = $this->getProfileUrl($user);
 
                 // Set default phone if not available
                 $user->phone = $user->phone ?? 'No phone';
