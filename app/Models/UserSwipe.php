@@ -17,6 +17,7 @@ class UserSwipe extends Model
         'right_swipes',
         'super_likes',
         'total_swipes',
+        'daily_limit',
         'archived_at'
     ];
 

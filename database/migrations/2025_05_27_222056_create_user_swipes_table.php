@@ -16,7 +16,9 @@ class CreateUserSwipesTable extends Migration
             $table->integer('right_swipes')->default(0);
             $table->integer('left_swipes')->default(0);
             $table->integer('super_likes')->default(0);
+            $table->integer('total_swipes')->default(0);
             $table->integer('daily_limit')->default(50); // Can be different per user/subscription
+            $table->timestamp('archived_at')->nullable();
             $table->timestamps();
 
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
