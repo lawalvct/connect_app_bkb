@@ -1,21 +1,11 @@
 @extends('admin.layouts.app')
 
 @section('title', 'Stream Details')
+@section('page-title', 'Stream Details')
 
 @section('header')
     <div class="flex justify-between items-center">
-        <div>
-            <h1 class="text-2xl font-bold text-gray-900">{{ $stream->title }}</h1>
-            <nav class="flex mt-2" aria-label="Breadcrumb">
-                <ol class="inline-flex items-center space-x-1 md:space-x-3">
-                    <li><a href="{{ route('admin.dashboard') }}" class="text-gray-500 hover:text-primary">Dashboard</a></li>
-                    <li><span class="text-gray-400">/</span></li>
-                    <li><a href="{{ route('admin.streams.index') }}" class="text-gray-500 hover:text-primary">Streams</a></li>
-                    <li><span class="text-gray-400">/</span></li>
-                    <li><span class="text-gray-900">{{ $stream->title }}</span></li>
-                </ol>
-            </nav>
-        </div>
+       
                 <div class="flex space-x-3">
             @if($stream->status === 'scheduled')
                 <button id="startStreamBtn" onclick="startStream({{ $stream->id }})"

@@ -39,16 +39,37 @@
                     <div class="flex justify-between items-center">
                         <h3 class="text-lg font-medium text-gray-900">Live Preview</h3>
                         <div class="flex items-center space-x-4">
+                            <button @click="refreshPreviews()"
+                                    class="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                                    title="Refresh camera previews">
+                                <i class="fas fa-sync-alt mr-1"></i>
+                                Refresh
+                            </button>
                             <span class="text-sm text-gray-500">Active Camera:</span>
                             <span class="font-medium text-blue-600" x-text="activeCameraName">Primary Camera</span>
                         </div>
                     </div>
                 </div>
                 <div class="p-6">
-                                        <div class="relative bg-black rounded-lg overflow-hidden" style="aspect-ratio: 16/9;">
-                        <div id="activeCameraPreview" class="w-full h-full"></div>
+                    <div class="relative bg-black rounded-lg overflow-hidden" style="aspect-ratio: 16/9;">
+                        <div id="activeCameraPreview" class="w-full h-full">
+                            <!-- Initial loading state -->
+                            <div class="w-full h-full flex items-center justify-center bg-gray-800 text-white">
+                                <div class="text-center">
+                                    <i class="fas fa-spinner fa-spin text-4xl mb-3 opacity-50"></i>
+                                    <p class="text-lg font-medium">Loading Camera Preview</p>
+                                    <p class="text-sm opacity-75">Initializing camera system...</p>
+                                </div>
+                            </div>
+                        </div>
                         <div class="absolute top-4 left-4 bg-black bg-opacity-75 text-white px-3 py-2 rounded" x-text="activeCameraName">
                             Primary Camera
+                        </div>
+                        <div x-show="switchingCamera" class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                            <div class="text-center text-white">
+                                <i class="fas fa-spinner fa-spin text-3xl mb-3"></i>
+                                <p class="text-lg font-medium">Switching Camera...</p>
+                            </div>
                         </div>
                         <div x-show="isLive" class="absolute top-4 right-4 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold animate-pulse">
                             LIVE
@@ -108,14 +129,14 @@
                                     <div class="flex items-center justify-between mb-2">
                                         <h4 class="font-medium text-gray-900" x-text="camera.camera_name"></h4>
                                         <div class="flex space-x-1">
-                                            <!-- Switch to Primary -->
-                                            <button x-show="!camera.is_primary && camera.is_active"
-                                                    @click="switchCamera(camera.id)"
-                                                    class="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded text-xs font-medium transition-colors">
-                                                <i class="fas fa-exchange-alt mr-1"></i>Switch
-                                            </button>
-
-                                            <!-- Remove Camera -->
+                            <!-- Switch to Primary -->
+                            <button x-show="!camera.is_primary && camera.is_active"
+                                    @click="switchCamera(camera.id)"
+                                    :disabled="switchingCamera === camera.id"
+                                    class="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-2 py-1 rounded text-xs font-medium transition-colors">
+                                <i :class="switchingCamera === camera.id ? 'fas fa-spinner fa-spin' : 'fas fa-exchange-alt'" class="mr-1"></i>
+                                <span x-text="switchingCamera === camera.id ? 'Switching...' : 'Switch'">Switch</span>
+                            </button>                                            <!-- Remove Camera -->
                                             <button x-show="!camera.is_primary"
                                                     @click="removeCamera(camera.id)"
                                                     class="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs font-medium transition-colors">
@@ -433,6 +454,7 @@ function cameraManagement() {
         adding: false,
         detectingDevices: false,
         testing: false,
+        switchingCamera: null,
 
         // Form data
         newCamera: {
@@ -731,6 +753,10 @@ function cameraManagement() {
         },
 
         async switchCamera(cameraId) {
+            if (this.switchingCamera) return; // Prevent multiple simultaneous switches
+
+            this.switchingCamera = cameraId;
+
             try {
                 const camera = this.cameras.find(c => c.id === cameraId);
                 if (!camera) throw new Error('Camera not found');
@@ -742,20 +768,16 @@ function cameraManagement() {
                 camera.is_primary = true;
                 this.activeCameraName = camera.camera_name;
 
-                // If streaming, switch the active video track
+                // Update the main preview regardless of live status
+                await this.updateMainPreview(cameraId);
+
+                // If streaming, also switch the published track
                 if (this.isLive && this.agoraClient) {
                     const newTrack = this.activeTracks.get(cameraId);
                     if (newTrack) {
                         // Unpublish current track and publish new one
                         await this.agoraClient.unpublish();
                         await this.agoraClient.publish([newTrack]);
-
-                        // Update main preview
-                        const mainPreview = document.getElementById('activeCameraPreview');
-                        if (mainPreview) {
-                            mainPreview.innerHTML = '';
-                            newTrack.play(mainPreview);
-                        }
                     }
                 }
 
@@ -767,6 +789,69 @@ function cameraManagement() {
             } catch (error) {
                 console.error('Error switching camera:', error);
                 this.showNotification('Failed to switch camera: ' + error.message, 'error');
+            } finally {
+                this.switchingCamera = null;
+            }
+        },
+
+        async updateMainPreview(cameraId) {
+            try {
+                const mainPreview = document.getElementById('activeCameraPreview');
+                if (!mainPreview) return;
+
+                // Check if we already have an active track for this camera
+                let videoTrack = this.activeTracks.get(cameraId);
+
+                if (!videoTrack) {
+                    // Create a new video track for this camera
+                    const camera = this.cameras.find(c => c.id === cameraId);
+                    if (!camera) return;
+
+                    // If camera has a device_id, use it
+                    if (camera.device_id) {
+                        videoTrack = await AgoraRTC.createCameraVideoTrack({
+                            cameraId: camera.device_id,
+                            encoderConfig: this.getEncoderConfig(camera.resolution || '720p')
+                        });
+
+                        // Store the track
+                        this.activeTracks.set(cameraId, videoTrack);
+                    } else {
+                        // For cameras without device_id, show placeholder
+                        mainPreview.innerHTML = `
+                            <div class="w-full h-full flex items-center justify-center bg-gray-800 text-white">
+                                <div class="text-center">
+                                    <i class="fas fa-video text-4xl mb-3 opacity-50"></i>
+                                    <p class="text-lg font-medium">${camera.camera_name}</p>
+                                    <p class="text-sm opacity-75">Camera preview not available</p>
+                                </div>
+                            </div>
+                        `;
+                        return;
+                    }
+                }
+
+                // Clear the preview and play the new track
+                mainPreview.innerHTML = '';
+                videoTrack.play(mainPreview);
+
+                console.log('Updated main preview for camera:', cameraId);
+
+            } catch (error) {
+                console.error('Error updating main preview:', error);
+                // Show error in preview
+                const mainPreview = document.getElementById('activeCameraPreview');
+                if (mainPreview) {
+                    mainPreview.innerHTML = `
+                        <div class="w-full h-full flex items-center justify-center bg-gray-800 text-white">
+                            <div class="text-center">
+                                <i class="fas fa-exclamation-triangle text-4xl mb-3 text-red-500"></i>
+                                <p class="text-lg font-medium">Camera Error</p>
+                                <p class="text-sm opacity-75">${error.message}</p>
+                            </div>
+                        </div>
+                    `;
+                }
             }
         },
 
@@ -777,9 +862,23 @@ function cameraManagement() {
 
                 if (shouldActivate) {
                     // Activate camera - create video track if not exists
-                    if (!this.activeTracks.has(cameraId)) {
-                        await this.testCameraDevice(camera.device_id, camera);
+                    if (!this.activeTracks.has(cameraId) && camera.device_id) {
+                        const videoTrack = await AgoraRTC.createCameraVideoTrack({
+                            cameraId: camera.device_id,
+                            encoderConfig: this.getEncoderConfig(camera.resolution || '720p')
+                        });
+
+                        this.activeTracks.set(cameraId, videoTrack);
+
+                        // Update the individual preview
+                        await this.initializeCameraPreview(camera);
+
+                        // If this is the primary camera, update the main preview too
+                        if (camera.is_primary) {
+                            await this.updateMainPreview(cameraId);
+                        }
                     }
+
                     camera.is_active = true;
                     camera.status = 'connected';
                 } else {
@@ -790,13 +889,26 @@ function cameraManagement() {
                         track.close();
                         this.activeTracks.delete(cameraId);
                     }
+
                     camera.is_active = false;
                     camera.status = 'disconnected';
 
-                    // Clear preview
+                    // Clear individual preview
                     const previewElement = document.getElementById(`camera-preview-${cameraId}`);
                     if (previewElement) {
-                        previewElement.innerHTML = '<i class="fas fa-video text-2xl opacity-50"></i>';
+                        previewElement.innerHTML = `
+                            <div class="w-full h-full flex items-center justify-center bg-gray-800 text-white">
+                                <div class="text-center">
+                                    <i class="fas fa-video-slash text-2xl mb-2 opacity-50"></i>
+                                    <p class="text-xs">Disconnected</p>
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    // If this was the primary camera, clear main preview too
+                    if (camera.is_primary) {
+                        this.showEmptyPreview('Primary camera disconnected');
                     }
                 }
 
@@ -1022,21 +1134,100 @@ function cameraManagement() {
                             status: camera.status || 'disconnected'
                         }));
 
-                        // Set active camera name
+                        // Set active camera name and initialize preview
                         const primaryCamera = this.cameras.find(c => c.is_primary);
                         if (primaryCamera) {
                             this.activeCameraName = primaryCamera.camera_name;
+                            // Initialize the main preview with the primary camera
+                            await this.updateMainPreview(primaryCamera.id);
+                        } else {
+                            // If no primary camera, show placeholder
+                            this.showEmptyPreview('No primary camera selected');
                         }
 
                         console.log('Loaded cameras:', this.cameras.length);
+
+                        // Initialize individual camera previews
+                        await this.initializeCameraPreviews();
+
                     } else {
                         console.error('Failed to load cameras:', data.message);
+                        this.showEmptyPreview('Failed to load cameras');
                     }
                 } else {
                     console.error('HTTP error loading cameras:', response.status);
+                    this.showEmptyPreview('Error loading cameras');
                 }
             } catch (error) {
                 console.error('Error loading cameras:', error);
+                this.showEmptyPreview('Connection error');
+            }
+        },
+
+        async initializeCameraPreviews() {
+            // Initialize preview for each active camera
+            for (const camera of this.cameras) {
+                if (camera.is_active && camera.device_id) {
+                    try {
+                        await this.initializeCameraPreview(camera);
+                    } catch (error) {
+                        console.error(`Failed to initialize preview for camera ${camera.id}:`, error);
+                    }
+                }
+            }
+        },
+
+        async initializeCameraPreview(camera) {
+            try {
+                const previewElement = document.getElementById(`camera-preview-${camera.id}`);
+                if (!previewElement) return;
+
+                // Create video track if not exists
+                if (!this.activeTracks.has(camera.id) && camera.device_id) {
+                    const videoTrack = await AgoraRTC.createCameraVideoTrack({
+                        cameraId: camera.device_id,
+                        encoderConfig: this.getEncoderConfig(camera.resolution || '720p')
+                    });
+
+                    this.activeTracks.set(camera.id, videoTrack);
+                }
+
+                // Play the track in the preview
+                const videoTrack = this.activeTracks.get(camera.id);
+                if (videoTrack) {
+                    previewElement.innerHTML = '';
+                    videoTrack.play(previewElement);
+                }
+
+            } catch (error) {
+                console.error(`Error initializing camera preview for ${camera.camera_name}:`, error);
+                // Show error state in the preview
+                const previewElement = document.getElementById(`camera-preview-${camera.id}`);
+                if (previewElement) {
+                    previewElement.innerHTML = `
+                        <div class="w-full h-full flex items-center justify-center bg-gray-800 text-white">
+                            <div class="text-center">
+                                <i class="fas fa-exclamation-triangle text-2xl mb-2 text-red-500"></i>
+                                <p class="text-sm">Preview Error</p>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+        },
+
+        showEmptyPreview(message) {
+            const mainPreview = document.getElementById('activeCameraPreview');
+            if (mainPreview) {
+                mainPreview.innerHTML = `
+                    <div class="w-full h-full flex items-center justify-center bg-gray-800 text-white">
+                        <div class="text-center">
+                            <i class="fas fa-video text-6xl mb-4 opacity-30"></i>
+                            <p class="text-xl font-medium mb-2">No Camera Preview</p>
+                            <p class="text-sm opacity-75">${message}</p>
+                        </div>
+                    </div>
+                `;
             }
         },
 
@@ -1119,6 +1310,20 @@ function cameraManagement() {
 
         formatDateTime(dateString) {
             return new Date(dateString).toLocaleString();
+        },
+
+        async refreshPreviews() {
+            try {
+                this.showNotification('Refreshing camera previews...', 'info');
+
+                // Reload cameras from database
+                await this.loadCameras();
+
+                this.showNotification('Camera previews refreshed successfully', 'success');
+            } catch (error) {
+                console.error('Error refreshing previews:', error);
+                this.showNotification('Failed to refresh previews: ' + error.message, 'error');
+            }
         },
 
         showNotification(message, type) {

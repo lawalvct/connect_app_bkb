@@ -1,20 +1,14 @@
 @extends('admin.layouts.app')
 
 @section('title', 'Live Broadcast - ' . $stream->title)
-
+@section('page-title', 'Streaming')
 @section('header')
     <div class="flex justify-between items-center">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900">L                            <input type="text"
-                                   x-model="newMessage"
-                                   placeholder="Type a message..."
-                                   class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                   maxlength="500">
-                            <button type="submit"
-                                    :disabled="!newMessage || !newMessage.trim()"
-                                    class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
-                                <i class="fas fa-paper-plane"></i>
-                            </button>ast: {{ $stream->title }}</h1>
+            <h1 class="text-2xl font-bold text-gray-900">
+                <i class="fas fa-broadcast-tower mr-2 text-red-500"></i>
+                Live Broadcast: {{ $stream->title }}
+            </h1>
             <div class="flex items-center mt-2 space-x-4">
                 <span class="px-3 py-1 rounded-full text-sm font-medium
                     @if($stream->status === 'live') bg-red-100 text-red-800
@@ -22,7 +16,13 @@
                     <i class="fas fa-circle mr-1 @if($stream->status === 'live') text-red-500 animate-pulse @else text-yellow-500 @endif"></i>
                     {{ $stream->status === 'live' ? 'LIVE' : 'PREPARING' }}
                 </span>
-                <span class="text-sm text-gray-500">Channel: {{ $stream->channel_name }}</span>
+                <span class="text-sm text-gray-500">
+                    <i class="fas fa-video mr-1"></i>
+                    Channel: {{ $stream->channel_name }}
+                </span>
+                <span class="text-sm text-gray-500" x-data x-text="new Date().toLocaleString()">
+                    <i class="fas fa-clock mr-1"></i>
+                </span>
             </div>
         </div>
         <div class="flex space-x-3">
@@ -32,7 +32,7 @@
                 <i class="fas fa-stop mr-2"></i>End Broadcast
             </button>
             <a href="{{ route('admin.streams.cameras', $stream) }}" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
-                <i class="fas fa-video mr-2"></i>Camera Management
+                <i class="fas fa-video mr-2"></i>Camera Setup
             </a>
             <a href="{{ route('admin.streams.show', $stream) }}" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
                 <i class="fas fa-arrow-left mr-2"></i>Back to Stream
@@ -78,130 +78,194 @@
                     </div>
 
                     <!-- Broadcasting Controls -->
-                    <div class="flex flex-wrap items-center justify-between gap-4">
-                        <div class="flex items-center space-x-4">
-                            <!-- Audio Controls -->
-                            <button @click="toggleAudio()"
-                                    :class="audioEnabled ? 'bg-blue-600 hover:bg-blue-700' : 'bg-red-600 hover:bg-red-700'"
-                                    class="text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
-                                <i :class="audioEnabled ? 'fas fa-microphone' : 'fas fa-microphone-slash'" class="mr-2"></i>
-                                <span x-text="audioEnabled ? 'Mute' : 'Unmute'">Mute</span>
+                    <div class="space-y-6">
+                        <!-- Main Stream Control -->
+                        <div class="text-center">
+                            <button x-show="!isStreaming" @click="startBroadcast()"
+                                    :disabled="connecting || false"
+                                    class="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white px-12 py-4 rounded-xl text-xl font-bold transition-all shadow-xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">
+                                <span x-show="!connecting" class="flex items-center">
+                                    <i class="fas fa-broadcast-tower mr-3 text-2xl"></i>
+                                    GO LIVE
+                                </span>
+                                <span x-show="connecting" class="flex items-center">
+                                    <i class="fas fa-spinner fa-spin mr-3 text-2xl"></i>
+                                    CONNECTING...
+                                </span>
                             </button>
-
-                            <!-- Video Controls -->
-                            <button @click="toggleVideo()"
-                                    :class="videoEnabled ? 'bg-blue-600 hover:bg-blue-700' : 'bg-red-600 hover:bg-red-700'"
-                                    class="text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
-                                <i :class="videoEnabled ? 'fas fa-video' : 'fas fa-video-slash'" class="mr-2"></i>
-                                <span x-text="videoEnabled ? 'Stop Video' : 'Start Video'">Stop Video</span>
+                            <button x-show="isStreaming" @click="stopBroadcast()"
+                                    class="bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-800 hover:to-gray-900 text-white px-12 py-4 rounded-xl text-xl font-bold transition-all shadow-xl transform hover:scale-105">
+                                <i class="fas fa-stop-circle mr-3 text-2xl"></i>END STREAM
                             </button>
+                        </div>
 
-                            <!-- Screen Share -->
-                            <button @click="toggleScreenShare()"
-                                    :class="screenSharing ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-600 hover:bg-gray-700'"
-                                    class="text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
-                                <i :class="screenSharing ? 'fas fa-desktop' : 'fas fa-desktop'" class="mr-2"></i>
-                                <span x-text="screenSharing ? 'Stop Sharing' : 'Share Screen'">Share Screen</span>
-                            </button>
+                        <!-- Stream Controls -->
+                        <div class="bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-6">
+                            <h4 class="text-lg font-semibold text-gray-800 mb-4 text-center">Stream Controls</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <!-- Audio Controls -->
+                                <button @click="toggleAudio()"
+                                        :class="audioEnabled ? 'bg-blue-600 hover:bg-blue-700 border-blue-600' : 'bg-red-600 hover:bg-red-700 border-red-600'"
+                                        class="flex flex-col items-center text-white px-4 py-4 rounded-xl text-sm font-medium transition-all transform hover:scale-105 border-2 shadow-lg">
+                                    <i :class="audioEnabled ? 'fas fa-microphone text-2xl mb-2' : 'fas fa-microphone-slash text-2xl mb-2'"></i>
+                                    <span class="font-bold" x-text="audioEnabled ? 'MICROPHONE ON' : 'MICROPHONE OFF'">MICROPHONE</span>
+                                    <span class="text-xs mt-1 opacity-75" x-text="audioEnabled ? 'Click to mute' : 'Click to unmute'">Click to toggle</span>
+                                </button>
 
-                            <!-- Multi-Camera Controls -->
+                                <!-- Video Controls -->
+                                <button @click="toggleVideo()"
+                                        :class="videoEnabled ? 'bg-blue-600 hover:bg-blue-700 border-blue-600' : 'bg-red-600 hover:bg-red-700 border-red-600'"
+                                        class="flex flex-col items-center text-white px-4 py-4 rounded-xl text-sm font-medium transition-all transform hover:scale-105 border-2 shadow-lg">
+                                    <i :class="videoEnabled ? 'fas fa-video text-2xl mb-2' : 'fas fa-video-slash text-2xl mb-2'"></i>
+                                    <span class="font-bold" x-text="videoEnabled ? 'CAMERA ON' : 'CAMERA OFF'">CAMERA</span>
+                                    <span class="text-xs mt-1 opacity-75" x-text="videoEnabled ? 'Click to disable' : 'Click to enable'">Click to toggle</span>
+                                </button>
+
+                                <!-- Screen Share -->
+                                <button @click="toggleScreenShare()"
+                                        :class="screenSharing ? 'bg-green-600 hover:bg-green-700 border-green-600' : 'bg-gray-600 hover:bg-gray-700 border-gray-600'"
+                                        class="flex flex-col items-center text-white px-4 py-4 rounded-xl text-sm font-medium transition-all transform hover:scale-105 border-2 shadow-lg">
+                                    <i :class="screenSharing ? 'fas fa-desktop text-2xl mb-2 text-green-200' : 'fas fa-desktop text-2xl mb-2'" class="mb-2"></i>
+                                    <span class="font-bold" x-text="screenSharing ? 'SHARING SCREEN' : 'SHARE SCREEN'">SCREEN SHARE</span>
+                                    <span class="text-xs mt-1 opacity-75" x-text="screenSharing ? 'Click to stop' : 'Click to share'">Click to toggle</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Advanced Controls -->
+                        <div class="flex flex-wrap items-center justify-between gap-4">
+                            <!-- Camera Source Selection -->
                             <div class="relative">
                                 <button @click="showCameras = !showCameras"
                                         :disabled="switchingCamera"
                                         :class="switchingCamera ? 'bg-purple-400 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700'"
-                                        class="text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                                        class="text-white px-6 py-3 rounded-lg text-sm font-semibold transition-colors shadow-md flex items-center">
                                     <i :class="switchingCamera ? 'fas fa-spinner fa-spin' : 'fas fa-video'" class="mr-2"></i>
-                                    <span x-text="switchingCamera ? 'Switching...' : 'Cameras'">Cameras</span>
-                                    <i class="fas fa-chevron-down ml-1" x-show="!switchingCamera"></i>
+                                    <span x-text="switchingCamera ? 'Switching...' : 'Camera Sources'">Camera Sources</span>
+                                    <i class="fas fa-chevron-down ml-2" x-show="!switchingCamera"></i>
                                 </button>
                                 <div x-show="showCameras" @click.away="showCameras = false"
-                                     class="absolute top-full left-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg p-4 min-w-64 z-50">
-                                    <div class="space-y-2">
+                                     class="absolute top-full left-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-xl p-4 min-w-80 z-50">
+                                    <div class="space-y-3">
                                         <div class="flex items-center justify-between mb-3">
-                                            <h4 class="font-medium text-gray-900">Camera Sources</h4>
+                                            <h4 class="font-semibold text-gray-900 flex items-center">
+                                                <i class="fas fa-video mr-2 text-purple-600"></i>
+                                                Camera Sources
+                                            </h4>
                                             <a href="{{ route('admin.streams.cameras', $stream) }}"
-                                               class="text-blue-600 hover:text-blue-700 text-sm">
-                                                Manage
+                                               class="text-blue-600 hover:text-blue-700 text-sm font-medium hover:underline">
+                                                <i class="fas fa-cog mr-1"></i>
+                                                Setup
                                             </a>
                                         </div>
 
                                         <!-- RTMP Streaming Option -->
-                                        <div class="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                                        <div class="mb-4 p-3 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-lg">
                                             <div class="flex items-center justify-between mb-2">
-                                                <h5 class="text-sm font-semibold text-purple-800">
+                                                <h5 class="text-sm font-semibold text-purple-800 flex items-center">
                                                     <i class="fas fa-broadcast-tower mr-2"></i>
-                                                    Professional Streaming Software
+                                                    Professional Software
                                                 </h5>
                                                 <button @click="showRtmpDetails = !showRtmpDetails"
-                                                        class="text-purple-600 hover:text-purple-800 text-sm">
+                                                        class="text-purple-600 hover:text-purple-800 text-sm font-medium">
+                                                    <i :class="showRtmpDetails ? 'fas fa-eye-slash' : 'fas fa-eye'" class="mr-1"></i>
                                                     <span x-text="showRtmpDetails ? 'Hide' : 'Show'">Show</span>
                                                 </button>
                                             </div>
-                                            <p class="text-xs text-purple-600 mb-2">
-                                                Use ManyCam, SplitCam, OBS, or XSplit for professional multi-camera control
+                                            <p class="text-xs text-purple-600 mb-3">
+                                                Use OBS, XSplit, ManyCam, or SplitCam for professional broadcasting
                                             </p>
-                                            <div x-show="showRtmpDetails" class="space-y-2">
+                                            <div x-show="showRtmpDetails" x-transition class="space-y-3">
                                                 <div class="text-xs">
-                                                    <div class="font-medium text-gray-700">RTMP Server:</div>
-                                                    <code x-text="rtmpDetails?.rtmp_url || 'Loading...'" class="text-xs bg-gray-100 px-2 py-1 rounded"></code>
+                                                    <div class="font-medium text-gray-700 mb-1">RTMP Server:</div>
+                                                    <div class="flex items-center space-x-2">
+                                                        <code x-text="rtmpDetails?.rtmp_url || 'Loading...'" class="text-xs bg-white px-2 py-1 rounded border flex-1"></code>
+                                                        <button @click="copyToClipboard(rtmpDetails?.rtmp_url)" class="text-purple-600 hover:text-purple-800">
+                                                            <i class="fas fa-copy"></i>
+                                                        </button>
+                                                    </div>
                                                 </div>
                                                 <div class="text-xs">
-                                                    <div class="font-medium text-gray-700">Stream Key:</div>
-                                                    <code x-text="rtmpDetails?.stream_key || 'Loading...'" class="text-xs bg-gray-100 px-2 py-1 rounded"></code>
+                                                    <div class="font-medium text-gray-700 mb-1">Stream Key:</div>
+                                                    <div class="flex items-center space-x-2">
+                                                        <code x-text="rtmpDetails?.stream_key || 'Loading...'" class="text-xs bg-white px-2 py-1 rounded border flex-1"></code>
+                                                        <button @click="copyToClipboard(rtmpDetails?.stream_key)" class="text-purple-600 hover:text-purple-800">
+                                                            <i class="fas fa-copy"></i>
+                                                        </button>
+                                                    </div>
                                                 </div>
                                                 <button @click="loadRtmpDetails()"
-                                                        class="text-xs bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700">
+                                                        class="w-full text-xs bg-purple-600 text-white px-3 py-2 rounded hover:bg-purple-700 transition-colors">
+                                                    <i class="fas fa-key mr-1"></i>
                                                     Get RTMP Details
                                                 </button>
                                             </div>
                                         </div>
 
-
-
                                         <div id="cameraSourcesList" class="space-y-2">
-                                            <p class="text-sm text-gray-500">Loading camera sources...</p>
+                                            <p class="text-sm text-gray-500 text-center py-4">
+                                                <i class="fas fa-spinner fa-spin mr-2"></i>
+                                                Loading camera sources...
+                                            </p>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <!-- Main Broadcast Button -->
-                        <div>
-                            <button x-show="!isStreaming" @click="startBroadcast()"
-                                    :disabled="connecting || false"
-                                    class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-md text-lg font-medium transition-colors disabled:opacity-50">
-                                <span x-show="!connecting">
-                                    <i class="fas fa-play mr-2"></i>Start Broadcast
-                                </span>
-                                <span x-show="connecting">
-                                    <i class="fas fa-spinner fa-spin mr-2"></i>Connecting...
-                                </span>
-                            </button>
-                            <button x-show="isStreaming" @click="stopBroadcast()"
-                                    class="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-md text-lg font-medium transition-colors">
-                                <i class="fas fa-stop mr-2"></i>Stop Broadcast
-                            </button>
+                            <!-- Quick Actions -->
+                            <div class="flex items-center space-x-3">
+                                <button @click="refreshStream()"
+                                        class="text-gray-600 hover:text-gray-800 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors flex items-center"
+                                        title="Refresh Stream">
+                                    <i class="fas fa-sync-alt mr-2"></i>
+                                    <span class="text-sm font-medium">Refresh</span>
+                                </button>
+                                <button @click="toggleFullscreen()"
+                                        class="text-gray-600 hover:text-gray-800 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors flex items-center"
+                                        title="Toggle Fullscreen">
+                                    <i class="fas fa-expand-alt mr-2"></i>
+                                    <span class="text-sm font-medium">Fullscreen</span>
+                                </button>
+                                <button @click="takeScreenshot()"
+                                        class="text-gray-600 hover:text-gray-800 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors flex items-center"
+                                        title="Take Screenshot">
+                                    <i class="fas fa-camera mr-2"></i>
+                                    <span class="text-sm font-medium">Screenshot</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
 
                     <!-- Stream Stats -->
-                    <div x-show="isStreaming" class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        <div class="bg-gray-50 p-3 rounded">
-                            <div class="font-medium text-gray-500">Bitrate</div>
-                            <div class="text-lg font-bold" x-text="(stats?.bitrate || 0) + ' kbps'">0 kbps</div>
+                    <div x-show="isStreaming" x-transition class="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="font-semibold text-blue-700">Bitrate</div>
+                                <i class="fas fa-tachometer-alt text-blue-600"></i>
+                            </div>
+                            <div class="text-2xl font-bold text-blue-800" x-text="(stats?.bitrate || 0) + ' kbps'">0 kbps</div>
                         </div>
-                        <div class="bg-gray-50 p-3 rounded">
-                            <div class="font-medium text-gray-500">Resolution</div>
-                            <div class="text-lg font-bold" x-text="stats?.resolution || '0x0'">0x0</div>
+                        <div class="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="font-semibold text-purple-700">Resolution</div>
+                                <i class="fas fa-expand-alt text-purple-600"></i>
+                            </div>
+                            <div class="text-2xl font-bold text-purple-800" x-text="stats?.resolution || '0x0'">0x0</div>
                         </div>
-                        <div class="bg-gray-50 p-3 rounded">
-                            <div class="font-medium text-gray-500">FPS</div>
-                            <div class="text-lg font-bold" x-text="stats?.fps || 0">0</div>
+                        <div class="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="font-semibold text-green-700">FPS</div>
+                                <i class="fas fa-video text-green-600"></i>
+                            </div>
+                            <div class="text-2xl font-bold text-green-800" x-text="stats?.fps || 0">0</div>
                         </div>
-                        <div class="bg-gray-50 p-3 rounded">
-                            <div class="font-medium text-gray-500">Network</div>
-                            <div class="text-lg font-bold" :class="(stats?.networkQuality || 0) >= 3 ? 'text-green-600' : (stats?.networkQuality || 0) >= 2 ? 'text-yellow-600' : 'text-red-600'"
+                        <div class="bg-gradient-to-br from-yellow-50 to-yellow-100 p-4 rounded-lg border border-yellow-200">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="font-semibold text-yellow-700">Network</div>
+                                <i class="fas fa-wifi text-yellow-600"></i>
+                            </div>
+                            <div class="text-2xl font-bold"
+                                 :class="(stats?.networkQuality || 0) >= 3 ? 'text-green-600' : (stats?.networkQuality || 0) >= 2 ? 'text-yellow-600' : 'text-red-600'"
                                  x-text="getNetworkStatus(stats?.networkQuality || 0)">Good</div>
                         </div>
                     </div>
@@ -212,29 +276,41 @@
         <!-- Chat & Viewer Panel -->
         <div class="lg:col-span-1">
             <!-- Viewer List -->
-            <div class="bg-white shadow rounded-lg mb-6">
-                <div class="px-6 py-4 border-b border-gray-200">
+            <div class="bg-white shadow-lg rounded-lg mb-6 border border-gray-200">
+                <div class="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
                     <div class="flex justify-between items-center">
-                        <h3 class="text-lg font-medium text-gray-900">Live Viewers</h3>
-                        <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm font-medium" x-text="viewerCount || 0">0</span>
+                        <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+                            <i class="fas fa-users mr-2 text-blue-600"></i>
+                            Live Viewers
+                        </h3>
+                        <div class="flex items-center space-x-2">
+                            <span class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-3 py-1 rounded-full text-sm font-bold shadow-md" x-text="viewerCount || 0">0</span>
+                            <button @click="loadViewers()" class="text-blue-600 hover:text-blue-800 text-sm" title="Refresh viewers">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div class="p-4 max-h-64 overflow-y-auto">
                     <div x-show="!viewers || viewers.length === 0" class="text-center text-gray-500 py-8">
-                        <i class="fas fa-users text-4xl mb-2 opacity-50"></i>
-                        <p>No viewers yet</p>
+                        <i class="fas fa-users text-4xl mb-3 opacity-30"></i>
+                        <p class="text-lg font-medium">No viewers yet</p>
+                        <p class="text-sm">Waiting for your audience...</p>
                     </div>
-                    <div class="space-y-2" x-show="viewers && viewers.length > 0">
+                    <div class="space-y-3" x-show="viewers && viewers.length > 0">
                         <template x-for="viewer in viewers" :key="viewer.id">
-                            <div class="flex items-center space-x-3 p-2 bg-gray-50 rounded">
+                            <div class="flex items-center space-x-3 p-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border border-gray-200 hover:shadow-md transition-all">
                                 <img :src="viewer.avatar || '/images/default-avatar.png'"
                                      :alt="viewer.name"
-                                     class="w-8 h-8 rounded-full">
+                                     class="w-10 h-10 rounded-full border-2 border-blue-200">
                                 <div class="flex-1">
-                                    <div class="text-sm font-medium" x-text="viewer.name"></div>
-                                    <div class="text-xs text-gray-500" x-text="viewer.joinedAt"></div>
+                                    <div class="text-sm font-semibold text-gray-900" x-text="viewer.name"></div>
+                                    <div class="text-xs text-gray-500 flex items-center">
+                                        <i class="fas fa-clock mr-1"></i>
+                                        <span x-text="viewer.joinedAt"></span>
+                                    </div>
                                 </div>
-                                <div class="w-2 h-2 bg-green-500 rounded-full"></div>
+                                <div class="w-3 h-3 bg-green-500 rounded-full shadow-md animate-pulse"></div>
                             </div>
                         </template>
                     </div>
@@ -242,30 +318,42 @@
             </div>
 
             <!-- Live Chat -->
-            <div class="bg-white shadow rounded-lg">
-                <div class="px-6 py-4 border-b border-gray-200">
-                    <h3 class="text-lg font-medium text-gray-900">Live Chat</h3>
+            <div class="bg-white shadow-lg rounded-lg border border-gray-200">
+                <div class="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-lg font-semibold text-gray-900 flex items-center">
+                            <i class="fas fa-comments mr-2 text-green-600"></i>
+                            Live Chat
+                        </h3>
+                        <button @click="loadChat()" class="text-green-600 hover:text-green-800 text-sm" title="Refresh chat">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
                 </div>
                 <div class="p-4">
                     <!-- Chat Messages -->
-                    <div id="chatMessages" class="h-64 overflow-y-auto mb-4 bg-gray-50 rounded p-3">
+                    <div id="chatMessages" class="h-64 overflow-y-auto mb-4 bg-gradient-to-b from-gray-50 to-gray-100 rounded-lg p-3 border border-gray-200">
                         <div x-show="!chatMessages || chatMessages.length === 0" class="text-center text-gray-500 py-8">
-                            <i class="fas fa-comments text-4xl mb-2 opacity-50"></i>
-                            <p>No messages yet</p>
+                            <i class="fas fa-comments text-4xl mb-3 opacity-30"></i>
+                            <p class="text-lg font-medium">No messages yet</p>
+                            <p class="text-sm">Start the conversation!</p>
                         </div>
-                        <div class="space-y-2" x-show="chatMessages && chatMessages.length > 0">
+                        <div class="space-y-3" x-show="chatMessages && chatMessages.length > 0">
                             <template x-for="message in chatMessages" :key="message.id">
-                                <div class="flex items-start space-x-2">
+                                <div class="flex items-start space-x-3 p-2 hover:bg-white rounded-lg transition-colors">
                                     <img :src="message.avatar || '/images/default-avatar.png'"
                                          :alt="message.username"
-                                         class="w-6 h-6 rounded-full">
+                                         class="w-8 h-8 rounded-full border-2"
+                                         :class="message.isAdmin ? 'border-red-300' : 'border-blue-300'">
                                     <div class="flex-1">
-                                        <div class="flex items-center space-x-2">
-                                            <span class="text-sm font-medium" x-text="message.username"></span>
-                                            <span x-show="message.isAdmin" class="px-1 py-0.5 bg-red-100 text-red-800 text-xs rounded font-medium">ADMIN</span>
+                                        <div class="flex items-center space-x-2 mb-1">
+                                            <span class="text-sm font-semibold"
+                                                  :class="message.isAdmin ? 'text-red-700' : 'text-gray-900'"
+                                                  x-text="message.username"></span>
+                                            <span x-show="message.isAdmin" class="px-2 py-0.5 bg-red-100 text-red-800 text-xs rounded-full font-bold">ADMIN</span>
                                             <span class="text-xs text-gray-500" x-text="message.timestamp"></span>
                                         </div>
-                                        <div class="text-sm text-gray-700" x-text="message.text"></div>
+                                        <div class="text-sm text-gray-700 leading-relaxed" x-text="message.text"></div>
                                     </div>
                                 </div>
                             </template>
@@ -277,12 +365,12 @@
                         <div class="flex space-x-2">
                             <input type="text"
                                    x-model="newMessage"
-                                   placeholder="Type a message..."
-                                   class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                   placeholder="Type your message as admin..."
+                                   class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm"
                                    maxlength="500">
                             <button type="submit"
                                     :disabled="!newMessage.trim()"
-                                    class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                                    class="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-6 py-3 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md transform hover:scale-105">
                                 <i class="fas fa-paper-plane"></i>
                             </button>
                         </div>
@@ -1232,6 +1320,90 @@ function liveBroadcast() {
             `;
 
             document.body.insertAdjacentHTML('beforeend', modalContent);
+        },
+
+        // New helper functions for improved UX
+        async copyToClipboard(text) {
+            try {
+                await navigator.clipboard.writeText(text);
+                this.showNotification('Copied to clipboard!', 'success');
+            } catch (err) {
+                console.error('Failed to copy text: ', err);
+                this.showNotification('Failed to copy text', 'error');
+            }
+        },
+
+        showNotification(message, type = 'info') {
+            // Create a simple toast notification
+            const toast = document.createElement('div');
+            toast.className = `fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white z-50 transition-all transform translate-x-full`;
+
+            if (type === 'success') {
+                toast.className += ' bg-green-600';
+            } else if (type === 'error') {
+                toast.className += ' bg-red-600';
+            } else {
+                toast.className += ' bg-blue-600';
+            }
+
+            toast.textContent = message;
+            document.body.appendChild(toast);
+
+            // Animate in
+            setTimeout(() => {
+                toast.classList.remove('translate-x-full');
+            }, 100);
+
+            // Remove after 3 seconds
+            setTimeout(() => {
+                toast.classList.add('translate-x-full');
+                setTimeout(() => {
+                    document.body.removeChild(toast);
+                }, 300);
+            }, 3000);
+        },
+
+        refreshStream() {
+            this.loadViewers();
+            this.loadChat();
+            this.showNotification('Stream refreshed', 'success');
+        },
+
+        toggleFullscreen() {
+            const videoContainer = document.getElementById('localVideo').parentElement;
+            if (!document.fullscreenElement) {
+                videoContainer.requestFullscreen().catch(err => {
+                    console.error('Error attempting to enable fullscreen:', err);
+                    this.showNotification('Fullscreen not supported', 'error');
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        },
+
+        async takeScreenshot() {
+            try {
+                const video = document.querySelector('#localVideo video');
+                if (video) {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(video, 0, 0);
+
+                    const link = document.createElement('a');
+                    link.download = `stream-screenshot-${Date.now()}.png`;
+                    link.href = canvas.toDataURL();
+                    link.click();
+
+                    this.showNotification('Screenshot saved!', 'success');
+                } else {
+                    this.showNotification('No video stream available', 'error');
+                }
+            } catch (error) {
+                console.error('Screenshot error:', error);
+                this.showNotification('Failed to take screenshot', 'error');
+            }
         }
     };
 
@@ -1265,24 +1437,80 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 }
 
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
 .animate-pulse {
     animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-#localVideo {
-    background: #000;
+.animate-slide-in {
+    animation: slideInRight 0.3s ease-out;
 }
 
+#localVideo {
+    background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
+    border-radius: 0.5rem;
+}
+
+/* Enhanced scrollbar styling */
 #chatMessages::-webkit-scrollbar {
-    width: 4px;
+    width: 6px;
 }
 
 #chatMessages::-webkit-scrollbar-track {
-    background: #f1f1f1;
+    background: #f3f4f6;
+    border-radius: 3px;
 }
 
 #chatMessages::-webkit-scrollbar-thumb {
-    background: #888;
+    background: linear-gradient(180deg, #9ca3af 0%, #6b7280 100%);
+    border-radius: 3px;
+}
+
+#chatMessages::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #6b7280 0%, #4b5563 100%);
+}
+
+/* Button hover effects */
+.transform:hover {
+    transform: translateY(-1px);
+}
+
+/* Gradient backgrounds for cards */
+.gradient-card {
+    background: linear-gradient(135deg, #ffffff 0%, #f9fafb 100%);
+}
+
+/* Live indicator enhancement */
+.live-pulse::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(45deg, #ef4444, #dc2626, #b91c1c);
+    border-radius: inherit;
+    z-index: -1;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+/* Toast notification positioning */
+.toast-container {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 1000;
+}
     border-radius: 2px;
 }
 
