@@ -46,7 +46,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('/post-reports', [\App\Http\Controllers\Admin\PostManagementController::class, 'getPostReports']);
             Route::patch('/post-reports/{report}/status', [\App\Http\Controllers\Admin\PostManagementController::class, 'updateReportStatus']);
             Route::get('/dashboard-data', [DashboardController::class, 'getDashboardData']);
-            Route::get('/dashboard-charts', [DashboardController::class, 'getChartData']);
+            Route::get('/dashboard-charts', [DashboardController::class, 'getChartDataByPeriod']);
             Route::get('/users', [UserManagementController::class, 'getUsers']);
             Route::get('/social-circles', [UserManagementController::class, 'getSocialCircles']);
             Route::get('/countries', [UserManagementController::class, 'getCountries']);
