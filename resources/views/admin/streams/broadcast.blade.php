@@ -545,8 +545,13 @@ function liveBroadcast() {
                     }
                 });
 
-                // Play local video
-                this.localVideoTrack.play('localVideo');
+                // Play local video with proper DOM element clearing
+                const localVideoElement = document.getElementById('localVideo');
+                if (localVideoElement) {
+                    localVideoElement.innerHTML = '';
+                    this.localVideoTrack.play(localVideoElement);
+                    console.log('Initial local video track playing');
+                }
 
                 console.log('Local tracks initialized');
             } catch (error) {
@@ -734,8 +739,8 @@ function liveBroadcast() {
                         // Update reference immediately
                         this.localVideoTrack = newVideoTrack;
 
-                        // Play new track locally
-                        this.localVideoTrack.play('localVideo');
+                        // Use helper function to update preview
+                        this.updateVideoPreview(this.localVideoTrack);
                         console.log('New track playing locally');
 
                         // For live streams, let's try a different approach
@@ -787,7 +792,8 @@ function liveBroadcast() {
                                 }
                             });
 
-                            this.localVideoTrack.play('localVideo');
+                            // Use helper function to update preview
+                            this.updateVideoPreview(this.localVideoTrack);
 
                             // Restart stream
                             await new Promise(resolve => setTimeout(resolve, 500));
@@ -812,7 +818,10 @@ function liveBroadcast() {
                     }
 
                     this.localVideoTrack = newVideoTrack;
-                    this.localVideoTrack.play('localVideo');
+
+                    // Use helper function to update preview
+                    this.updateVideoPreview(this.localVideoTrack);
+                    console.log('Local preview updated for new camera (not streaming)');
                 }
 
                 // Update selected camera name
@@ -1367,6 +1376,31 @@ function liveBroadcast() {
             this.loadViewers();
             this.loadChat();
             this.showNotification('Stream refreshed', 'success');
+        },
+
+        // Helper function to properly update video preview
+        updateVideoPreview(videoTrack, elementId = 'localVideo') {
+            try {
+                const videoElement = document.getElementById(elementId);
+                if (!videoElement) {
+                    console.error('Video element not found:', elementId);
+                    return false;
+                }
+
+                // Clear any existing video content
+                videoElement.innerHTML = '';
+
+                // Wait a brief moment for DOM to update
+                setTimeout(() => {
+                    videoTrack.play(videoElement);
+                    console.log('Video preview updated for element:', elementId);
+                }, 50);
+
+                return true;
+            } catch (error) {
+                console.error('Error updating video preview:', error);
+                return false;
+            }
         },
 
         toggleFullscreen() {
