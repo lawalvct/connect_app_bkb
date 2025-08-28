@@ -321,7 +321,7 @@
                             </div>
                         </div>
                         <div class="ml-4">
-                            <p class="text-sm font-semibold text-gray-900 group-hover:text-purple-900">Manage Streams</p>
+                            <p class="text-sm font-semibold text-gray-900 group-hover:text-purple-900">Live Streams</p>
                             <p class="text-xs text-gray-600">Monitor live streams and broadcasts</p>
                         </div>
                         <div class="ml-auto">
@@ -339,7 +339,7 @@
                             </div>
                         </div>
                         <div class="ml-4">
-                            <p class="text-sm font-semibold text-gray-900 group-hover:text-yellow-900">Manage Ads</p>
+                            <p class="text-sm font-semibold text-gray-900 group-hover:text-yellow-900">Advertisements</p>
                             <p class="text-xs text-gray-600">Review and approve advertisements</p>
                         </div>
                         <div class="ml-auto">
@@ -348,8 +348,76 @@
                     </a>
                     @endcan
 
+                    <!-- Stories Management -->
+                    <a href="{{ route('admin.stories.index') }}"
+                       class="flex items-center p-4 bg-gradient-to-r from-orange-50 to-orange-100 hover:from-orange-100 hover:to-orange-200 rounded-lg transition-all duration-200 group shadow-sm">
+                        <div class="flex-shrink-0">
+                            <div class="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <i class="fas fa-images text-white"></i>
+                            </div>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-semibold text-gray-900 group-hover:text-orange-900">Manage Stories</p>
+                            <p class="text-xs text-gray-600">Monitor user stories and content</p>
+                        </div>
+                        <div class="ml-auto">
+                            <i class="fas fa-chevron-right text-gray-400 group-hover:text-orange-600"></i>
+                        </div>
+                    </a>
+
+                    <!-- Subscriptions Management -->
+                    <a href="{{ route('admin.subscriptions.index') }}"
+                       class="flex items-center p-4 bg-gradient-to-r from-emerald-50 to-emerald-100 hover:from-emerald-100 hover:to-emerald-200 rounded-lg transition-all duration-200 group shadow-sm">
+                        <div class="flex-shrink-0">
+                            <div class="w-10 h-10 bg-emerald-500 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <i class="fas fa-credit-card text-white"></i>
+                            </div>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-semibold text-gray-900 group-hover:text-emerald-900">Subscriptions</p>
+                            <p class="text-xs text-gray-600">Manage user subscriptions and plans</p>
+                        </div>
+                        <div class="ml-auto">
+                            <i class="fas fa-chevron-right text-gray-400 group-hover:text-emerald-600"></i>
+                        </div>
+                    </a>
+
+                    <!-- Push Notifications -->
+                    <a href="{{ route('admin.notifications.push.index') }}"
+                       class="flex items-center p-4 bg-gradient-to-r from-pink-50 to-pink-100 hover:from-pink-100 hover:to-pink-200 rounded-lg transition-all duration-200 group shadow-sm">
+                        <div class="flex-shrink-0">
+                            <div class="w-10 h-10 bg-pink-500 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <i class="fas fa-bell text-white"></i>
+                            </div>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-semibold text-gray-900 group-hover:text-pink-900">Push Notifications</p>
+                            <p class="text-xs text-gray-600">Send notifications to users</p>
+                        </div>
+                        <div class="ml-auto">
+                            <i class="fas fa-chevron-right text-gray-400 group-hover:text-pink-600"></i>
+                        </div>
+                    </a>
+
+                    <!-- Social Circles -->
+                    <a href="{{ route('admin.social-circles.index') }}"
+                       class="flex items-center p-4 bg-gradient-to-r from-teal-50 to-teal-100 hover:from-teal-100 hover:to-teal-200 rounded-lg transition-all duration-200 group shadow-sm">
+                        <div class="flex-shrink-0">
+                            <div class="w-10 h-10 bg-teal-500 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <i class="fas fa-circle-nodes text-white"></i>
+                            </div>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-semibold text-gray-900 group-hover:text-teal-900">Social Circles</p>
+                            <p class="text-xs text-gray-600">Manage social circle categories</p>
+                        </div>
+                        <div class="ml-auto">
+                            <i class="fas fa-chevron-right text-gray-400 group-hover:text-teal-600"></i>
+                        </div>
+                    </a>
+
                     @can('view-analytics')
-                    <a href="{{ route('admin.analytics') }}"
+                    <a href="{{ route('admin.analytics.index') }}"
                        class="flex items-center p-4 bg-gradient-to-r from-indigo-50 to-indigo-100 hover:from-indigo-100 hover:to-indigo-200 rounded-lg transition-all duration-200 group shadow-sm">
                         <div class="flex-shrink-0">
                             <div class="w-10 h-10 bg-indigo-500 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -357,7 +425,7 @@
                             </div>
                         </div>
                         <div class="ml-4">
-                            <p class="text-sm font-semibold text-gray-900 group-hover:text-indigo-900">View Analytics</p>
+                            <p class="text-sm font-semibold text-gray-900 group-hover:text-indigo-900">Analytics</p>
                             <p class="text-xs text-gray-600">Detailed reports and insights</p>
                         </div>
                         <div class="ml-auto">
@@ -366,8 +434,25 @@
                     </a>
                     @endcan
 
+                    <!-- Countries Management -->
+                    <a href="{{ route('admin.countries.index') }}"
+                       class="flex items-center p-4 bg-gradient-to-r from-cyan-50 to-cyan-100 hover:from-cyan-100 hover:to-cyan-200 rounded-lg transition-all duration-200 group shadow-sm">
+                        <div class="flex-shrink-0">
+                            <div class="w-10 h-10 bg-cyan-500 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <i class="fas fa-globe text-white"></i>
+                            </div>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-semibold text-gray-900 group-hover:text-cyan-900">Countries</p>
+                            <p class="text-xs text-gray-600">Manage country settings</p>
+                        </div>
+                        <div class="ml-auto">
+                            <i class="fas fa-chevron-right text-gray-400 group-hover:text-cyan-600"></i>
+                        </div>
+                    </a>
+
                     @can('manage-settings')
-                    <a href="{{ route('admin.settings') }}"
+                    <a href="{{ route('admin.settings.index') }}"
                        class="flex items-center p-4 bg-gradient-to-r from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 rounded-lg transition-all duration-200 group shadow-sm">
                         <div class="flex-shrink-0">
                             <div class="w-10 h-10 bg-gray-500 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">

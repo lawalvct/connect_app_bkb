@@ -80,6 +80,35 @@ class AnalyticsController extends Controller
             ->limit(10)
             ->get();
 
+        // Recent Activity Feed
+        $recentActivity = collect([
+            (object)[
+                'id' => 1,
+                'description' => 'New user registered',
+                'created_at' => Carbon::now()->subMinutes(5)
+            ],
+            (object)[
+                'id' => 2,
+                'description' => 'Post published by user',
+                'created_at' => Carbon::now()->subMinutes(12)
+            ],
+            (object)[
+                'id' => 3,
+                'description' => 'Stream started',
+                'created_at' => Carbon::now()->subMinutes(25)
+            ],
+            (object)[
+                'id' => 4,
+                'description' => 'New subscription purchased',
+                'created_at' => Carbon::now()->subHour()
+            ],
+            (object)[
+                'id' => 5,
+                'description' => 'Ad campaign approved',
+                'created_at' => Carbon::now()->subHours(2)
+            ]
+        ]);
+
         return view('admin.analytics.index', compact(
             'stats',
             'userGrowth',
@@ -87,6 +116,7 @@ class AnalyticsController extends Controller
             'topPosts',
             'revenueData',
             'popularCountries',
+            'recentActivity',
             'startDate',
             'endDate'
         ));
