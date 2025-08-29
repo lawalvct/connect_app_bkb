@@ -28,6 +28,11 @@ Route::get('/test-conversation', function () {
     return view('test-conversation');
 });
 
+// Test route for call functionality
+Route::get('/test-calls', function () {
+    return view('call-test');
+});
+
 // Firebase configuration test page
 Route::get('/firebase-test', function () {
     return view('firebase-test');
@@ -48,10 +53,20 @@ Route::post('/broadcasting/auth', function (Request $request) {
 Route::get('/test-users', function () {
     $users = \App\Models\User::take(5)->get(['id', 'name', 'email']);
     $output = '<h2>Test User Credentials (Password: 12345678 for all)</h2><ul>';
-    foreach($users as $user) {
-        $output .= '<li>ID: ' . $user->id . ', Name: ' . $user->name . ', Email: ' . $user->email . '</li>';
+
+    foreach ($users as $user) {
+        $output .= '<li>Email: ' . $user->email . ' | Name: ' . $user->name . ' | ID: ' . $user->id . '</li>';
     }
-    $output .= '</ul><br><a href="/test-conversation">Go to Chat Test</a>';
+
+    $output .= '</ul>';
+    $output .= '<br><h3>Quick Login Test:</h3>';
+    $output .= '<form method="POST" action="/api/v1/login" style="margin: 20px 0;">';
+    $output .= '<input type="email" name="email" placeholder="Email" required style="padding: 10px; margin: 5px;"><br>';
+    $output .= '<input type="password" name="password" placeholder="Password (12345678)" required style="padding: 10px; margin: 5px;"><br>';
+    $output .= '<button type="submit" style="padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; cursor: pointer;">Login & Get Token</button>';
+    $output .= '</form>';
+    $output .= '<p><a href="/test-calls" style="background: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px;">Go to Call Testing Interface</a></p>';
+
     return $output;
 });
 
