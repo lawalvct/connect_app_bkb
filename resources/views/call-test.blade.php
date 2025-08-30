@@ -980,14 +980,18 @@
 
                             const recentCalls = response.data.data.calls.filter(call => {
                                 // Look for calls initiated in the last 2 minutes that are still active
-                                const callTime = new Date(call.created_at);
+                                const callTime = new Date(call.started_at);
                                 const now = new Date();
                                 const timeDiff = (now - callTime) / 1000; // seconds
 
                                 this.log(`Checking call ${call.id}: status=${call.status}, timeDiff=${timeDiff}s, initiator=${call.initiator?.id}, currentUser=${this.currentUser?.id}`, 'info');
+                                this.log(`Call time: ${call.started_at}, Now: ${now.toISOString()}, Parsed time: ${callTime.toISOString()}`, 'info');
 
                                 return call.status === 'initiated' &&
+                                       !isNaN(timeDiff) && // Valid time calculation
+                                       timeDiff >= 0 && // Not in future
                                        timeDiff < 120 && // Within last 2 minutes
+                                       call.initiator?.id && this.currentUser?.id && // Both IDs exist
                                        call.initiator.id !== this.currentUser.id; // Not initiated by current user
                             });
 
