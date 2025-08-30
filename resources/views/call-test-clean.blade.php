@@ -636,30 +636,6 @@
                     <p>Camera: @{{ mediaStatus.camera ? 'On' : 'Off' }}</p>
                     <p>Microphone: @{{ mediaStatus.microphone ? 'On' : 'Off' }}</p>
                 </div>
-                <div class="status-card" :class="{ active: pollingActive }">
-                    <h4><i class="fas fa-radar"></i> Call Polling</h4>
-                    <p>@{{ pollingActive ? 'Active - Checking for calls' : 'Inactive' }}</p>
-                    <small v-if="pollingActive">Every 5 seconds</small>
-                </div>
-            </div>
-
-            <!-- Incoming Call Alert -->
-            <div v-if="currentCall && currentCall.status === 'initiated' && !userIsInitiator" class="card" style="border: 3px solid #28a745; background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);">
-                <h3 style="color: #155724;"><i class="fas fa-phone-volume"></i> 📞 Incoming Call!</h3>
-                <div style="text-align: center; padding: 20px;">
-                    <h4 style="color: #155724;">Call from: @{{ currentCall.initiator?.name || 'Unknown User' }}</h4>
-                    <p style="color: #155724;"><strong>Type:</strong> @{{ currentCall.call_type?.charAt(0).toUpperCase() + currentCall.call_type?.slice(1) }} Call</p>
-                    <p style="color: #155724;"><strong>Call ID:</strong> @{{ currentCall.id }}</p>
-
-                    <div style="margin-top: 20px;">
-                        <button @click="answerCall" class="btn btn-success" style="margin-right: 10px; font-size: 18px; padding: 15px 30px;">
-                            <i class="fas fa-phone"></i> Accept Call
-                        </button>
-                        <button @click="rejectCall" class="btn btn-danger" style="font-size: 18px; padding: 15px 30px;">
-                            <i class="fas fa-phone-slash"></i> Decline Call
-                        </button>
-                    </div>
-                </div>
             </div>
 
             <!-- Current Call Info -->
@@ -716,16 +692,6 @@
                     <!-- End Call -->
                     <button @click="endCall" :disabled="!currentCall" class="btn btn-warning">
                         <i class="fas fa-phone-hangup"></i> End Call
-                    </button>
-
-                    <!-- Manual Check for Incoming Calls -->
-                    <button @click="checkForIncomingCalls" class="btn btn-secondary">
-                        <i class="fas fa-search"></i> Check for Incoming Calls
-                    </button>
-
-                    <!-- Test Simulate Incoming Call -->
-                    <button @click="simulateIncomingCall" class="btn btn-info">
-                        <i class="fas fa-test-tube"></i> Simulate Incoming Call (Test)
                     </button>
 
                     <br><br>
@@ -833,9 +799,7 @@
                     lastResponse: '',
                     logId: 0,
                     callTimer: null,
-                    startTime: null,
-                    callPollingInterval: null,
-                    pollingActive: false
+                    startTime: null
                 }
             },
             computed: {
@@ -903,12 +867,6 @@
                             // Auto load conversations after login
                             setTimeout(() => {
                                 this.loadConversations();
-                                this.startCallPolling();
-
-                                // Request notification permission
-                                if ('Notification' in window && Notification.permission === 'default') {
-                                    Notification.requestPermission();
-                                }
                             }, 1000);
 
                         } else {
@@ -935,157 +893,28 @@
                     // Reset call state
                     this.resetCallState();
                     this.leaveAgoraChannel();
-                    this.stopCallPolling();
 
                     this.log('Logged out successfully', 'info');
-                },
-
-                startCallPolling() {
-                    if (this.pollingActive) return;
-
-                    this.pollingActive = true;
-                    this.log('Started polling for incoming calls', 'info');
-
-                    this.callPollingInterval = setInterval(async () => {
-                        await this.checkForIncomingCalls();
-                    }, 5000); // Poll every 5 seconds
-                },
-
-                stopCallPolling() {
-                    if (this.callPollingInterval) {
-                        clearInterval(this.callPollingInterval);
-                        this.callPollingInterval = null;
-                        this.pollingActive = false;
-                        this.log('Stopped polling for incoming calls', 'info');
-                    }
-                },
-
-                async checkForIncomingCalls() {
-                    try {
-                        // Only check if we're not already in a call
-                        if (this.currentCall) {
-                            this.log('Skipping poll - already in call', 'info');
-                            return;
-                        }
-
-                        this.log('🔍 Polling for incoming calls...', 'info');
-
-                        // Use call history to check for recent initiated calls
-                        const response = await axios.get(`${this.config.apiUrl}/calls/history`);
-
-                        this.log(`Poll response: ${JSON.stringify(response.data)}`, 'info');
-
-                        if (response.data.success && response.data.data && response.data.data.calls) {
-                            this.log(`Found ${response.data.data.calls.length} calls in history`, 'info');
-
-                            const recentCalls = response.data.data.calls.filter(call => {
-                                // Look for calls initiated in the last 2 minutes that are still active
-                                const callTime = new Date(call.created_at);
-                                const now = new Date();
-                                const timeDiff = (now - callTime) / 1000; // seconds
-
-                                this.log(`Checking call ${call.id}: status=${call.status}, timeDiff=${timeDiff}s, initiator=${call.initiator?.id}, currentUser=${this.currentUser?.id}`, 'info');
-
-                                return call.status === 'initiated' &&
-                                       timeDiff < 120 && // Within last 2 minutes
-                                       call.initiator.id !== this.currentUser.id; // Not initiated by current user
-                            });
-
-                            this.log(`Found ${recentCalls.length} relevant incoming calls`, 'info');
-
-                            if (recentCalls.length > 0) {
-                                const incomingCall = recentCalls[0]; // Get the most recent one
-                                this.currentCall = incomingCall;
-                                this.log(`📞 INCOMING CALL DETECTED! Call ID: ${incomingCall.id}`, 'success');
-                                this.log(`From: ${incomingCall.initiator?.name || 'Unknown'}`, 'info');
-                                this.callStatus.connected = true;
-                                this.callStatus.message = 'Incoming call';
-
-                                // Show a browser notification if supported
-                                if ('Notification' in window && Notification.permission === 'granted') {
-                                    new Notification('Incoming Call', {
-                                        body: `Call from ${incomingCall.initiator?.name || 'Unknown'}`,
-                                        icon: '/favicon.ico'
-                                    });
-                                }
-                            }
-                        } else {
-                            this.log('No calls found in history or invalid response', 'info');
-                        }
-                    } catch (error) {
-                        // Don't spam logs with polling errors unless it's important
-                        if (error.response?.status !== 404) {
-                            this.log(`❌ Error checking for incoming calls: ${error.response?.data?.message || error.message}`, 'error');
-                            this.log(`Full error: ${JSON.stringify(error.response?.data)}`, 'error');
-                        }
-                    }
-                },
-
-                simulateIncomingCall() {
-                    // Create a fake incoming call for testing
-                    this.currentCall = {
-                        id: 999,
-                        status: 'initiated',
-                        call_type: 'video',
-                        conversation_id: this.config.conversationId,
-                        initiator: {
-                            id: 9999,
-                            name: 'Test Caller',
-                            email: 'test@example.com'
-                        },
-                        participants: [],
-                        created_at: new Date().toISOString()
-                    };
-
-                    this.callStatus.connected = true;
-                    this.callStatus.message = 'Simulated incoming call';
-                    this.log('🧪 Simulated incoming call created for testing', 'success');
                 },
 
                 async loadConversations() {
                     this.conversationsLoading = true;
                     try {
-                        this.log('Loading conversations...', 'info');
-                        this.log(`API URL: ${this.config.apiUrl}/conversations`, 'info');
-                        this.log(`Auth Token: ${this.authToken ? 'Present' : 'Missing'}`, 'info');
-
                         const response = await axios.get(`${this.config.apiUrl}/conversations`);
 
-                        this.log(`API Response Status: ${response.status}`, 'info');
-                        this.log(`API Response Data: ${JSON.stringify(response.data)}`, 'info');
-
                         if (response.data.success) {
-                            // Handle different possible response structures
-                            let conversationsData = response.data.data;
-
-                            // If data is an object with conversations property
-                            if (conversationsData && typeof conversationsData === 'object' && conversationsData.conversations) {
-                                conversationsData = conversationsData.conversations;
-                            }
-
-                            // Ensure it's an array
-                            this.conversations = Array.isArray(conversationsData) ? conversationsData : [];
-
+                            this.conversations = response.data.data || [];
                             this.log(`Loaded ${this.conversations.length} conversations`, 'success');
 
                             // Auto-select first conversation if none selected
                             if (this.conversations.length > 0 && !this.config.conversationId) {
                                 this.selectConversation(this.conversations[0]);
-                            } else if (this.conversations.length === 0) {
-                                this.log('No conversations found', 'info');
                             }
                         } else {
-                            this.log(`Failed to load conversations: ${response.data.message || 'Unknown error'}`, 'error');
+                            this.log('Failed to load conversations', 'error');
                         }
                     } catch (error) {
                         this.log(`Error loading conversations: ${error.response?.data?.message || error.message}`, 'error');
-                        this.log(`Error status: ${error.response?.status}`, 'error');
-                        this.log(`Full error response: ${JSON.stringify(error.response?.data)}`, 'error');
-
-                        // Check if it's an authentication error
-                        if (error.response?.status === 401) {
-                            this.log('Authentication error - token may have expired', 'error');
-                        }
                     }
                     this.conversationsLoading = false;
                 },
@@ -1430,7 +1259,6 @@
                 if (this.callTimer) {
                     clearInterval(this.callTimer);
                 }
-                this.stopCallPolling();
                 this.leaveAgoraChannel();
             }
         }).mount('#app');

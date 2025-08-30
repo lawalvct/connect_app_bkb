@@ -148,6 +148,73 @@ Route::prefix('streams/{id}')->middleware('throttle:30,1')->group(function () {
             ], 500);
         }
     })->middleware('throttle:10,1');
+
+    // Check watch access for stream (unprotected but user-aware)
+    Route::get('/check-watch', function ($id) {
+        try {
+            $stream = \App\Models\Stream::findOrFail($id);
+            $user = null;
+            $hasAccess = false;
+            $reason = '';
+
+            // Check if user is authenticated
+            if (auth('sanctum')->check()) {
+                $user = auth('sanctum')->user();
+
+                // Check if stream is free
+                if (!$stream->is_paid || $stream->price <= 0) {
+                    $hasAccess = true;
+                    $reason = 'Free stream access granted';
+                } else {
+                    // Check if user has paid for the stream
+                    $hasAccess = $stream->hasUserPaid($user);
+                    $reason = $hasAccess ? 'Paid access verified' : 'Payment required to watch this premium stream';
+                }
+            } else {
+                // Unauthenticated user - can only watch free streams
+                if (!$stream->is_paid || $stream->price <= 0) {
+                    $hasAccess = true;
+                    $reason = 'Free stream access granted to guest user';
+                } else {
+                    $hasAccess = false;
+                    $reason = 'Authentication and payment required for premium stream';
+                }
+            }
+
+            // Additional checks
+            if ($stream->status !== 'live' && $stream->status !== 'scheduled') {
+                $hasAccess = false;
+                $reason = 'Stream is not currently available';
+            }
+
+            return response()->json([
+                'success' => true,
+                'has_access' => $hasAccess,
+                'reason' => $reason,
+                'stream_info' => [
+                    'id' => $stream->id,
+                    'title' => $stream->title,
+                    'status' => $stream->status,
+                    'is_paid' => $stream->is_paid,
+                    'price' => $stream->price,
+                    'currency' => $stream->currency,
+                    'free_minutes' => $stream->free_minutes ?? 0,
+                ],
+                'user_info' => $user ? [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'authenticated' => true
+                ] : [
+                    'authenticated' => false
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to check watch access: ' . $e->getMessage()
+            ], 500);
+        }
+    });
 });
 
 Route::middleware('auth:api')->get('/user', function (Request $request) {
@@ -466,6 +533,7 @@ Route::prefix('discover')->group(function () {
             // Stream participation (All users)
             Route::post('/{id}/join', [StreamController::class, 'join']);
             Route::post('/{id}/leave', [StreamController::class, 'leave']);
+            Route::get('/{id}/check-watch', [StreamController::class, 'checkWatchAccess']);
             Route::post('/{id}/chat', [\App\Http\Controllers\API\V1\StreamChatController::class, 'sendMessage']);
             Route::delete('/{streamId}/chats/{messageId}', [\App\Http\Controllers\API\V1\StreamChatController::class, 'deleteMessage']);
 

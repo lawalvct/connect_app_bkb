@@ -702,4 +702,117 @@ class StreamController extends BaseController
             'message' => 'You can continue watching.'
         ]);
     }
+
+    /**
+     * Check if authenticated user has access to watch a stream
+     */
+    public function checkWatchAccess(Request $request, $id)
+    {
+        try {
+            $stream = Stream::findOrFail($id);
+            $user = $request->user();
+            $hasAccess = false;
+            $reason = '';
+            $details = [];
+
+            // Check stream status first
+            if ($stream->status === 'ended') {
+                $hasAccess = false;
+                $reason = 'Stream has ended and is no longer available';
+            } elseif ($stream->status === 'upcoming') {
+                $hasAccess = false;
+                $reason = 'Stream has not started yet';
+            } elseif ($stream->status !== 'live') {
+                $hasAccess = false;
+                $reason = 'Stream is not currently live';
+            } else {
+                // Stream is live, check payment status
+                if (!$stream->is_paid || $stream->price <= 0) {
+                    $hasAccess = true;
+                    $reason = 'Free stream access granted';
+                } else {
+                    // Check if user has paid for the stream
+                    $hasAccess = $stream->hasUserPaid($user);
+                    $reason = $hasAccess ? 'Premium stream access verified' : 'Payment required for premium stream';
+
+                    if (!$hasAccess && $stream->free_minutes > 0) {
+                        // Check if user can still watch free minutes
+                        $viewer = $stream->viewers()->where('user_id', $user->id)->first();
+                        if ($viewer && $viewer->joined_at) {
+                            $minutesWatched = $viewer->joined_at->diffInMinutes(now());
+                            if ($minutesWatched < $stream->free_minutes) {
+                                $hasAccess = true;
+                                $reason = 'Free minutes still available';
+                                $details['free_minutes_remaining'] = $stream->free_minutes - $minutesWatched;
+                                $details['minutes_watched'] = $minutesWatched;
+                            } else {
+                                $reason = 'Free minutes exhausted - payment required';
+                                $details['minutes_watched'] = $minutesWatched;
+                            }
+                        } else {
+                            $hasAccess = true;
+                            $reason = 'Free minutes available for new viewer';
+                            $details['free_minutes_available'] = $stream->free_minutes;
+                        }
+                    }
+                }
+            }
+
+            // Get payment status details if it's a paid stream
+            $paymentDetails = null;
+            if ($stream->is_paid && $stream->price > 0) {
+                $completedPayment = $stream->completedPayments()->where('user_id', $user->id)->first();
+                $paymentDetails = [
+                    'has_paid' => (bool) $completedPayment,
+                    'payment_required' => !$completedPayment,
+                    'stream_price' => $stream->price,
+                    'currency' => $stream->currency,
+                    'free_minutes' => $stream->free_minutes ?? 0,
+                ];
+
+                if ($completedPayment) {
+                    $paymentDetails['payment_date'] = $completedPayment->paid_at;
+                    $paymentDetails['payment_reference'] = $completedPayment->reference;
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'has_access' => $hasAccess,
+                'reason' => $reason,
+                'details' => $details,
+                'stream_info' => [
+                    'id' => $stream->id,
+                    'title' => $stream->title,
+                    'description' => $stream->description,
+                    'status' => $stream->status,
+                    'is_paid' => $stream->is_paid,
+                    'price' => $stream->price,
+                    'currency' => $stream->currency,
+                    'free_minutes' => $stream->free_minutes ?? 0,
+                    'current_viewers' => $stream->current_viewers,
+                    'max_viewers' => $stream->max_viewers,
+                    'started_at' => $stream->started_at,
+                    'scheduled_at' => $stream->scheduled_at,
+                    'streamer' => [
+                        'id' => $stream->user->id,
+                        'name' => $stream->user->name,
+                        'username' => $stream->user->username ?? $stream->user->name,
+                    ],
+                ],
+                'payment_info' => $paymentDetails,
+                'user_info' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'authenticated' => true,
+                ],
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to check watch access: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
 }
