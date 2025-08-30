@@ -274,12 +274,26 @@
             overflow: hidden;
             position: relative;
             aspect-ratio: 16/9;
+            min-height: 200px;
         }
 
         .video-container video {
             width: 100%;
             height: 100%;
             object-fit: cover;
+            border-radius: 12px;
+        }
+
+        /* Ensure Agora video elements fill container */
+        .video-container > div {
+            width: 100%;
+            height: 100%;
+        }
+
+        .video-container > div > video {
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: cover !important;
         }
 
         .video-label {
@@ -615,9 +629,28 @@
                         </select>
                     </div>
                 </div>
-                <button @click="getDevices" class="btn btn-primary">
-                    <i class="fas fa-refresh"></i> Refresh Devices
-                </button>
+                <div class="device-controls" style="margin-top: 15px;">
+                    <button @click="getDevices" class="btn btn-primary">
+                        <i class="fas fa-refresh"></i> Refresh Devices
+                    </button>
+                    <button @click="testCameraPreview" class="btn btn-success" style="margin-left: 10px;">
+                        <i class="fas fa-play"></i> Test Camera (Agora)
+                    </button>
+                    <button @click="stopCameraPreview" class="btn btn-danger" style="margin-left: 10px;">
+                        <i class="fas fa-stop"></i> Stop Camera
+                    </button>
+                </div>
+                <div class="device-controls" style="margin-top: 10px;">
+                    <button @click="testNativeCamera" class="btn btn-info">
+                        <i class="fas fa-video"></i> Test Native Camera
+                    </button>
+                    <button @click="stopNativeCamera" class="btn btn-warning" style="margin-left: 10px;">
+                        <i class="fas fa-stop"></i> Stop Native
+                    </button>
+                    <small style="display: block; margin-top: 5px; color: #666;">
+                        Use "Test Native Camera" if Agora camera test doesn't work
+                    </small>
+                </div>
             </div>
 
             <!-- Call Status -->
@@ -689,6 +722,18 @@
                         <div class="video-label">Remote Video</div>
                         <div id="remote-video"></div>
                     </div>
+                </div>
+                <!-- Video Debugging Controls -->
+                <div class="video-controls" style="margin-top: 15px; text-align: center;">
+                    <button @click="checkRemoteUsers" class="btn btn-info">
+                        <i class="fas fa-search"></i> Check Remote Users
+                    </button>
+                    <button @click="forceRefreshRemoteVideo" class="btn btn-warning" style="margin-left: 10px;">
+                        <i class="fas fa-refresh"></i> Refresh Remote Video
+                    </button>
+                    <small style="display: block; margin-top: 5px; color: #666;">
+                        Use these if remote video isn't showing during calls
+                    </small>
                 </div>
             </div>
 
@@ -835,7 +880,8 @@
                     callTimer: null,
                     startTime: null,
                     callPollingInterval: null,
-                    pollingActive: false
+                    pollingActive: false,
+                    nativeStream: null
                 }
             },
             computed: {
@@ -1000,15 +1046,19 @@
                             if (recentCalls.length > 0) {
                                 const incomingCall = recentCalls[0]; // Get the most recent one
                                 this.currentCall = incomingCall;
+
+                                // Set the call type to match the incoming call
+                                this.config.callType = incomingCall.call_type;
                                 this.log(`📞 INCOMING CALL DETECTED! Call ID: ${incomingCall.id}`, 'success');
                                 this.log(`From: ${incomingCall.initiator?.name || 'Unknown'}`, 'info');
+                                this.log(`Call type: ${incomingCall.call_type}`, 'info');
                                 this.callStatus.connected = true;
                                 this.callStatus.message = 'Incoming call';
 
                                 // Show a browser notification if supported
                                 if ('Notification' in window && Notification.permission === 'granted') {
                                     new Notification('Incoming Call', {
-                                        body: `Call from ${incomingCall.initiator?.name || 'Unknown'}`,
+                                        body: `${incomingCall.call_type.toUpperCase()} call from ${incomingCall.initiator?.name || 'Unknown'}`,
                                         icon: '/favicon.ico'
                                     });
                                 }
@@ -1121,12 +1171,31 @@
 
                 async getDevices() {
                     try {
+                        // Request camera and microphone permissions first
+                        await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+
                         const devices = await AgoraRTC.getDevices();
                         this.devices.cameras = devices.filter(device => device.kind === 'videoinput');
                         this.devices.microphones = devices.filter(device => device.kind === 'audioinput');
+
                         this.log(`Found ${this.devices.cameras.length} cameras and ${this.devices.microphones.length} microphones`, 'info');
+
+                        // Set default devices if not already selected
+                        if (this.devices.cameras.length > 0 && !this.selectedCamera) {
+                            this.selectedCamera = this.devices.cameras[0].deviceId;
+                            this.log(`Selected default camera: ${this.devices.cameras[0].label}`, 'info');
+                        }
+
+                        if (this.devices.microphones.length > 0 && !this.selectedMicrophone) {
+                            this.selectedMicrophone = this.devices.microphones[0].deviceId;
+                            this.log(`Selected default microphone: ${this.devices.microphones[0].label}`, 'info');
+                        }
+
                     } catch (error) {
                         this.log(`Failed to get devices: ${error.message}`, 'error');
+                        if (error.name === 'NotAllowedError') {
+                            this.log('❌ Camera/microphone permission denied. Please allow access for video calls.', 'error');
+                        }
                     }
                 },
 
@@ -1173,6 +1242,10 @@
 
                         this.lastResponse = JSON.stringify(response.data, null, 2);
                         this.currentCall = response.data.data.call;
+
+                        // Set the call type to match the incoming call
+                        this.config.callType = this.currentCall.call_type;
+                        this.log(`Call type set to: ${this.config.callType}`, 'info');
 
                         this.log('Call answered successfully', 'success');
                         this.callStatus.message = 'Call answered';
@@ -1273,13 +1346,27 @@
 
                         // Create video track for video calls
                         if (this.config.callType === 'video' && (this.selectedCamera || this.devices.cameras.length > 0)) {
-                            this.localTracks.video = await AgoraRTC.createCameraVideoTrack({
-                                cameraId: this.selectedCamera || this.devices.cameras[0]?.deviceId
-                            });
-                            this.mediaStatus.camera = true;
+                            this.log('Creating video track...', 'info');
+                            try {
+                                this.localTracks.video = await AgoraRTC.createCameraVideoTrack({
+                                    cameraId: this.selectedCamera || this.devices.cameras[0]?.deviceId
+                                });
+                                this.mediaStatus.camera = true;
+                                this.log('Video track created successfully', 'success');
 
-                            // Play local video
-                            this.localTracks.video.play('local-video');
+                                // Play local video
+                                const localVideoElement = document.getElementById('local-video');
+                                if (localVideoElement) {
+                                    this.localTracks.video.play('local-video');
+                                    this.log('Local video playing in DOM element', 'success');
+                                } else {
+                                    this.log('❌ Local video DOM element not found!', 'error');
+                                }
+                            } catch (videoError) {
+                                this.log(`❌ Failed to create video track: ${videoError.message}`, 'error');
+                                this.log('Full video error:', 'error');
+                                console.error('Video track creation error:', videoError);
+                            }
                         }
 
                         // Publish tracks
@@ -1356,25 +1443,332 @@
                     }
                 },
 
-                handleUserPublished(user, mediaType) {
-                    this.log(`User ${user.uid} published ${mediaType}`, 'info');
+                async testCameraPreview() {
+                    try {
+                        this.log('🎥 Testing camera preview...', 'info');
+
+                        // Clear any existing video track
+                        if (this.localTracks.video) {
+                            this.localTracks.video.stop();
+                            this.localTracks.video.close();
+                            this.localTracks.video = null;
+                        }
+
+                        // Clear the video container
+                        const localVideoElement = document.getElementById('local-video');
+                        if (localVideoElement) {
+                            localVideoElement.innerHTML = '';
+                            this.log('Cleared local video container', 'info');
+                        } else {
+                            this.log('❌ Local video element not found!', 'error');
+                            return;
+                        }
+
+                        // Check if camera is selected
+                        if (!this.selectedCamera && this.devices.cameras.length === 0) {
+                            this.log('❌ No camera available. Please refresh devices first.', 'error');
+                            return;
+                        }
+
+                        this.log(`Using camera: ${this.selectedCamera || 'default'}`, 'info');
+                        this.log(`Available cameras: ${this.devices.cameras.length}`, 'info');
+
+                        // Log available cameras
+                        this.devices.cameras.forEach((camera, index) => {
+                            this.log(`Camera ${index}: ${camera.label || camera.deviceId}`, 'info');
+                        });
+
+                        // Create video track
+                        const cameraConfig = {
+                            cameraId: this.selectedCamera || this.devices.cameras[0]?.deviceId
+                        };
+
+                        this.log(`Camera config: ${JSON.stringify(cameraConfig)}`, 'info');
+
+                        this.localTracks.video = await AgoraRTC.createCameraVideoTrack(cameraConfig);
+                        this.log('✅ Video track created successfully', 'success');
+
+                        // Play in the local video container
+                        this.log('Attempting to play video in local container...', 'info');
+                        await this.localTracks.video.play('local-video');
+                        this.log('✅ Video play() method completed', 'success');
+
+                        // Check what was actually created
+                        setTimeout(() => {
+                            const container = document.getElementById('local-video');
+                            if (container) {
+                                this.log(`Container contents: ${container.innerHTML ? 'Has content' : 'Empty'}`, 'info');
+                                this.log(`Container children: ${container.children.length}`, 'info');
+
+                                const videos = container.querySelectorAll('video');
+                                this.log(`Video elements found: ${videos.length}`, 'info');
+
+                                videos.forEach((video, index) => {
+                                    this.log(`Video ${index}: width=${video.videoWidth}, height=${video.videoHeight}, playing=${!video.paused}`, 'info');
+                                });
+                            }
+                        }, 1000);
+
+                        this.mediaStatus.camera = true;
+
+                    } catch (error) {
+                        this.log(`❌ Camera preview failed: ${error.message}`, 'error');
+                        console.error('Camera preview error:', error);
+
+                        if (error.name === 'NotAllowedError') {
+                            this.log('❌ Camera permission denied. Please allow camera access.', 'error');
+                        } else if (error.name === 'NotFoundError') {
+                            this.log('❌ Camera not found. Please check device connection.', 'error');
+                        } else if (error.name === 'NotReadableError') {
+                            this.log('❌ Camera is already in use by another application.', 'error');
+                        }
+                    }
+                },
+
+                async stopCameraPreview() {
+                    try {
+                        if (this.localTracks.video) {
+                            this.localTracks.video.stop();
+                            this.localTracks.video.close();
+                            this.localTracks.video = null;
+                            this.mediaStatus.camera = false;
+
+                            // Clear video container
+                            const localVideoElement = document.getElementById('local-video');
+                            if (localVideoElement) {
+                                localVideoElement.innerHTML = '';
+                            }
+
+                            this.log('Camera preview stopped', 'info');
+                        }
+                    } catch (error) {
+                        this.log(`Error stopping camera: ${error.message}`, 'error');
+                    }
+                },
+
+                async testNativeCamera() {
+                    try {
+                        this.log('🎥 Testing native camera access...', 'info');
+
+                        // Clear container
+                        const localVideoElement = document.getElementById('local-video');
+                        if (localVideoElement) {
+                            localVideoElement.innerHTML = '';
+                        }
+
+                        // Create video element
+                        const video = document.createElement('video');
+                        video.style.width = '100%';
+                        video.style.height = '100%';
+                        video.style.objectFit = 'cover';
+                        video.autoplay = true;
+                        video.muted = true;
+                        video.playsInline = true;
+
+                        // Get camera stream
+                        const constraints = {
+                            video: {
+                                deviceId: this.selectedCamera ? { exact: this.selectedCamera } : undefined,
+                                width: { ideal: 640 },
+                                height: { ideal: 480 }
+                            }
+                        };
+
+                        this.log(`Native camera constraints: ${JSON.stringify(constraints)}`, 'info');
+
+                        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                        video.srcObject = stream;
+
+                        localVideoElement.appendChild(video);
+
+                        this.log('✅ Native camera test successful', 'success');
+                        this.log('Video should now be visible in the Local Video container', 'success');
+
+                        // Store stream reference for cleanup
+                        this.nativeStream = stream;
+
+                    } catch (error) {
+                        this.log(`❌ Native camera test failed: ${error.message}`, 'error');
+                        console.error('Native camera error:', error);
+                    }
+                },
+
+                stopNativeCamera() {
+                    if (this.nativeStream) {
+                        this.nativeStream.getTracks().forEach(track => track.stop());
+                        this.nativeStream = null;
+
+                        const localVideoElement = document.getElementById('local-video');
+                        if (localVideoElement) {
+                            localVideoElement.innerHTML = '';
+                        }
+
+                        this.log('Native camera stopped', 'info');
+                    }
+                },
+
+                checkRemoteUsers() {
+                    try {
+                        this.log('🔍 Checking for remote users in channel...', 'info');
+
+                        if (!this.agoraClient) {
+                            this.log('❌ Agora client not initialized', 'error');
+                            return;
+                        }
+
+                        const remoteUsers = this.agoraClient.remoteUsers;
+                        this.log(`Found ${remoteUsers.length} remote users`, 'info');
+
+                        remoteUsers.forEach(user => {
+                            this.log(`Remote user ${user.uid}:`, 'info');
+                            this.log(`  - Has video track: ${!!user.videoTrack}`, 'info');
+                            this.log(`  - Has audio track: ${!!user.audioTrack}`, 'info');
+
+                            if (user.videoTrack) {
+                                this.log(`  - Video track enabled: ${user.videoTrack.enabled}`, 'info');
+                                this.log(`  - Video track muted: ${user.videoTrack.muted}`, 'info');
+                            }
+                        });
+
+                        // Check remote video container
+                        const remoteVideoElement = document.getElementById('remote-video');
+                        if (remoteVideoElement) {
+                            const videoElements = remoteVideoElement.querySelectorAll('video');
+                            this.log(`Remote video container has ${videoElements.length} video elements`, 'info');
+                        }
+
+                    } catch (error) {
+                        this.log(`❌ Error checking remote users: ${error.message}`, 'error');
+                    }
+                },
+
+                async forceRefreshRemoteVideo() {
+                    try {
+                        this.log('🔄 Force refreshing remote video...', 'info');
+
+                        if (!this.agoraClient) {
+                            this.log('❌ Agora client not initialized', 'error');
+                            return;
+                        }
+
+                        const remoteUsers = this.agoraClient.remoteUsers;
+                        const remoteVideoElement = document.getElementById('remote-video');
+
+                        if (remoteVideoElement) {
+                            remoteVideoElement.innerHTML = '';
+                        }
+
+                        for (const user of remoteUsers) {
+                            if (user.videoTrack && user.hasVideo) {
+                                this.log(`Attempting to re-display video for user ${user.uid}`, 'info');
+                                try {
+                                    user.videoTrack.play('remote-video');
+                                    this.log(`Re-played video for user ${user.uid}`, 'success');
+                                } catch (error) {
+                                    this.log(`Failed to re-play video for user ${user.uid}: ${error.message}`, 'error');
+                                }
+                            }
+                        }
+
+                    } catch (error) {
+                        this.log(`❌ Error refreshing remote video: ${error.message}`, 'error');
+                    }
+                },                handleUserPublished(user, mediaType) {
+                    this.log(`📡 User ${user.uid} published ${mediaType}`, 'info');
 
                     this.agoraClient.subscribe(user, mediaType).then(() => {
+                        this.log(`✅ Successfully subscribed to user ${user.uid} ${mediaType}`, 'success');
+
                         if (mediaType === 'video') {
-                            user.videoTrack.play('remote-video');
+                            this.log(`🎥 Processing remote video from user ${user.uid}`, 'info');
+
+                            const remoteVideoElement = document.getElementById('remote-video');
+                            if (!remoteVideoElement) {
+                                this.log('❌ Remote video container not found!', 'error');
+                                return;
+                            }
+
+                            if (!user.videoTrack) {
+                                this.log('❌ No video track on user object', 'error');
+                                return;
+                            }
+
+                            try {
+                                // Clear any existing content first
+                                remoteVideoElement.innerHTML = '';
+                                this.log('Cleared remote video container', 'info');
+
+                                // Play the video track
+                                user.videoTrack.play('remote-video');
+                                this.log('🎬 Remote video play() method called', 'success');
+
+                                // Check if video was actually created after a short delay
+                                setTimeout(() => {
+                                    const container = document.getElementById('remote-video');
+                                    if (container) {
+                                        const videoElements = container.querySelectorAll('video');
+                                        this.log(`Remote container has ${videoElements.length} video elements`, 'info');
+
+                                        videoElements.forEach((video, index) => {
+                                            this.log(`Remote video ${index}: ${video.videoWidth}x${video.videoHeight}, playing=${!video.paused}`, 'info');
+
+                                            // Ensure video fills container
+                                            video.style.width = '100%';
+                                            video.style.height = '100%';
+                                            video.style.objectFit = 'cover';
+                                            video.style.display = 'block';
+                                        });
+
+                                        if (videoElements.length === 0) {
+                                            this.log('❌ No video elements were created in remote container', 'error');
+                                        } else {
+                                            this.log('✅ Remote video should now be visible', 'success');
+                                        }
+                                    }
+                                }, 1000);
+
+                            } catch (videoPlayError) {
+                                this.log(`❌ Failed to play remote video: ${videoPlayError.message}`, 'error');
+                                console.error('Remote video play error:', videoPlayError);
+                            }
+
                         } else if (mediaType === 'audio') {
-                            user.audioTrack.play();
+                            this.log(`🔊 Processing remote audio from user ${user.uid}`, 'info');
+                            if (user.audioTrack) {
+                                user.audioTrack.play();
+                                this.log('✅ Remote audio playing', 'success');
+                            } else {
+                                this.log('❌ Remote audio track missing', 'error');
+                            }
                         }
+                    }).catch(error => {
+                        this.log(`❌ Failed to subscribe to user ${user.uid} ${mediaType}: ${error.message}`, 'error');
+                        console.error('Subscription error:', error);
                     });
                 },
 
                 handleUserUnpublished(user, mediaType) {
-                    this.log(`User ${user.uid} unpublished ${mediaType}`, 'info');
+                    this.log(`📤 User ${user.uid} unpublished ${mediaType}`, 'info');
+
+                    if (mediaType === 'video') {
+                        // Clear remote video when user stops publishing video
+                        const remoteVideoElement = document.getElementById('remote-video');
+                        if (remoteVideoElement) {
+                            remoteVideoElement.innerHTML = '';
+                            this.log('Cleared remote video container due to unpublish', 'info');
+                        }
+                    }
                 },
 
                 handleUserLeft(user) {
-                    this.log(`User ${user.uid} left the channel`, 'info');
-                    document.getElementById('remote-video').innerHTML = '';
+                    this.log(`👋 User ${user.uid} left the channel`, 'info');
+
+                    // Clear remote video container
+                    const remoteVideoElement = document.getElementById('remote-video');
+                    if (remoteVideoElement) {
+                        remoteVideoElement.innerHTML = '';
+                        this.log('Cleared remote video container - user left', 'info');
+                    }
                 },
 
                 startCallTimer() {
