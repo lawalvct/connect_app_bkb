@@ -842,7 +842,7 @@ class ProfileController extends BaseController
         $validator = Validator::make($request->all(), [
             'image_id' => 'required|integer',
             'image_type' => 'required|string|in:profile_multi,user_profile',
-            'new_image' => "required|file|image|mimes:jpeg,png,jpg,gif,webp|max:{$maxFileSize}", // Dynamic max from settings
+'new_image' => "required|file|mimes:jpeg,png,jpg,gif,webp,mp4,mov,avi,wmv,flv,webm,3gp,mkv,m4v,pdf,doc,docx|max:{$maxFileSize}", // Dynamic max from settings
             'upload_type' => 'nullable|string|in:s3,local',
         ]);
 
