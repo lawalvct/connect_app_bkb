@@ -3,6 +3,7 @@
 namespace App\Http\Requests\V1;
 
 use Illuminate\Foundation\Http\FormRequest;
+use App\Models\Setting;
 
 class CreateStoryRequest extends FormRequest
 {
@@ -13,10 +14,13 @@ class CreateStoryRequest extends FormRequest
 
     public function rules(): array
     {
+        // Get max file upload size from settings table (in KB), default to 50MB (50000 KB)
+        $maxFileSize = Setting::getValue('max_file_upload_size', 50000);
+
         return [
             'type' => 'required|in:text,image,video',
             'content' => 'nullable',
-            'file' => 'required|max:50000', // 50MB max
+            'file' => "required|max:{$maxFileSize}", // Dynamic max from settings
             'caption' => 'nullable|string|max:500',
             'background_color' => 'nullable|string|regex:/^#[0-9A-Fa-f]{6}$/',
             'font_settings' => 'nullable|array',
@@ -49,10 +53,14 @@ class CreateStoryRequest extends FormRequest
 
     public function messages(): array
     {
+        // Get max file upload size from settings for error message
+        $maxFileSize = Setting::getValue('max_file_upload_size', 50000);
+        $maxFileSizeMB = round($maxFileSize / 1024, 1); // Convert KB to MB
+
         return [
             'content.required_if' => 'Content is required for text stories.',
             'file.required_if' => 'File is required for image and video stories.',
-            'file.max' => 'File size cannot exceed 50MB.',
+            'file.max' => "File size cannot exceed {$maxFileSizeMB}MB.",
             'background_color.regex' => 'Background color must be a valid hex color (e.g., #FF0000).',
         ];
     }

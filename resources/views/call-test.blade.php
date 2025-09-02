@@ -731,8 +731,17 @@
                     <button @click="forceRefreshRemoteVideo" class="btn btn-warning" style="margin-left: 10px;">
                         <i class="fas fa-refresh"></i> Refresh Remote Video
                     </button>
+                    <button @click="verifyChannelSync" class="btn btn-primary" style="margin-left: 10px;">
+                        <i class="fas fa-sync"></i> Verify Channel
+                    </button>
+                    <button @click="runComprehensiveDiagnostic" class="btn btn-danger" style="margin-left: 10px;">
+                        <i class="fas fa-stethoscope"></i> Full Diagnostic
+                    </button>
+                    <button @click="forceReconnectAgora" class="btn btn-secondary" style="margin-left: 10px;">
+                        <i class="fas fa-sync-alt"></i> Force Reconnect
+                    </button>
                     <small style="display: block; margin-top: 5px; color: #666;">
-                        Use these if remote video isn't showing during calls
+                        Use "Verify Channel" to check if both users are in the same channel
                     </small>
                 </div>
             </div>
@@ -741,6 +750,19 @@
             <div class="card">
                 <h3><i class="fas fa-gamepad"></i> Call Controls</h3>
                 <div class="controls-section">
+                    <!-- Quick Call Type Buttons -->
+                    <div style="margin-bottom: 15px;">
+                        <button @click="config.callType = 'video'; log('Call type set to VIDEO', 'info')" class="btn btn-info" style="margin-right: 10px;">
+                            <i class="fas fa-video"></i> Set Video Call
+                        </button>
+                        <button @click="config.callType = 'audio'; log('Call type set to AUDIO', 'info')" class="btn btn-secondary">
+                            <i class="fas fa-phone"></i> Set Audio Call
+                        </button>
+                        <small style="display: block; margin-top: 5px; color: #666;">
+                            Current call type: <strong>@{{ config.callType.toUpperCase() }}</strong>
+                        </small>
+                    </div>
+
                     <!-- Initiate Call -->
                     <button @click="initiateCall" :disabled="loading || currentCall || !config.conversationId" class="btn btn-primary">
                         <div v-if="loading" class="loading"></div>
@@ -1162,6 +1184,8 @@
                         this.agoraClient.on("user-published", this.handleUserPublished);
                         this.agoraClient.on("user-unpublished", this.handleUserUnpublished);
                         this.agoraClient.on("user-left", this.handleUserLeft);
+                        this.agoraClient.on("user-joined", this.handleUserJoined);
+                        this.agoraClient.on("connection-state-change", this.handleConnectionStateChange);
 
                         this.log('Agora client initialized', 'success');
                     } catch (error) {
@@ -1238,25 +1262,32 @@
                     if (!this.currentCall) return;
 
                     try {
+                        this.log('📞 Answering call...', 'info');
                         const response = await axios.post(`${this.config.apiUrl}/calls/${this.currentCall.id}/answer`);
 
                         this.lastResponse = JSON.stringify(response.data, null, 2);
                         this.currentCall = response.data.data.call;
 
+                        // CRITICAL: Set the Agora configuration from the response
+                        this.agoraConfig = response.data.data.agora_config;
+                        this.log(`🔧 Agora config received: ${JSON.stringify(this.agoraConfig)}`, 'info');
+
                         // Set the call type to match the incoming call
                         this.config.callType = this.currentCall.call_type;
-                        this.log(`Call type set to: ${this.config.callType}`, 'info');
+                        this.log(`📱 Call type set to: ${this.config.callType}`, 'info');
 
-                        this.log('Call answered successfully', 'success');
+                        this.log('✅ Call answered successfully', 'success');
                         this.callStatus.message = 'Call answered';
+                        this.callStatus.connected = true;
 
                         // Join Agora channel if not already joined
                         if (!this.agoraStatus.connected) {
+                            this.log('🌐 Joining Agora channel...', 'info');
                             await this.joinAgoraChannel();
                         }
 
                     } catch (error) {
-                        this.log(`Failed to answer call: ${error.response?.data?.message || error.message}`, 'error');
+                        this.log(`❌ Failed to answer call: ${error.response?.data?.message || error.message}`, 'error');
                         this.lastResponse = JSON.stringify(error.response?.data || error.message, null, 2);
                     }
                 },
@@ -1310,73 +1341,133 @@
                 },
 
                 async joinAgoraChannel() {
-                    if (!this.agoraConfig || !this.agoraClient) return;
+                    if (!this.agoraConfig || !this.agoraClient) {
+                        this.log('❌ Cannot join Agora channel - missing config or client', 'error');
+                        this.log(`AgoraConfig present: ${!!this.agoraConfig}`, 'error');
+                        this.log(`AgoraClient present: ${!!this.agoraClient}`, 'error');
+                        return;
+                    }
 
                     try {
+                        this.log('🌐 Joining Agora channel with config:', 'info');
+                        this.log(`  - App ID: ${this.agoraConfig.app_id}`, 'info');
+                        this.log(`  - Channel: ${this.agoraConfig.channel_name}`, 'info');
+                        this.log(`  - UID: ${this.agoraConfig.uid}`, 'info');
+                        this.log(`  - Token present: ${!!this.agoraConfig.token}`, 'info');
+                        this.log(`  - Current connection state: ${this.agoraClient.connectionState}`, 'info');
+
                         // Join the channel
-                        await this.agoraClient.join(
+                        const joinResult = await this.agoraClient.join(
                             this.agoraConfig.app_id,
                             this.agoraConfig.channel_name,
                             this.agoraConfig.token,
                             this.agoraConfig.uid
                         );
 
-                        this.log(`Joined Agora channel: ${this.agoraConfig.channel_name}`, 'success');
+                        this.log(`✅ Joined Agora channel: ${this.agoraConfig.channel_name}`, 'success');
+                        this.log(`✅ Join result UID: ${joinResult}`, 'success');
+                        this.log(`✅ Connection state after join: ${this.agoraClient.connectionState}`, 'success');
+
                         this.agoraStatus.connected = true;
                         this.agoraStatus.message = 'Connected to Agora';
 
+                        // Wait a moment for connection to stabilize
+                        await new Promise(resolve => setTimeout(resolve, 500));
+
                         // Create and publish local tracks
+                        this.log('🎬 Creating local tracks...', 'info');
                         await this.createLocalTracks();
 
                     } catch (error) {
-                        this.log(`Failed to join Agora channel: ${error.message}`, 'error');
+                        this.log(`❌ Failed to join Agora channel: ${error.message}`, 'error');
+                        this.log(`❌ Error code: ${error.code}`, 'error');
+                        this.log(`❌ Error details: ${JSON.stringify(error)}`, 'error');
                         this.agoraStatus.message = 'Agora connection failed';
+                        this.agoraStatus.connected = false;
                     }
                 },
 
                 async createLocalTracks() {
                     try {
+                        this.log(`🎬 Creating local tracks for ${this.config.callType} call`, 'info');
+
+                        // Clear any existing video tracks first
+                        if (this.localTracks.video) {
+                            this.log('Cleaning up existing video track', 'info');
+                            this.localTracks.video.stop();
+                            this.localTracks.video.close();
+                            this.localTracks.video = null;
+                            this.mediaStatus.camera = false;
+                        }
+
+                        // Clear any existing audio tracks first
+                        if (this.localTracks.audio) {
+                            this.log('Cleaning up existing audio track', 'info');
+                            this.localTracks.audio.stop();
+                            this.localTracks.audio.close();
+                            this.localTracks.audio = null;
+                            this.mediaStatus.microphone = false;
+                        }
+
                         // Create audio track
                         if (this.selectedMicrophone || this.devices.microphones.length > 0) {
+                            this.log('🎤 Creating audio track...', 'info');
                             this.localTracks.audio = await AgoraRTC.createMicrophoneAudioTrack({
                                 microphoneId: this.selectedMicrophone || this.devices.microphones[0]?.deviceId
                             });
                             this.mediaStatus.microphone = true;
+                            this.log('✅ Audio track created successfully', 'success');
                         }
 
-                        // Create video track for video calls
-                        if (this.config.callType === 'video' && (this.selectedCamera || this.devices.cameras.length > 0)) {
-                            this.log('Creating video track...', 'info');
-                            try {
-                                this.localTracks.video = await AgoraRTC.createCameraVideoTrack({
-                                    cameraId: this.selectedCamera || this.devices.cameras[0]?.deviceId
-                                });
-                                this.mediaStatus.camera = true;
-                                this.log('Video track created successfully', 'success');
+                        // Create video track ONLY for video calls
+                        if (this.config.callType === 'video') {
+                            this.log(`📹 Call type is VIDEO - creating video track`, 'info');
+                            if (this.selectedCamera || this.devices.cameras.length > 0) {
+                                try {
+                                    this.localTracks.video = await AgoraRTC.createCameraVideoTrack({
+                                        cameraId: this.selectedCamera || this.devices.cameras[0]?.deviceId
+                                    });
+                                    this.mediaStatus.camera = true;
+                                    this.log('✅ Video track created successfully', 'success');
 
-                                // Play local video
-                                const localVideoElement = document.getElementById('local-video');
-                                if (localVideoElement) {
-                                    this.localTracks.video.play('local-video');
-                                    this.log('Local video playing in DOM element', 'success');
-                                } else {
-                                    this.log('❌ Local video DOM element not found!', 'error');
+                                    // Play local video
+                                    const localVideoElement = document.getElementById('local-video');
+                                    if (localVideoElement) {
+                                        this.localTracks.video.play('local-video');
+                                        this.log('✅ Local video playing in DOM element', 'success');
+                                    } else {
+                                        this.log('❌ Local video DOM element not found!', 'error');
+                                    }
+                                } catch (videoError) {
+                                    this.log(`❌ Failed to create video track: ${videoError.message}`, 'error');
+                                    console.error('Video track creation error:', videoError);
                                 }
-                            } catch (videoError) {
-                                this.log(`❌ Failed to create video track: ${videoError.message}`, 'error');
-                                this.log('Full video error:', 'error');
-                                console.error('Video track creation error:', videoError);
+                            } else {
+                                this.log('❌ No camera available for video call', 'error');
+                            }
+                        } else {
+                            this.log(`🔊 Call type is AUDIO - skipping video track creation`, 'info');
+                            // Clear local video container for audio calls
+                            const localVideoElement = document.getElementById('local-video');
+                            if (localVideoElement) {
+                                localVideoElement.innerHTML = '';
                             }
                         }
 
                         // Publish tracks
                         const tracks = Object.values(this.localTracks).filter(track => track);
+                        this.log(`📤 Publishing ${tracks.length} tracks:`, 'info');
+                        tracks.forEach((track, index) => {
+                            const trackType = track === this.localTracks.video ? 'video' : 'audio';
+                            this.log(`  Track ${index}: ${trackType} (enabled: ${track.enabled})`, 'info');
+                        });
+
                         if (tracks.length > 0) {
                             await this.agoraClient.publish(tracks);
-                            this.log('Local tracks published', 'success');
-                        }
-
-                    } catch (error) {
+                            this.log('✅ Local tracks published successfully', 'success');
+                        } else {
+                            this.log('⚠️ No tracks to publish', 'error');
+                        }                    } catch (error) {
                         this.log(`Failed to create local tracks: ${error.message}`, 'error');
                     }
                 },
@@ -1673,78 +1764,251 @@
                     } catch (error) {
                         this.log(`❌ Error refreshing remote video: ${error.message}`, 'error');
                     }
+                },
+
+                async runComprehensiveDiagnostic() {
+                    this.log('🔍 Running comprehensive video diagnostic...', 'info');
+                    this.log('==================================================', 'info');
+
+                    // 1. Check authentication
+                    this.log(`1. Authentication: ${this.isAuthenticated ? '✅' : '❌'}`, 'info');
+                    if (this.currentUser) {
+                        this.log(`   Current user: ${this.currentUser.name} (ID: ${this.currentUser.id})`, 'info');
+                    }
+
+                    // 2. Check call state
+                    this.log(`2. Call state: ${this.currentCall ? '✅ Call active' : '❌ No call'}`, 'info');
+                    if (this.currentCall) {
+                        this.log(`   Call ID: ${this.currentCall.id}`, 'info');
+                        this.log(`   Call type: ${this.currentCall.call_type}`, 'info');
+                        this.log(`   Call status: ${this.currentCall.status}`, 'info');
+                    }
+
+                    // 3. Check Agora configuration
+                    this.log(`3. Agora config: ${this.agoraConfig ? '✅' : '❌'}`, 'info');
+                    if (this.agoraConfig) {
+                        this.log(`   Channel: ${this.agoraConfig.channel_name}`, 'info');
+                        this.log(`   UID: ${this.agoraConfig.uid}`, 'info');
+                        this.log(`   Token present: ${!!this.agoraConfig.token}`, 'info');
+                        this.log(`   App ID: ${this.agoraConfig.app_id}`, 'info');
+                    }
+
+                    // 4. Check Agora client and connection
+                    this.log(`4. Agora client: ${this.agoraClient ? '✅' : '❌'}`, 'info');
+                    this.log(`   Connected: ${this.agoraStatus.connected ? '✅' : '❌'}`, 'info');
+
+                    if (this.agoraClient) {
+                        this.log(`   Connection state: ${this.agoraClient.connectionState}`, 'info');
+                        this.log(`   Local UID: ${this.agoraClient.uid}`, 'info');
+                    }
+
+                    // 5. Check devices
+                    this.log(`5. Devices:`, 'info');
+                    this.log(`   Cameras: ${this.devices.cameras.length}`, 'info');
+                    this.log(`   Selected camera: ${this.selectedCamera || 'None'}`, 'info');
+                    this.log(`   Microphones: ${this.devices.microphones.length}`, 'info');
+
+                    // 6. Check local tracks
+                    this.log(`6. Local tracks:`, 'info');
+                    this.log(`   Video track: ${this.localTracks.video ? '✅' : '❌'}`, 'info');
+                    if (this.localTracks.video) {
+                        this.log(`     Enabled: ${this.localTracks.video.enabled}`, 'info');
+                        this.log(`     Muted: ${this.localTracks.video.muted}`, 'info');
+                    }
+                    this.log(`   Audio track: ${this.localTracks.audio ? '✅' : '❌'}`, 'info');
+
+                    // 7. Check remote users
+                    if (this.agoraClient) {
+                        const remoteUsers = this.agoraClient.remoteUsers;
+                        this.log(`7. Remote users: ${remoteUsers.length}`, 'info');
+                        remoteUsers.forEach((user, index) => {
+                            this.log(`   User ${index + 1} (UID: ${user.uid}):`, 'info');
+                            this.log(`     Has video: ${user.hasVideo ? '✅' : '❌'}`, 'info');
+                            this.log(`     Video track: ${user.videoTrack ? '✅' : '❌'}`, 'info');
+                            this.log(`     Has audio: ${user.hasAudio ? '✅' : '❌'}`, 'info');
+                            this.log(`     Audio track: ${user.audioTrack ? '✅' : '❌'}`, 'info');
+                        });
+                    }
+
+                    // 8. Check video containers
+                    this.log(`8. Video containers:`, 'info');
+                    const localContainer = document.getElementById('local-video');
+                    const remoteContainer = document.getElementById('remote-video');
+                    this.log(`   Local container: ${localContainer ? '✅' : '❌'}`, 'info');
+                    this.log(`   Remote container: ${remoteContainer ? '✅' : '❌'}`, 'info');
+
+                    if (localContainer) {
+                        this.log(`   Local videos: ${localContainer.querySelectorAll('video').length}`, 'info');
+                    }
+                    if (remoteContainer) {
+                        this.log(`   Remote videos: ${remoteContainer.querySelectorAll('video').length}`, 'info');
+                    }
+
+                    this.log('==================================================', 'info');
+                    this.log('✅ Diagnostic complete', 'success');
+                },
+
+                async forceReconnectAgora() {
+                    try {
+                        this.log('🔄 Force reconnecting to Agora channel...', 'info');
+
+                        // Leave current channel if connected
+                        if (this.agoraClient && this.agoraStatus.connected) {
+                            await this.leaveAgoraChannel();
+                        }
+
+                        // Wait a moment
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+
+                        // Rejoin the channel
+                        if (this.agoraConfig) {
+                            await this.joinAgoraChannel();
+                        } else {
+                            this.log('❌ No Agora config available for reconnection', 'error');
+                        }
+
+                    } catch (error) {
+                        this.log(`❌ Force reconnect failed: ${error.message}`, 'error');
+                    }
+                },
+
+                async verifyChannelSync() {
+                    this.log('🔍 Verifying channel synchronization...', 'info');
+
+                    if (!this.agoraClient || !this.agoraStatus.connected) {
+                        this.log('❌ Not connected to Agora channel', 'error');
+                        return false;
+                    }
+
+                    const remoteUsers = this.agoraClient.remoteUsers;
+                    this.log(`📊 Channel Status:`, 'info');
+                    this.log(`  - Local UID: ${this.agoraClient.uid}`, 'info');
+                    this.log(`  - Channel: ${this.agoraConfig?.channel_name}`, 'info');
+                    this.log(`  - Connection State: ${this.agoraClient.connectionState}`, 'info');
+                    this.log(`  - Remote Users Count: ${remoteUsers.length}`, 'info');
+
+                    if (remoteUsers.length === 0) {
+                        this.log('⚠️ No remote users found in channel', 'warning');
+                        this.log('   This could mean:', 'warning');
+                        this.log('   1. Other user has not joined the channel yet', 'warning');
+                        this.log('   2. Token/channel mismatch between users', 'warning');
+                        this.log('   3. Network connectivity issues', 'warning');
+                        return false;
+                    }
+
+                    remoteUsers.forEach((user, index) => {
+                        this.log(`👤 Remote User ${index + 1}:`, 'info');
+                        this.log(`  - UID: ${user.uid}`, 'info');
+                        this.log(`  - Has Video: ${user.hasVideo}`, 'info');
+                        this.log(`  - Has Audio: ${user.hasAudio}`, 'info');
+                        this.log(`  - Video Track: ${!!user.videoTrack}`, 'info');
+                        this.log(`  - Audio Track: ${!!user.audioTrack}`, 'info');
+                    });
+
+                    return remoteUsers.length > 0;
                 },                handleUserPublished(user, mediaType) {
                     this.log(`📡 User ${user.uid} published ${mediaType}`, 'info');
 
-                    this.agoraClient.subscribe(user, mediaType).then(() => {
-                        this.log(`✅ Successfully subscribed to user ${user.uid} ${mediaType}`, 'success');
+                    // Use retry logic for subscription due to timing issues
+                    this.subscribeWithRetry(user, mediaType, 3, 500);
+                },
 
-                        if (mediaType === 'video') {
-                            this.log(`🎥 Processing remote video from user ${user.uid}`, 'info');
+                async subscribeWithRetry(user, mediaType, maxRetries = 3, delay = 500) {
+                    let retryCount = 0;
 
-                            const remoteVideoElement = document.getElementById('remote-video');
-                            if (!remoteVideoElement) {
-                                this.log('❌ Remote video container not found!', 'error');
-                                return;
-                            }
+                    const attemptSubscribe = async () => {
+                        try {
+                            this.log(`🔄 Subscription attempt ${retryCount + 1} for user ${user.uid} ${mediaType}`, 'info');
 
-                            if (!user.videoTrack) {
-                                this.log('❌ No video track on user object', 'error');
-                                return;
-                            }
+                            await this.agoraClient.subscribe(user, mediaType);
+                            this.log(`✅ Successfully subscribed to user ${user.uid} ${mediaType}`, 'success');
 
-                            try {
-                                // Clear any existing content first
-                                remoteVideoElement.innerHTML = '';
-                                this.log('Cleared remote video container', 'info');
+                            if (mediaType === 'video') {
+                                this.log(`🎥 Processing remote video from user ${user.uid}`, 'info');
 
-                                // Play the video track
-                                user.videoTrack.play('remote-video');
-                                this.log('🎬 Remote video play() method called', 'success');
+                                const remoteVideoElement = document.getElementById('remote-video');
+                                if (!remoteVideoElement) {
+                                    this.log('❌ Remote video container not found!', 'error');
+                                    return;
+                                }
 
-                                // Check if video was actually created after a short delay
+                                // Wait a moment for the video track to be properly attached
                                 setTimeout(() => {
-                                    const container = document.getElementById('remote-video');
-                                    if (container) {
-                                        const videoElements = container.querySelectorAll('video');
-                                        this.log(`Remote container has ${videoElements.length} video elements`, 'info');
-
-                                        videoElements.forEach((video, index) => {
-                                            this.log(`Remote video ${index}: ${video.videoWidth}x${video.videoHeight}, playing=${!video.paused}`, 'info');
-
-                                            // Ensure video fills container
-                                            video.style.width = '100%';
-                                            video.style.height = '100%';
-                                            video.style.objectFit = 'cover';
-                                            video.style.display = 'block';
-                                        });
-
-                                        if (videoElements.length === 0) {
-                                            this.log('❌ No video elements were created in remote container', 'error');
-                                        } else {
-                                            this.log('✅ Remote video should now be visible', 'success');
-                                        }
+                                    if (!user.videoTrack) {
+                                        this.log('❌ No video track on user object after subscription', 'error');
+                                        return;
                                     }
-                                }, 1000);
 
-                            } catch (videoPlayError) {
-                                this.log(`❌ Failed to play remote video: ${videoPlayError.message}`, 'error');
-                                console.error('Remote video play error:', videoPlayError);
+                                    try {
+                                        // Clear any existing content first
+                                        remoteVideoElement.innerHTML = '';
+                                        this.log('Cleared remote video container', 'info');
+
+                                        // Play the video track
+                                        user.videoTrack.play('remote-video');
+                                        this.log('🎬 Remote video play() method called', 'success');
+
+                                        // Check if video was actually created after a short delay
+                                        setTimeout(() => {
+                                            const container = document.getElementById('remote-video');
+                                            if (container) {
+                                                const videoElements = container.querySelectorAll('video');
+                                                this.log(`Remote container has ${videoElements.length} video elements`, 'info');
+
+                                                videoElements.forEach((video, index) => {
+                                                    this.log(`Remote video ${index}: ${video.videoWidth}x${video.videoHeight}, playing=${!video.paused}`, 'info');
+
+                                                    // Ensure video fills container
+                                                    video.style.width = '100%';
+                                                    video.style.height = '100%';
+                                                    video.style.objectFit = 'cover';
+                                                    video.style.display = 'block';
+                                                });
+
+                                                if (videoElements.length === 0) {
+                                                    this.log('❌ No video elements were created in remote container', 'error');
+                                                } else {
+                                                    this.log('✅ Remote video should now be visible', 'success');
+                                                }
+                                            }
+                                        }, 1000);
+
+                                    } catch (videoPlayError) {
+                                        this.log(`❌ Failed to play remote video: ${videoPlayError.message}`, 'error');
+                                        console.error('Remote video play error:', videoPlayError);
+                                    }
+                                }, 200); // Wait 200ms for video track to be attached
+
+                            } else if (mediaType === 'audio') {
+                                this.log(`🔊 Processing remote audio from user ${user.uid}`, 'info');
+
+                                // Wait for audio track to be attached
+                                setTimeout(() => {
+                                    if (user.audioTrack) {
+                                        user.audioTrack.play();
+                                        this.log('✅ Remote audio playing', 'success');
+                                    } else {
+                                        this.log('❌ Remote audio track missing after subscription', 'error');
+                                    }
+                                }, 100);
                             }
 
-                        } else if (mediaType === 'audio') {
-                            this.log(`🔊 Processing remote audio from user ${user.uid}`, 'info');
-                            if (user.audioTrack) {
-                                user.audioTrack.play();
-                                this.log('✅ Remote audio playing', 'success');
+                        } catch (error) {
+                            retryCount++;
+                            this.log(`❌ Subscription attempt ${retryCount} failed for user ${user.uid} ${mediaType}: ${error.message}`, 'error');
+
+                            if (retryCount < maxRetries) {
+                                this.log(`⏳ Retrying in ${delay}ms... (${retryCount}/${maxRetries})`, 'info');
+                                setTimeout(() => attemptSubscribe(), delay);
                             } else {
-                                this.log('❌ Remote audio track missing', 'error');
+                                this.log(`💀 Max retries (${maxRetries}) reached for user ${user.uid} ${mediaType}`, 'error');
+                                console.error('Final subscription error:', error);
                             }
                         }
-                    }).catch(error => {
-                        this.log(`❌ Failed to subscribe to user ${user.uid} ${mediaType}: ${error.message}`, 'error');
-                        console.error('Subscription error:', error);
-                    });
+                    };
+
+                    // Start the first attempt
+                    attemptSubscribe();
                 },
 
                 handleUserUnpublished(user, mediaType) {
@@ -1768,6 +2032,24 @@
                     if (remoteVideoElement) {
                         remoteVideoElement.innerHTML = '';
                         this.log('Cleared remote video container - user left', 'info');
+                    }
+                },
+
+                handleUserJoined(user) {
+                    this.log(`👋 User ${user.uid} joined the channel`, 'success');
+                    this.log(`  - User has video: ${user.hasVideo}`, 'info');
+                    this.log(`  - User has audio: ${user.hasAudio}`, 'info');
+                },
+
+                handleConnectionStateChange(curState, prevState, reason) {
+                    this.log(`🔌 Connection state changed: ${prevState} → ${curState}`, 'info');
+                    if (reason) {
+                        this.log(`  - Reason: ${reason}`, 'info');
+                    }
+
+                    if (curState === 'DISCONNECTED') {
+                        this.agoraStatus.connected = false;
+                        this.agoraStatus.message = 'Disconnected';
                     }
                 },
 

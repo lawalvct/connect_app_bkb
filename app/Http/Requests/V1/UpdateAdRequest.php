@@ -3,6 +3,7 @@
 namespace App\Http\Requests\V1;
 
 use Illuminate\Foundation\Http\FormRequest;
+use App\Models\Setting;
 
 class UpdateAdRequest extends FormRequest
 {
@@ -13,11 +14,14 @@ class UpdateAdRequest extends FormRequest
 
     public function rules(): array
     {
+        // Get max file upload size from settings table (in KB), default to 50MB (50000 KB)
+        $maxFileSize = Setting::getValue('max_file_upload_size', 50000);
+
         return [
             'ad_name' => 'sometimes|string|max:255',
             'type' => 'sometimes|in:banner,video,carousel,story,feed',
             'description' => 'nullable|string|max:1000',
-            'media_files.*' => 'nullable|file|mimes:jpg,jpeg,png,gif,mp4,mov,avi|max:50000',
+            'media_files.*' => "nullable|file|mimes:jpg,jpeg,png,gif,mp4,mov,avi|max:{$maxFileSize}",
             'call_to_action' => 'nullable|string|max:100',
             'destination_url' => 'nullable|url',
             'ad_placement' => 'sometimes|array|min:1', // At least one social circle if provided

@@ -4,6 +4,7 @@ namespace App\Http\Requests\V1;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use App\Models\Setting;
 
 class StorePostRequest extends FormRequest
 {
@@ -14,11 +15,14 @@ class StorePostRequest extends FormRequest
 
     public function rules(): array
     {
+        // Get max file upload size from settings table (in KB), default to 50MB (50000 KB)
+        $maxFileSize = Setting::getValue('max_file_upload_size', 50000);
+
         return [
             'content' => 'nullable|string|max:5000',
             'social_circle_id' => 'required|exists:social_circles,id',
             'media' => 'nullable|array|max:10',
-            'media.*' => 'file|max:50000|mimes:jpeg,png,jpg,gif,webp,mp4,mov,avi,wmv,flv,webm',
+            'media.*' => "file|max:{$maxFileSize}|mimes:jpeg,png,jpg,gif,webp,mp4,mov,avi,wmv,flv,webm",
             'tagged_users' => 'nullable|array',
             'tagged_users.*' => 'exists:users,id',
             'location' => 'nullable|array',
@@ -32,11 +36,15 @@ class StorePostRequest extends FormRequest
 
     public function messages(): array
     {
+        // Get max file upload size from settings for error message
+        $maxFileSize = Setting::getValue('max_file_upload_size', 50000);
+        $maxFileSizeMB = round($maxFileSize / 1024, 1); // Convert KB to MB
+
         return [
             'social_circle_id.required' => 'Please select a social circle for your post.',
             'social_circle_id.exists' => 'Selected social circle does not exist.',
             'media.max' => 'You can upload maximum 10 media files.',
-            'media.*.max' => 'Each file must be less than 50MB.',
+            'media.*.max' => "Each file must be less than {$maxFileSizeMB}MB.",
             'content.max' => 'Post content cannot exceed 5000 characters.',
             'scheduled_at.after' => 'Scheduled time must be in the future.',
         ];

@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use App\Models\Setting;
 class ProfileController extends BaseController
 {
     /**
@@ -194,8 +195,11 @@ class ProfileController extends BaseController
      */
     public function uploadProfilePicture(Request $request)
     {
+        // Get max file upload size from settings table (in KB), default to 5MB (5120 KB)
+        $maxFileSize = Setting::getValue('max_file_upload_size', 5120);
+
         $validator = Validator::make($request->all(), [
-            'profile' => 'required|file|image|max:5120', // 5MB max
+            'profile' => "required|file|image|max:{$maxFileSize}", // Dynamic max from settings
         ]);
 
         if ($validator->fails()) {
@@ -228,8 +232,11 @@ class ProfileController extends BaseController
      */
     public function uploadMultipleProfilePictures(Request $request)
     {
+        // Get max file upload size from settings table (in KB), default to 5MB (5120 KB)
+        $maxFileSize = Setting::getValue('max_file_upload_size', 5120);
+
         $validator = Validator::make($request->all(), [
-            'profile.*' => 'required|file|image|max:5120', // 5MB max
+            'profile.*' => "required|file|image|max:{$maxFileSize}", // Dynamic max from settings
         ]);
 
         if ($validator->fails()) {
@@ -711,10 +718,12 @@ class ProfileController extends BaseController
      */
     public function uploadNewProfileImages(Request $request)
     {
+        // Get max file upload size from settings table (in KB), default to 10MB (10240 KB)
+        $maxFileSize = Setting::getValue('max_file_upload_size', 10240);
 
         $validator = Validator::make($request->all(), [
             'images' => 'required|array|min:1|max:10',
-            'images.*' => 'required|file|image|mimes:jpeg,png,jpg,gif,webp|max:10240', // 10MB max
+            'images.*' => "required|file|image|mimes:jpeg,png,jpg,gif,webp|max:{$maxFileSize}", // Dynamic max from settings
             'set_as_main' => 'nullable|boolean',
             'upload_type' => 'nullable|string|in:s3,local', // Allow choosing upload type
         ]);
@@ -827,11 +836,13 @@ class ProfileController extends BaseController
      */
     public function replaceProfileImage(Request $request)
     {
+        // Get max file upload size from settings table (in KB), default to 10MB (10240 KB)
+        $maxFileSize = Setting::getValue('max_file_upload_size', 10240);
 
         $validator = Validator::make($request->all(), [
             'image_id' => 'required|integer',
             'image_type' => 'required|string|in:profile_multi,user_profile',
-            'new_image' => 'required|file|image|mimes:jpeg,png,jpg,gif,webp|max:10240', // 10MB max
+            'new_image' => "required|file|image|mimes:jpeg,png,jpg,gif,webp|max:{$maxFileSize}", // Dynamic max from settings
             'upload_type' => 'nullable|string|in:s3,local',
         ]);
 
@@ -961,8 +972,11 @@ class ProfileController extends BaseController
      */
     public function uploadSingleProfileImage(Request $request)
     {
+        // Get max file upload size from settings table (in KB), default to 10MB (10240 KB)
+        $maxFileSize = Setting::getValue('max_file_upload_size', 10240);
+
         $validator = Validator::make($request->all(), [
-            'image' => 'required|file|image|mimes:jpeg,png,jpg,gif,webp|max:10240', // 10MB max
+            'image' => "required|file|image|mimes:jpeg,png,jpg,gif,webp|max:{$maxFileSize}", // Dynamic max from settings
             'set_as_main' => 'nullable|boolean',
             'upload_type' => 'nullable|string|in:s3,local',
         ]);
@@ -1060,9 +1074,12 @@ class ProfileController extends BaseController
      */
     public function bulkUploadProfileImages(Request $request)
     {
+        // Get max file upload size from settings table (in KB), default to 10MB (10240 KB)
+        $maxFileSize = Setting::getValue('max_file_upload_size', 10240);
+
         $validator = Validator::make($request->all(), [
             'images' => 'required|array|min:1|max:10',
-            'images.*' => 'required|file|image|mimes:jpeg,png,jpg,gif,webp|max:10240',
+            'images.*' => "required|file|image|mimes:jpeg,png,jpg,gif,webp|max:{$maxFileSize}",
             'set_first_as_main' => 'nullable|boolean',
             'create_variants' => 'nullable|boolean', // Create thumbnail, medium, large variants
         ]);
@@ -1263,11 +1280,13 @@ class ProfileController extends BaseController
 //verifyMe function here
 public function verifyMe(Request $request)
 {
+    // Get max file upload size from settings table (in KB), default to ~10MB (10048 KB)
+    $maxFileSize = Setting::getValue('max_file_upload_size', 10048);
 
     //user will provide id card type and id card image for admin to verify
     $validator = Validator::make($request->all(), [
         'id_card_type' => 'required|string|in:national_id,passport,drivers_license,voters_card,international_passport',
-        'id_card_image' => 'required|image|mimes:jpeg,png,jpg,gif|max:10048',
+        'id_card_image' => "required|image|mimes:jpeg,png,jpg,gif|max:{$maxFileSize}",
     ]);
 
     if ($validator->fails()) {
@@ -1358,8 +1377,11 @@ public function verifyMe(Request $request)
 
     public function updateProfilePicture(Request $request)
     {
+        // Get max file upload size from settings table (in KB), default to 50MB (50120 KB)
+        $maxFileSize = Setting::getValue('max_file_upload_size', 50120);
+
         $validator = Validator::make($request->all(), [
-            'profile_picture' => 'required|image|mimes:jpeg,png,jpg,gif,webp|max:50120', // 50MB max
+            'profile_picture' => "required|image|mimes:jpeg,png,jpg,gif,webp|max:{$maxFileSize}", // Dynamic size limit
         ]);
 
         if ($validator->fails()) {

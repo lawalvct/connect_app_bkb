@@ -19,6 +19,7 @@ use App\Helpers\FileUploadHelper;
 use App\Helpers\NombaPyamentHelper;
 use App\Models\AdPayment;
 use App\Models\SocialCircle;
+use App\Models\Setting;
 
 /**
  * @OA\Tag(
@@ -410,6 +411,9 @@ public function store(Request $request)
     try {
         $user = $request->user();
 
+        // Get max file upload size from settings table (in KB), default to 20MB (20480 KB)
+        $maxFileSize = Setting::getValue('max_file_upload_size', 20480);
+
         // Validate request
         $validated = $request->validate([
             'ad_name' => 'required|string|max:255',
@@ -431,7 +435,7 @@ public function store(Request $request)
             'target_audience.locations' => 'required|array',
             'target_audience.interests' => 'required|array',
             'media_files' => 'nullable|array',
-            'media_files.*' => 'file|mimes:jpeg,png,jpg,gif,mp4,avi,mov|max:20480', // 20MB max
+            'media_files.*' => "file|mimes:jpeg,png,jpg,gif,mp4,avi,mov|max:{$maxFileSize}", // Dynamic max from settings
             'target_countries' => 'nullable|array',
             'ad_placement' => 'nullable|array',
             'target_countries.*' => 'integer|exists:countries,id',

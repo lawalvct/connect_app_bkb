@@ -2,6 +2,7 @@
 namespace App\Http\Requests\V1;
 
 use Illuminate\Foundation\Http\FormRequest;
+use App\Models\Setting;
 
 class CreatePostRequest extends FormRequest
 {
@@ -20,9 +21,12 @@ class CreatePostRequest extends FormRequest
      */
     public function rules(): array
     {
+        // Get max file upload size from settings table (in KB), default to 100MB (102400 KB)
+        $maxFileSize = Setting::getValue('max_file_upload_size', 102400);
+
         return [
             'message' => 'nullable|string',
-            'file' => 'nullable|file|max:10240', // 10MB max
+            'file' => "nullable|file|max:{$maxFileSize}", // Dynamic max from settings
             'type' => 'required|string|in:text,image,video',
             'social_id' => 'required|integer|exists:social_circles,id',
             'tagged_user_ids' => 'nullable|array',

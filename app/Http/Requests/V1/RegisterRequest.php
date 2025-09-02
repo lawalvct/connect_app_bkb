@@ -5,6 +5,7 @@ namespace App\Http\Requests\V1;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use App\Models\Setting;
 
 class RegisterRequest extends FormRequest
 {
@@ -25,6 +26,9 @@ class RegisterRequest extends FormRequest
      */
     public function rules()
     {
+        // Get max file upload size from settings table (in KB), default to 100MB (100000 KB)
+        $maxFileSize = Setting::getValue('max_file_upload_size', 100000);
+
         return [
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
@@ -43,7 +47,7 @@ class RegisterRequest extends FormRequest
             'device_token' => 'nullable|string',
             'social_circles' => 'nullable|array',
             'social_circles.*' => 'exists:social_circles,id',
-            'profile_media' => 'nullable|file|mimes:jpeg,png,jpg,gif,mp4,mov,avi,wmv|max:100000',
+            'profile_media' => "nullable|file|mimes:jpeg,png,jpg,gif,mp4,mov,avi,wmv|max:{$maxFileSize}",
           //  'recaptcha_token' => 'required|string',
             'website' => 'prohibited', // Honeypot field - should always be empty
         ];

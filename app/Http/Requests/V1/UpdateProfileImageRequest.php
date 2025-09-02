@@ -2,6 +2,7 @@
 namespace App\Http\Requests\V1;
 
 use Illuminate\Foundation\Http\FormRequest;
+use App\Models\Setting;
 
 class UpdateProfileImageRequest extends FormRequest
 {
@@ -20,8 +21,11 @@ class UpdateProfileImageRequest extends FormRequest
      */
     public function rules(): array
     {
+        // Get max file upload size from settings table (in KB), default to 2MB (2048 KB)
+        $maxFileSize = Setting::getValue('max_file_upload_size', 2048);
+
         return [
-            'image' => 'required|image|max:2048',
+            'image' => "required|image|max:{$maxFileSize}",
         ];
     }
 }

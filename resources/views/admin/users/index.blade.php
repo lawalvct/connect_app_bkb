@@ -4,7 +4,7 @@
 
 
 @section('content')
-    <div x-data="userManagement()" x-init="loadUsers(); loadSocialCircles(); loadCountries(); loadPendingVerificationsCount(); initExportStatus()">
+    <div x-data="userManagement()" x-init="loadUsers(); loadSocialCircles(); loadPendingVerificationsCount(); initExportStatus()">
 
         <!-- Header with Export -->
         <div class="flex justify-between items-center mb-6">
@@ -153,9 +153,9 @@
                                 @change="loadUsers()"
                                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary">
                             <option value="">All Countries</option>
-                            <template x-for="country in countries" :key="country.id">
-                                <option :value="country.id" x-text="country.name"></option>
-                            </template>
+                            @foreach(\App\Models\Country::orderBy('name')->get() as $country)
+                                <option value="{{ $country->id }}">{{ $country->name }}</option>
+                            @endforeach
                         </select>
                     </div>
 
@@ -846,7 +846,6 @@
             stats: {},
             pagination: {},
             socialCircles: [],
-            countries: [],
             loading: false,
             selectedUsers: [],
             exportOpen: false,
@@ -1045,33 +1044,6 @@
                     console.error('Failed to load social circles:', error);
                     document.getElementById('social-circles-debug').textContent =
                         'Error: ' + error.message;
-                }
-            },
-
-            async loadCountries() {
-                try {
-                    const response = await fetch('/admin/api/countries', {
-                        headers: {
-                            'Accept': 'application/json',
-                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                        }
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}`);
-                    }
-
-                    const data = await response.json();
-
-                    // Handle both the new format and legacy format
-                    if (data.success && Array.isArray(data.countries)) {
-                        this.countries = data.countries;
-                    } else if (Array.isArray(data)) {
-                        this.countries = data;
-                    }
-                } catch (error) {
-                    console.error('Failed to load countries:', error);
-                    this.countries = [];
                 }
             },
 
