@@ -46,7 +46,7 @@ class AuthService
             'gender' => $data['gender'] ?? null,
             'city' => $data['city'] ?? null,
             'state' => $data['state'] ?? null,
-            'timezone' => $timezone, 
+            'timezone' => $timezone,
             'interests' => $data['interests'] ?? null,
             'social_links' => $data['social_links'] ?? null,
             'profile' => $data['profile'] ?? null,
@@ -55,6 +55,7 @@ class AuthService
             'email_otp' => $data['email_otp'],
             'social_id' => $data['social_id'] ?? null,
             'social_type' => $data['social_type'] ?? null,
+            'registration_step' => 6
         ]);
 
         // Assign social circles if provided

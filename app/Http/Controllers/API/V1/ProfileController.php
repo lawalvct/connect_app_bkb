@@ -859,7 +859,7 @@ class ProfileController extends BaseController
 
             DB::beginTransaction();
 
-            $existingImage = null;
+        $existingImage = null;
             $wasMainImage = false;
 
             // Find existing image
