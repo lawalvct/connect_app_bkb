@@ -1304,6 +1304,9 @@ public function handleNombaCallbackWeb(Request $request)
             $pendingSubscription = new UserSubscription();
             $pendingSubscription->user_id = $user->id;
             $pendingSubscription->subscription_id = $subscriptionPlanId;
+            $pendingSubscription->amount = $subscriptionPlan->price; // Add the required amount field
+            $pendingSubscription->currency = 'USD'; // Add currency
+            $pendingSubscription->payment_method = 'stripe'; // Add payment method
             $pendingSubscription->status = 'pending';
             $pendingSubscription->starts_at = now();
             $pendingSubscription->expires_at = now()->addDays(30);
