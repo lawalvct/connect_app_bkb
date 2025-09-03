@@ -296,6 +296,10 @@ Route::get('api/v1/auth/google/callback', [AuthController::class, 'handleGoogleC
 
 Route::get('/payment/callback', [SubscriptionController::class, 'handleNombaCallbackWeb'])->name('payment.callback.web');
 
+// Stripe subscription success callback
+Route::get('/subscription-success', [SubscriptionController::class, 'handleStripeSuccess'])->name('subscription.success');
+Route::get('/subscription-cancel', [SubscriptionController::class, 'handleStripeCancel'])->name('subscription.cancel');
+
 // Firebase service worker with dynamic config
 Route::get('/firebase-messaging-sw.js', function () {
     $config = [

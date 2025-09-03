@@ -9,6 +9,7 @@ use App\Helpers\UserSubscriptionHelper;
 use App\Helpers\NombaPyamentHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 use Stripe\Stripe;
 use Stripe\Customer;
 use Stripe\PaymentIntent;
@@ -1486,8 +1487,10 @@ public function handleNombaCallbackWeb(Request $request)
         if ($userSubscription) {
             $userSubscription->update([
                 'status' => 'active',
-                'current_period_start' => \Carbon\Carbon::createFromTimestamp($subscription['current_period_start']),
-                'current_period_end' => \Carbon\Carbon::createFromTimestamp($subscription['current_period_end']),
+                'current_period_start' => $subscription['current_period_start'] ?
+                    \Carbon\Carbon::createFromTimestamp($subscription['current_period_start']) : now(),
+                'current_period_end' => $subscription['current_period_end'] ?
+                    \Carbon\Carbon::createFromTimestamp($subscription['current_period_end']) : now()->addMonth(),
             ]);
 
             \Log::info('Stripe subscription created webhook processed', [
@@ -1518,8 +1521,10 @@ public function handleNombaCallbackWeb(Request $request)
 
             $userSubscription->update([
                 'status' => $localStatus,
-                'current_period_start' => \Carbon\Carbon::createFromTimestamp($subscription['current_period_start']),
-                'current_period_end' => \Carbon\Carbon::createFromTimestamp($subscription['current_period_end']),
+                'current_period_start' => $subscription['current_period_start'] ?
+                    \Carbon\Carbon::createFromTimestamp($subscription['current_period_start']) : now(),
+                'current_period_end' => $subscription['current_period_end'] ?
+                    \Carbon\Carbon::createFromTimestamp($subscription['current_period_end']) : now()->addMonth(),
             ]);
 
             \Log::info('Stripe subscription updated webhook processed', [
@@ -1595,5 +1600,135 @@ public function handleNombaCallbackWeb(Request $request)
         }
     }
 
+    /**
+     * Handle Stripe subscription success callback from web
+     */
+    public function handleStripeSuccess(Request $request)
+    {
+        try {
+            $sessionId = $request->get('session_id');
+
+            if (!$sessionId) {
+                return view('subscription-result', [
+                    'status' => 'error',
+                    'title' => 'Payment Error',
+                    'message' => 'Invalid session ID provided',
+                    'redirect_url' => env('FRONTEND_URL', config('app.url'))
+                ]);
+            }
+
+            \Log::info('Processing Stripe subscription success', [
+                'session_id' => $sessionId
+            ]);
+
+            // Find the pending subscription by session ID
+            $pendingSubscription = UserSubscription::where('stripe_session_id', $sessionId)
+                ->where('status', 'pending')
+                ->first();
+
+            if (!$pendingSubscription) {
+                return view('subscription-result', [
+                    'status' => 'error',
+                    'title' => 'Subscription Not Found',
+                    'message' => 'No pending subscription found for this session',
+                    'redirect_url' => env('FRONTEND_URL', config('app.url'))
+                ]);
+            }
+
+            // Retrieve the session from Stripe to get subscription details
+            \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
+
+            $session = \Stripe\Checkout\Session::retrieve($sessionId);
+
+            if ($session->payment_status !== 'paid') {
+                return view('subscription-result', [
+                    'status' => 'error',
+                    'title' => 'Payment Not Completed',
+                    'message' => 'Payment has not been completed yet',
+                    'redirect_url' => env('FRONTEND_URL', config('app.url'))
+                ]);
+            }
+
+            // Get the subscription from Stripe
+            $stripeSubscription = null;
+            if ($session->subscription) {
+                $stripeSubscription = \Stripe\Subscription::retrieve($session->subscription);
+            }
+
+            // Update the user subscription record
+            $pendingSubscription->update([
+                'status' => 'active',
+                'payment_status' => 'completed',
+                'transaction_reference' => $session->payment_intent ?? $session->id,
+                'customer_id' => $session->customer,
+                'stripe_subscription_id' => $session->subscription,
+                'started_at' => now(),
+                'current_period_start' => ($stripeSubscription && $stripeSubscription->current_period_start) ?
+                    \Carbon\Carbon::createFromTimestamp($stripeSubscription->current_period_start) : now(),
+                'current_period_end' => ($stripeSubscription && $stripeSubscription->current_period_end) ?
+                    \Carbon\Carbon::createFromTimestamp($stripeSubscription->current_period_end) : now()->addMonth(),
+                'expires_at' => ($stripeSubscription && $stripeSubscription->current_period_end) ?
+                    \Carbon\Carbon::createFromTimestamp($stripeSubscription->current_period_end) : now()->addMonth(),
+                'paid_at' => now(),
+                'last_payment_at' => now(),
+                'payment_details' => [
+                    'stripe_session_id' => $sessionId,
+                    'stripe_customer_id' => $session->customer,
+                    'stripe_subscription_id' => $session->subscription,
+                    'amount_paid' => $session->amount_total / 100, // Convert from cents
+                    'currency' => strtoupper($session->currency),
+                    'payment_method' => 'stripe',
+                    'processed_at' => now()->toISOString()
+                ]
+            ]);
+
+            // Update user's Stripe customer ID if not already set
+            $user = $pendingSubscription->user;
+            if (!$user->stripe_customer_id && $session->customer) {
+                $user->update(['stripe_customer_id' => $session->customer]);
+            }
+
+            \Log::info('Subscription activated successfully', [
+                'user_id' => $pendingSubscription->user_id,
+                'subscription_id' => $pendingSubscription->id,
+                'stripe_subscription_id' => $session->subscription
+            ]);
+
+            return view('subscription-result', [
+                'status' => 'success',
+                'title' => 'Subscription Activated!',
+                'message' => 'Your subscription has been successfully activated. Welcome to the premium experience!',
+                'subscription' => $pendingSubscription->fresh(),
+                'redirect_url' => env('FRONTEND_URL', config('app.url')) . '/dashboard' // Redirect to frontend
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Stripe subscription success handling failed', [
+                'session_id' => $request->get('session_id'),
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return view('subscription-result', [
+                'status' => 'error',
+                'title' => 'Processing Error',
+                'message' => 'An error occurred while processing your subscription. Please contact support.',
+                'redirect_url' => env('FRONTEND_URL', config('app.url'))
+            ]);
+        }
+    }
+
+    /**
+     * Handle Stripe subscription cancel callback from web
+     */
+    public function handleStripeCancel(Request $request)
+    {
+        return view('subscription-result', [
+            'status' => 'cancelled',
+            'title' => 'Subscription Cancelled',
+            'message' => 'Your subscription process was cancelled. You can try again anytime.',
+            'redirect_url' => env('FRONTEND_URL', config('app.url')) . '/subscriptions' // Redirect to frontend subscriptions
+        ]);
+    }
 
 }
