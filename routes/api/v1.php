@@ -429,10 +429,16 @@ Route::prefix('discover')->group(function () {
     Route::get('suggested-connections', [SearchController::class, 'discoverSuggestedConnections']);
 });
 
-    // Notifications
+    // Notifications (Legacy system)
     Route::get('notifications', [NotificationController::class, 'index']);
     Route::post('notifications/{id}/read', [NotificationController::class, 'markAsRead']);
     Route::post('notifications/read-all', [NotificationController::class, 'markAllAsRead']);
+
+    // User Notifications (New system)
+    Route::get('user-notifications', [NotificationController::class, 'getUserNotifications']);
+    Route::get('user-notifications/count', [NotificationController::class, 'getUserNotificationCount']);
+    Route::post('user-notifications/{id}/read', [NotificationController::class, 'markUserNotificationAsRead']);
+    Route::post('user-notifications/read-all', [NotificationController::class, 'markAllUserNotificationsAsRead']);
 
     // Subscription routes
     Route::prefix('subscriptions')->group(function () {

@@ -17,6 +17,7 @@ use App\Mail\WelcomeEmail;
 use App\Mail\VerificationEmail;
 use App\Models\User;
 use App\Models\AdminNotification;
+use App\Models\UserNotification;
 use App\Models\Admin;
 use App\Models\UserProfileUpload;
 use Illuminate\Support\Facades\Auth;
@@ -169,6 +170,10 @@ public function register(RegisterRequest $request)
                 'action_url' => url('/admin/users/' . $user->id),
                 'icon' => 'user-plus',
             ]);
+
+            // Create welcome and tutorial notifications for the new user
+            UserNotification::createWelcomeNotification($user->id);
+            UserNotification::createTutorialNotification($user->id);
 
 // Send pusher notification to admin channel
 try {
