@@ -11,6 +11,7 @@ class Kernel extends ConsoleKernel
       //  ProcessAdMetrics::class,
        // SendAdReminders::class,
         \App\Console\Commands\TestAdSystem::class, // Add this line
+        \App\Console\Commands\ExpireUserSubscriptions::class,
     ];
 
     /**
@@ -20,6 +21,9 @@ class Kernel extends ConsoleKernel
     {
         // Send ad expiry reminders daily at 9 AM
         $schedule->command('ads:send-reminders')->dailyAt('09:00');
+
+        // Check for subscription expiration daily at 6 AM
+        $schedule->command('subscriptions:expire --notify')->dailyAt('06:00');
 
         // You can add more scheduled tasks here
         // $schedule->command('ads:update-performance')->hourly();

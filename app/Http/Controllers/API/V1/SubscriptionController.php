@@ -14,7 +14,6 @@ use Stripe\Stripe;
 use Stripe\Customer;
 use Stripe\PaymentIntent;
 use Stripe\Subscription as StripeSubscription;
-
 use Exception;
 
 class SubscriptionController extends BaseController
