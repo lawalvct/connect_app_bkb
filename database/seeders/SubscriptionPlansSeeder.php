@@ -22,7 +22,9 @@ class SubscriptionPlansSeeder extends Seeder
                     'travel_connections',
                     'country_specific_search',
                     'travel_planning_tools',
-                    'safe_distance_connections'
+                    'safe_distance_connections',
+                    'additional 100 swipes'
+
                 ],
                 'is_active' => true,
                 'sort_order' => 1,
@@ -87,7 +89,8 @@ class SubscriptionPlansSeeder extends Seeder
                     'profile_boost',
                     'increased_visibility',
                     'front_of_line',
-                    'more_profile_views'
+                    'more_profile_views',
+                    'additional 50 swipes'
                 ],
                 'is_active' => true,
                 'sort_order' => 4,

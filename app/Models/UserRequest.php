@@ -4,11 +4,10 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 
 class UserRequest extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory;
 
     protected $table = 'user_requests';
 
@@ -32,8 +31,7 @@ class UserRequest extends Model
         'responded_at',
         'disconnected_at',
         'created_at',
-        'updated_at',
-        'deleted_at'
+        'updated_at'
     ];
 
     // Relationships
@@ -71,6 +69,11 @@ class UserRequest extends Model
     public function scopeFromUser($query, $userId)
     {
         return $query->where('sender_id', $userId);
+    }
+
+    public function scopeActive($query)
+    {
+        return $query->where('deleted_flag', 'N');
     }
 
     // Methods

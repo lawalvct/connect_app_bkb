@@ -153,8 +153,8 @@ class UserSubscriptionHelper
     {
         $activeSubscriptions = self::getByUserId($userId);
 
-        // Check for unlimited or premium subscriptions
-        return in_array('6', $activeSubscriptions) || in_array('8', $activeSubscriptions);
+        // Check for unlimited (ID 2) or premium (ID 3) subscriptions
+        return in_array('2', $activeSubscriptions) || in_array('3', $activeSubscriptions);
     }
 
     /**
@@ -164,8 +164,8 @@ class UserSubscriptionHelper
     {
         $activeSubscriptions = self::getByUserId($userId);
 
-        // Check for travel or premium subscriptions
-        return in_array('4', $activeSubscriptions) || in_array('8', $activeSubscriptions);
+        // Check for travel (ID 1) or premium (ID 3) subscriptions
+        return in_array('1', $activeSubscriptions) || in_array('3', $activeSubscriptions);
     }
 
     /**
@@ -174,7 +174,16 @@ class UserSubscriptionHelper
     public static function hasBoostAccess($userId)
     {
         $subscriptions = self::getByUserId($userId);
-        return in_array('4', $subscriptions) || in_array('3', $subscriptions); // Boost or Premium
+        return in_array('4', $subscriptions) || in_array('3', $subscriptions); // Boost (ID 4) or Premium (ID 3)
+    }
+
+    /**
+     * Check if user has active Connect Boost subscription (ID 4)
+     */
+    public static function hasConnectBoost($userId)
+    {
+        $activeSubscriptions = self::getByUserId($userId);
+        return in_array('4', $activeSubscriptions); // Connect Boost ID is 4
     }
 
     /**

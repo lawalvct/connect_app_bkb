@@ -459,15 +459,22 @@ public static function getAllDetailByUserId($id)
     public static function getUserDailySwipeLimit($userId)
     {
         try {
+            $baseLimit = 50; // Free user default limit
+
             // Check if user has unlimited access
             if (UserSubscriptionHelper::hasUnlimitedAccess($userId)) {
                 return 999999; // Unlimited
             }
 
-            // Free user
-            return 50;
+            // Check if user has Connect Boost subscription (+50 additional swipes)
+            if (UserSubscriptionHelper::hasConnectBoost($userId)) {
+                $baseLimit += 50; // Add 50 swipes for Connect Boost
+            }
+
+            return $baseLimit;
         } catch (\Exception $e) {
             // Default to free user limit if there's an error
+            \Log::error('Error getting daily swipe limit: ' . $e->getMessage());
             return 50;
         }
     }

@@ -43,6 +43,7 @@ class UserRequestsHelper
     {
         return UserRequest::where('sender_id', $senderId)
                          ->where('receiver_id', $receiverId)
+                         ->active()
                          ->first();
     }
 
@@ -51,7 +52,8 @@ class UserRequestsHelper
         return UserRequest::where(function ($query) use ($userId) {
             $query->where('sender_id', $userId)
                   ->orWhere('receiver_id', $userId);
-        })->pluck('sender_id', 'receiver_id')
+        })->active()
+          ->pluck('sender_id', 'receiver_id')
           ->flatten()
           ->filter(function ($id) use ($userId) {
               return $id != $userId;
@@ -64,6 +66,7 @@ class UserRequestsHelper
     {
         return UserRequest::where('receiver_id', $userId)
                          ->where('status', 'pending')
+                         ->active()
                          ->with(['sender' => function ($query) {
                              $query->select('id', 'name', 'username', 'profile', 'profile_url', 'bio');
                          }])
@@ -80,6 +83,7 @@ class UserRequestsHelper
             ->where('status', 'accepted')
             ->where('sender_status', 'accepted')
             ->where('receiver_status', 'accepted')
+            ->active()
             ->with(['sender', 'receiver'])
             ->get();
 
@@ -111,6 +115,7 @@ class UserRequestsHelper
                       ->where('status', 'accepted')
                       ->where('sender_status', 'accepted')
                       ->where('receiver_status', 'accepted')
+                      ->where('deleted_flag', 'N')
                       ->exists();
               } catch (\Exception $e) {
                   \Log::error('Error checking if users are connected', [
@@ -137,6 +142,7 @@ class UserRequestsHelper
                       ->where('status', 'accepted')
                       ->where('sender_status', 'accepted')
                       ->where('receiver_status', 'accepted')
+                      ->where('deleted_flag', 'N')
                       ->count();
 
                   // Count connections where user is receiver
@@ -145,6 +151,7 @@ class UserRequestsHelper
                       ->where('status', 'accepted')
                       ->where('sender_status', 'accepted')
                       ->where('receiver_status', 'accepted')
+                      ->where('deleted_flag', 'N')
                       ->count();
 
                   return $senderCount + $receiverCount;
@@ -159,7 +166,7 @@ class UserRequestsHelper
 
     public static function acceptRequest($requestId, $userId)
     {
-        $request = UserRequest::find($requestId);
+        $request = UserRequest::active()->find($requestId);
 
         if (!$request || $request->receiver_id !== $userId) {
             return false;
@@ -182,7 +189,7 @@ class UserRequestsHelper
 
     public static function rejectRequest($requestId, $userId)
     {
-        $request = UserRequest::find($requestId);
+        $request = UserRequest::active()->find($requestId);
 
         if (!$request || $request->receiver_id !== $userId) {
             return false;
@@ -203,6 +210,7 @@ class UserRequestsHelper
                       ->orWhere(['sender_id' => $targetUserId, 'receiver_id' => $userId]);
             })
             ->where('status', 'accepted')
+            ->active()
             ->first();
 
         if ($connection) {
@@ -220,7 +228,8 @@ class UserRequestsHelper
     public static function getTodaySwipeCount($userId, $socialId = null)
     {
         $query = UserRequest::where('sender_id', $userId)
-                           ->whereDate('created_at', Carbon::today());
+                           ->whereDate('created_at', Carbon::today())
+                           ->active();
 
         if ($socialId) {
             $query->where('social_id', $socialId);
@@ -234,6 +243,7 @@ class UserRequestsHelper
         return UserRequest::where('sender_id', $userId)
                          ->where('request_type', $type)
                          ->whereDate('created_at', Carbon::today())
+                         ->active()
                          ->count();
     }
 
@@ -366,6 +376,7 @@ class UserRequestsHelper
             return DB::table('user_requests')
                 ->where('receiver_id', $userId)
                 ->where('status', 'pending')
+                ->where('deleted_flag', 'N')
                 ->count();
         } catch (\Exception $e) {
             \Log::error('Error getting pending requests count', [
