@@ -113,15 +113,23 @@ class UserNotification extends Model
     public static function createWelcomeNotification($userId)
     {
         return self::create([
-            'title' => 'Welcome to ConnectInc! 🎉',
-            'message' => 'Welcome to ConnectInc! We are excited to have you join our community. Here are some tips to get you started: Complete your profile, upload photos, explore user discovery, and start connecting with people who share your interests.',
+            'title' => 'Welcome to ConnectInc! 🎉💫',
+            'message' => "🌟 Welcome to your new social universe! 🌟\n\n🔥 Ready to make genuine connections?\n\n✨ Swipe 👉 to send connection requests\n💬 Chat in real-time with your matches\n📞🎥 Make audio & video calls instantly\n📸 Share posts & stories with your network\n🎬 Watch exclusive live streams from creators\n💎 Upgrade to premium for unlimited swipes!\n\nYour journey to meaningful connections starts now! 🚀",
             'type' => 'welcome',
             'user_id' => $userId,
             'icon' => 'fa-heart',
             'priority' => 10,
             'data' => [
                 'action_type' => 'welcome',
-                'show_tutorial' => true
+                'show_tutorial' => true,
+                'features_highlighted' => [
+                    'swiping',
+                    'messaging',
+                    'calling',
+                    'stories',
+                    'streaming',
+                    'premium'
+                ]
             ]
         ]);
     }
@@ -129,20 +137,33 @@ class UserNotification extends Model
     public static function createTutorialNotification($userId)
     {
         return self::create([
-            'title' => 'How to Use ConnectInc',
-            'message' => 'Learn how to make the most of ConnectInc: 1) Complete your profile with photos and details 2) Join social circles that interest you 3) Discover and swipe on potential connections 4) Start conversations with your matches 5) Consider premium subscriptions for unlimited features',
+            'title' => 'Master ConnectInc in 5 Steps! 🎯',
+            'message' => "🚀 Your complete guide to ConnectInc success:\n\n1️⃣ 📱 **Build Your Profile**: Add stunning photos & write an engaging bio\n\n2️⃣ 🎯 **Join Social Circles**: Find your tribes & interests\n\n3️⃣ 💫 **Start Discovering**: Swipe 👉 to connect, 👈 to pass\n\n4️⃣ 💬 **Engage & Connect**: Chat, call, share posts & stories\n\n5️⃣ 🎬 **Explore Live Streams**: Watch exclusive content from creators\n\n💎 **Pro Tip**: Upgrade to premium for unlimited daily swipes and exclusive features!\n\nReady to connect? Let's go! 🔥",
             'type' => 'tutorial',
             'user_id' => $userId,
             'icon' => 'fa-graduation-cap',
             'priority' => 9,
             'data' => [
                 'action_type' => 'tutorial',
+                'tutorial_version' => '2.0',
                 'steps' => [
-                    'Complete Profile',
-                    'Join Social Circles',
-                    'Start Swiping',
-                    'Make Connections',
+                    'Build Your Amazing Profile',
+                    'Join Relevant Social Circles',
+                    'Discover & Swipe on Users',
+                    'Chat, Call & Share Content',
+                    'Watch Live Streams',
                     'Upgrade to Premium'
+                ],
+                'estimated_completion_time' => '5 minutes',
+                'features_covered' => [
+                    'profile_setup',
+                    'social_circles',
+                    'user_discovery',
+                    'messaging',
+                    'calling',
+                    'posts_stories',
+                    'live_streaming',
+                    'premium_features'
                 ]
             ]
         ]);
