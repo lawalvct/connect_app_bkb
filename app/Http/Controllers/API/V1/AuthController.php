@@ -25,6 +25,7 @@ use App\Services\RecaptchaService;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use illuminate\Support\Str;
+use App\Helpers\UserSubscriptionHelper;
 
 
 
@@ -318,6 +319,9 @@ private function addDefaultProfileUploads(User $user)
             // Generate token
             $token = $this->authService->createToken($user);
 
+            // Get user's active subscriptions
+            $activeSubscriptions = UserSubscriptionHelper::getActiveSubscriptionsWithDetails($user->id);
+   $user->active_subscriptions = $activeSubscriptions;
             return $this->sendResponse('Login successful', [
                 'user' => new UserResource($user),
                 'token' => $token,

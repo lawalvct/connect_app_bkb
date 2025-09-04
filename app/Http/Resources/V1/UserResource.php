@@ -81,6 +81,32 @@ class UserResource extends JsonResource
             // Recent Posts
             'recent_posts' => $this->when(isset($this->recent_posts), $this->recent_posts),
 
+            // Active Subscriptions
+            'active_subscriptions' => $this->when(isset($this->active_subscriptions), function () use ($userModelInstance) {
+                return collect($this->active_subscriptions)->map(function ($subscription) use ($userModelInstance) {
+                    return [
+                        'id' => $subscription->id,
+                        'subscription_id' => $subscription->subscription_id,
+                        'subscription_name' => $subscription->subscription_name ?? 'Unknown',
+                        'slug' => $subscription->slug ?? null,
+                        'description' => $subscription->description ?? null,
+                        'amount' => (float)$subscription->amount,
+                        'currency' => $subscription->currency ?? 'USD',
+                        'payment_method' => $subscription->payment_method ?? null,
+                        'payment_status' => $subscription->payment_status ?? 'pending',
+                        'status' => $subscription->status ?? 'pending',
+                        'features' => $subscription->features ? json_decode($subscription->features, true) : [],
+                        'started_at' => $subscription->started_at ?
+                            TimezoneHelper::convertToUserTimezone($subscription->started_at, $userModelInstance)?->toISOString() : null,
+                        'expires_at' => $subscription->expires_at ?
+                            TimezoneHelper::convertToUserTimezone($subscription->expires_at, $userModelInstance)?->toISOString() : null,
+                        'auto_renew' => $subscription->auto_renew === 'Y',
+                        'days_remaining' => $subscription->expires_at ?
+                            max(0, now()->diffInDays($subscription->expires_at, false)) : 0,
+                    ];
+                });
+            }),
+
             // Social Circles (detailed)
             'social_circles' => $this->when(isset($this->social_circles_detailed), $this->social_circles_detailed),
 

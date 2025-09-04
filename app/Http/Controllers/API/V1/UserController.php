@@ -15,6 +15,7 @@ use App\Helpers\PostHelper;
 use App\Helpers\UserLikeHelper;
 use App\Helpers\UserRequestsHelper;
 use App\Helpers\SocialCircleHelper;
+use App\Helpers\UserSubscriptionHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Cache;
@@ -73,6 +74,9 @@ class UserController extends BaseController
             $postsThisMonth = PostHelper::getPostsThisMonth($user->id);
             $postsThisWeek = PostHelper::getPostsThisWeek($user->id);
 
+            // Get user's active subscriptions
+            $activeSubscriptions = UserSubscriptionHelper::getActiveSubscriptionsWithDetails($user->id);
+
             // Add computed fields to user object
             $user->total_connections = $totalConnections;
             $user->total_likes = $totalLikes;
@@ -86,6 +90,7 @@ class UserController extends BaseController
             $user->pending_requests_count = $pendingRequestsCount;
             $user->posts_this_month = $postsThisMonth;
             $user->posts_this_week = $postsThisWeek;
+            $user->active_subscriptions = $activeSubscriptions;
 
             // Profile completion percentage
             $user->profile_completion_percentage = $user->profile_completion;
