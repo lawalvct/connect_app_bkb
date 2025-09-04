@@ -92,6 +92,8 @@ class UserNotification extends Model
             'info' => 'text-blue-600',
             'welcome' => 'text-purple-600',
             'tutorial' => 'text-indigo-600',
+            'connection_request' => 'text-pink-600',
+            'connection_accepted' => 'text-green-600',
             default => 'text-gray-600'
         };
     }
@@ -105,6 +107,8 @@ class UserNotification extends Model
             'info' => 'bg-blue-100 text-blue-800',
             'welcome' => 'bg-purple-100 text-purple-800',
             'tutorial' => 'bg-indigo-100 text-indigo-800',
+            'connection_request' => 'bg-pink-100 text-pink-800',
+            'connection_accepted' => 'bg-green-100 text-green-800',
             default => 'bg-gray-100 text-gray-800'
         };
     }
@@ -165,6 +169,44 @@ class UserNotification extends Model
                     'live_streaming',
                     'premium_features'
                 ]
+            ]
+        ]);
+    }
+
+    public static function createConnectionRequestNotification($senderId, $receiverId, $senderName, $requestId)
+    {
+        return self::create([
+            'title' => 'New Connection Request! 💫',
+            'message' => "🎉 {$senderName} sent you a connection request!\n\n✨ Check out their profile and see if you want to connect.\n\n💬 If you both swipe right, you can start chatting instantly!",
+            'type' => 'connection_request',
+            'user_id' => $receiverId,
+            'icon' => 'fa-heart',
+            'priority' => 8,
+            'action_url' => '/connections/requests',
+            'data' => [
+                'action_type' => 'connection_request',
+                'sender_id' => $senderId,
+                'sender_name' => $senderName,
+                'request_id' => $requestId
+            ]
+        ]);
+    }
+
+    public static function createConnectionAcceptedNotification($accepterId, $senderId, $accepterName, $requestId)
+    {
+        return self::create([
+            'title' => 'Connection Accepted! 🎉',
+            'message' => "🌟 Great news! {$accepterName} accepted your connection request!\n\n💬 You can now start chatting with each other.\n📞🎥 Make calls and share stories together!\n\nTime to break the ice! 🚀",
+            'type' => 'connection_accepted',
+            'user_id' => $senderId,
+            'icon' => 'fa-check-circle',
+            'priority' => 9,
+            'action_url' => '/conversations',
+            'data' => [
+                'action_type' => 'connection_accepted',
+                'accepter_id' => $accepterId,
+                'accepter_name' => $accepterName,
+                'request_id' => $requestId
             ]
         ]);
     }

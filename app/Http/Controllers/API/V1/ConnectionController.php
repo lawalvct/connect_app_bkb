@@ -19,6 +19,7 @@ use App\Http\Resources\V1\CountryResource;
 use App\Models\User;
 use App\Models\UserRequest;
 use App\Models\UserSwipe;
+use App\Models\UserNotification;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
@@ -485,6 +486,25 @@ class ConnectionController extends Controller
                 ], 400);
             }
 
+            // Create notification for the target user about the connection request
+            try {
+                if ($data['request_type'] === 'right_swipe') {
+                    UserNotification::createConnectionRequestNotification(
+                        $user->id,
+                        $data['user_id'],
+                        $user->name,
+                        $result['request_id']
+                    );
+                }
+            } catch (\Exception $notificationException) {
+                \Log::error('Failed to create connection request notification', [
+                    'sender_id' => $user->id,
+                    'receiver_id' => $data['user_id'],
+                    'error' => $notificationException->getMessage()
+                ]);
+                // Don't fail the connection request if notification fails
+            }
+
             // Get updated swipe stats
             $swipeStats = UserHelper::getSwipeStats($user->id);
 
@@ -648,6 +668,25 @@ class ConnectionController extends Controller
                 ], 400);
             }
 
+            // Create notification for the sender when their request is accepted
+            try {
+                if ($data['action'] === 'accept') {
+                    UserNotification::createConnectionAcceptedNotification(
+                        $user->id,
+                        $connectionRequest->sender_id,
+                        $user->name,
+                        $id
+                    );
+                }
+            } catch (\Exception $notificationException) {
+                \Log::error('Failed to create connection accepted notification', [
+                    'sender_id' => $connectionRequest->sender_id,
+                    'accepter_id' => $user->id,
+                    'error' => $notificationException->getMessage()
+                ]);
+                // Don't fail the response if notification fails
+            }
+
             return response()->json([
                 'status' => 1,
                 'message' => $message,
@@ -681,18 +720,84 @@ class ConnectionController extends Controller
     {
         try {
             $user = $request->user();
-            $requests = UserRequestsHelper::getPendingRequests($user->id);
+
+            // Get pending requests where current user is the receiver - same as getIncomingRequests
+            // Add additional safety checks for valid sender and receiver
+            $requests = UserRequest::with(['sender.profileImages', 'sender.country'])
+                ->where('receiver_id', $user->id)
+                ->where('status', 'pending')
+                ->where('deleted_flag', 'N')
+                ->whereNotNull('sender_id')
+                ->whereNotNull('receiver_id')
+                ->whereHas('sender', function($query) {
+                    $query->where('deleted_flag', 'N')->whereNull('deleted_at');
+                })
+                ->orderBy('created_at', 'desc')
+                ->get();
+
+            if ($requests->isEmpty()) {
+                return response()->json([
+                    'status' => 1,
+                    'message' => 'No connection requests found',
+                    'data' => []
+                ], $this->successStatus);
+            }
+
+            // Transform the data for response with null safety
+            $transformedRequests = $requests->map(function ($request) {
+                $senderData = null;
+                if ($request->sender) {
+                    // Get first profile image safely
+                    $profileImage = $request->sender->profileImages->first();
+
+                    $senderData = [
+                        'id' => $request->sender->id,
+                        'name' => $request->sender->name ?? '',
+                        'username' => $request->sender->username ?? '',
+                        'email' => $request->sender->email ?? '',
+                        'profile' => $request->sender->profile ?? null,
+                        'profile_url' => $request->sender->profile_url ?? null,
+                        'profile_image' => $profileImage ? $profileImage->image_url : null,
+                        'bio' => $request->sender->bio ?? '',
+                        'age' => $request->sender->age ?? null,
+                        'country' => $request->sender->country ? [
+                            'id' => $request->sender->country->id,
+                            'name' => $request->sender->country->name,
+                            'code' => $request->sender->country->code ?? null,
+                        ] : null,
+                        'is_verified' => $request->sender->is_verified ?? false,
+                    ];
+                }
+
+                return [
+                    'id' => $request->id,
+                    'sender_id' => $request->sender_id,
+                    'receiver_id' => $request->receiver_id,
+                    'social_id' => $request->social_id,
+                    'request_type' => $request->request_type ?? 'right_swipe',
+                    'message' => $request->message ?? null,
+                    'status' => $request->status,
+                    'created_at' => $request->created_at,
+                    'updated_at' => $request->updated_at,
+                    'time_ago' => $request->created_at ? $request->created_at->diffForHumans() : null,
+                    'sender' => $senderData
+                ];
+            })->filter(function($request) {
+                // Extra safety: only return requests that have valid sender data
+                return $request['sender'] !== null;
+            })->values(); // Re-index array after filtering
 
             return response()->json([
                 'status' => 1,
                 'message' => 'Connection requests retrieved successfully',
-                'data' => ConnectionRequestResource::collection($requests)
+                'data' => $transformedRequests
             ], $this->successStatus);
 
         } catch (\Exception $e) {
-            Log::error('Get connection requests failed', [
+            \Log::error('Get connection requests failed', [
                 'user_id' => $request->user()->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
 
             return response()->json([
