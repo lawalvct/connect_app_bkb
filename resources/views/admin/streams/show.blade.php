@@ -5,7 +5,7 @@
 
 @section('header')
     <div class="flex justify-between items-center">
-       
+
                 <div class="flex space-x-3">
             @if($stream->status === 'scheduled')
                 <button id="startStreamBtn" onclick="startStream({{ $stream->id }})"
@@ -340,6 +340,43 @@
                             <div class="ml-3">
                                 <p class="text-sm font-medium text-purple-900">Revenue</p>
                                 <p class="text-2xl font-bold text-purple-600">{{ $stream->currency }} {{ number_format($stream->streamPayments()->sum('amount'), 2) }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Interaction Statistics -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-thumbs-up text-red-600 text-2xl"></i>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm font-medium text-red-900">Total Likes</p>
+                                <p class="text-2xl font-bold text-red-600">{{ $stream->likes_count ?? 0 }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-thumbs-down text-orange-600 text-2xl"></i>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm font-medium text-orange-900">Total Dislikes</p>
+                                <p class="text-2xl font-bold text-orange-600">{{ $stream->dislikes_count ?? 0 }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-share text-indigo-600 text-2xl"></i>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm font-medium text-indigo-900">Total Shares</p>
+                                <p class="text-2xl font-bold text-indigo-600">{{ $stream->shares_count ?? 0 }}</p>
                             </div>
                         </div>
                     </div>

@@ -98,6 +98,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
             // Stream Management API
             Route::get('/streams', [StreamManagementController::class, 'getStreams']);
             Route::get('/streams/stats', [StreamManagementController::class, 'getStats']);
+            Route::get('/streams/interaction-stats', [StreamManagementController::class, 'getStreamInteractionStats']);
             Route::get('/streams/{id}/viewers', [StreamManagementController::class, 'getViewers']);
             Route::get('/streams/{id}/chats', [StreamManagementController::class, 'getChats']);
             Route::post('/streams/{id}/start', [StreamManagementController::class, 'startStream']);

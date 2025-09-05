@@ -81,6 +81,65 @@
             </div>
         </div>
 
+        <!-- Interaction Statistics Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+            <!-- Total Likes -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="flex items-center">
+                    <div class="p-3 bg-green-100 rounded-lg">
+                        <i class="fas fa-thumbs-up text-2xl text-green-600"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">Total Likes</p>
+                        <p class="text-2xl font-bold text-gray-900" x-text="stats.total_likes || '0'"></p>
+                        <p class="text-xs text-gray-500" x-text="'Avg: ' + (stats.avg_likes_per_stream || '0') + ' per stream'"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Total Dislikes -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="flex items-center">
+                    <div class="p-3 bg-red-100 rounded-lg">
+                        <i class="fas fa-thumbs-down text-2xl text-red-600"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">Total Dislikes</p>
+                        <p class="text-2xl font-bold text-gray-900" x-text="stats.total_dislikes || '0'"></p>
+                        <p class="text-xs text-gray-500" x-text="'Avg: ' + (stats.avg_dislikes_per_stream || '0') + ' per stream'"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Total Shares -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="flex items-center">
+                    <div class="p-3 bg-blue-100 rounded-lg">
+                        <i class="fas fa-share text-2xl text-blue-600"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">Total Shares</p>
+                        <p class="text-2xl font-bold text-gray-900" x-text="stats.total_shares || '0'"></p>
+                        <p class="text-xs text-gray-500" x-text="'Avg: ' + (stats.avg_shares_per_stream || '0') + ' per stream'"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Total Interactions -->
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <div class="flex items-center">
+                    <div class="p-3 bg-purple-100 rounded-lg">
+                        <i class="fas fa-heart text-2xl text-purple-600"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-600">Total Interactions</p>
+                        <p class="text-2xl font-bold text-gray-900" x-text="stats.total_interactions || '0'"></p>
+                        <p class="text-xs text-gray-500">All engagement combined</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Filters and Search -->
         <div class="bg-white rounded-lg shadow-md mb-6">
             <div class="p-6">
@@ -163,6 +222,7 @@
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Viewers</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Interactions</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Revenue</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -202,6 +262,21 @@
                                         <div class="flex items-center">
                                             <i class="fas fa-users text-gray-400 mr-1"></i>
                                             <span x-text="stream.current_viewers || 0"></span>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap">
+                                        <div class="space-y-1">
+                                            <div class="flex items-center text-xs">
+                                                <i class="fas fa-thumbs-up text-green-500 mr-1"></i>
+                                                <span x-text="stream.likes_count || 0" class="text-green-600 font-medium"></span>
+                                                <i class="fas fa-thumbs-down text-red-500 ml-3 mr-1"></i>
+                                                <span x-text="stream.dislikes_count || 0" class="text-red-600 font-medium"></span>
+                                            </div>
+                                            <div class="flex items-center text-xs">
+                                                <i class="fas fa-share text-blue-500 mr-1"></i>
+                                                <span x-text="stream.shares_count || 0" class="text-blue-600 font-medium"></span>
+                                                <span class="text-gray-400 ml-2" x-text="'(' + (stream.interaction_stats?.total_interactions || 0) + ' total)'"></span>
+                                            </div>
                                         </div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">

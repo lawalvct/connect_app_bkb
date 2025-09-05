@@ -144,7 +144,14 @@ $data['is_paid'] = ($data['free_minutes'] > 0 && $data['price'] > 0);
      */
     public function show($id)
     {
-        $stream = Stream::with(['user', 'viewers.user', 'chats.user', 'payments.user'])->findOrFail($id);
+        $stream = Stream::with([
+            'user',
+            'viewers.user',
+            'chats.user',
+            'payments.user',
+            'interactions'
+        ])->findOrFail($id);
+
         return view('admin.streams.show', compact('stream'));
     }
 
@@ -424,9 +431,43 @@ $data['is_paid'] = ($data['free_minutes'] > 0 && $data['price'] > 0);
 
         $streams = $query->paginate($request->get('per_page', 15));
 
+        // Transform streams to include interaction stats
+        $transformedStreams = $streams->getCollection()->map(function ($stream) {
+            return [
+                'id' => $stream->id,
+                'title' => $stream->title,
+                'description' => $stream->description,
+                'status' => $stream->status,
+                'stream_type' => $stream->stream_type,
+                'is_paid' => $stream->is_paid,
+                'price' => $stream->price,
+                'currency' => $stream->currency,
+                'current_viewers' => $stream->current_viewers,
+                'likes_count' => $stream->likes_count ?? 0,
+                'dislikes_count' => $stream->dislikes_count ?? 0,
+                'shares_count' => $stream->shares_count ?? 0,
+                'free_minutes' => $stream->free_minutes,
+                'scheduled_at' => $stream->scheduled_at,
+                'started_at' => $stream->started_at,
+                'ended_at' => $stream->ended_at,
+                'created_at' => $stream->created_at,
+                'updated_at' => $stream->updated_at,
+                'user' => [
+                    'id' => $stream->user->id,
+                    'name' => $stream->user->name,
+                    'email' => $stream->user->email,
+                ],
+                'interaction_stats' => [
+                    'total_interactions' => ($stream->likes_count ?? 0) + ($stream->dislikes_count ?? 0) + ($stream->shares_count ?? 0),
+                    'engagement_rate' => $stream->current_viewers > 0 ?
+                        round((($stream->likes_count ?? 0) + ($stream->dislikes_count ?? 0)) / $stream->current_viewers * 100, 2) : 0
+                ]
+            ];
+        });
+
         return response()->json([
             'success' => true,
-            'data' => $streams->items(),
+            'data' => $transformedStreams,
             'pagination' => [
                 'current_page' => $streams->currentPage(),
                 'last_page' => $streams->lastPage(),
@@ -451,11 +492,76 @@ $data['is_paid'] = ($data['free_minutes'] > 0 && $data['price'] > 0);
             'total_messages' => StreamChat::count(),
             'paid_streams' => Stream::where('is_paid', true)->count(),
             'free_streams' => Stream::where('is_paid', false)->count(),
+
+            // Interaction statistics
+            'total_likes' => Stream::sum('likes_count'),
+            'total_dislikes' => Stream::sum('dislikes_count'),
+            'total_shares' => Stream::sum('shares_count'),
+            'total_interactions' => Stream::selectRaw('SUM(likes_count + dislikes_count + shares_count) as total')->value('total') ?? 0,
+
+            // Average interaction rates
+            'avg_likes_per_stream' => round(Stream::avg('likes_count') ?? 0, 2),
+            'avg_dislikes_per_stream' => round(Stream::avg('dislikes_count') ?? 0, 2),
+            'avg_shares_per_stream' => round(Stream::avg('shares_count') ?? 0, 2),
+
+            // Most engaged streams
+            'most_liked_stream' => Stream::orderBy('likes_count', 'desc')->first(),
+            'most_shared_stream' => Stream::orderBy('shares_count', 'desc')->first(),
         ];
 
         return response()->json([
             'success' => true,
             'data' => $stats
+        ]);
+    }
+
+    /**
+     * Get detailed interaction stats for a specific stream
+     */
+    public function getStreamInteractionStats($id)
+    {
+        $stream = Stream::with(['likes', 'dislikes', 'shares.user'])->findOrFail($id);
+
+        $recentLikes = $stream->likes()->with('user:id,name,email')->orderBy('created_at', 'desc')->limit(10)->get();
+        $recentDislikes = $stream->dislikes()->with('user:id,name,email')->orderBy('created_at', 'desc')->limit(10)->get();
+        $recentShares = $stream->shares()->with('user:id,name,email')->orderBy('created_at', 'desc')->limit(10)->get();
+
+        // Share platform breakdown
+        $sharePlatforms = $stream->shares()
+            ->selectRaw('share_platform, COUNT(*) as count')
+            ->whereNotNull('share_platform')
+            ->groupBy('share_platform')
+            ->orderBy('count', 'desc')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'stream' => [
+                    'id' => $stream->id,
+                    'title' => $stream->title,
+                    'status' => $stream->status,
+                    'current_viewers' => $stream->current_viewers,
+                ],
+                'interaction_summary' => [
+                    'likes_count' => $stream->likes_count ?? 0,
+                    'dislikes_count' => $stream->dislikes_count ?? 0,
+                    'shares_count' => $stream->shares_count ?? 0,
+                    'total_interactions' => ($stream->likes_count ?? 0) + ($stream->dislikes_count ?? 0) + ($stream->shares_count ?? 0),
+                    'engagement_rate' => $stream->current_viewers > 0 ?
+                        round((($stream->likes_count ?? 0) + ($stream->dislikes_count ?? 0)) / $stream->current_viewers * 100, 2) : 0
+                ],
+                'recent_likes' => $recentLikes,
+                'recent_dislikes' => $recentDislikes,
+                'recent_shares' => $recentShares,
+                'share_platforms' => $sharePlatforms,
+                'interaction_ratio' => [
+                    'like_ratio' => ($stream->likes_count + $stream->dislikes_count) > 0 ?
+                        round($stream->likes_count / ($stream->likes_count + $stream->dislikes_count) * 100, 2) : 0,
+                    'dislike_ratio' => ($stream->likes_count + $stream->dislikes_count) > 0 ?
+                        round($stream->dislikes_count / ($stream->likes_count + $stream->dislikes_count) * 100, 2) : 0
+                ]
+            ]
         ]);
     }
 
