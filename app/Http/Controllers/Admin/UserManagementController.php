@@ -327,19 +327,19 @@ class UserManagementController extends Controller
                 'pending_verifications' => \App\Models\UserVerification::where('admin_status', 'pending')->count(),
                 'verified_users' => \App\Models\UserVerification::where('admin_status', 'approved')->distinct('user_id')->count(),
                 'rejected_verifications' => \App\Models\UserVerification::where('admin_status', 'rejected')->count(),
-                'total_connections' => \App\Models\UserRequest::withTrashed()
+                'total_connections' => \App\Models\UserRequest::where('deleted_flag', 'N')
                     ->where('status', 'accepted')
                     ->where('sender_status', 'accepted')
                     ->where('receiver_status', 'accepted')
                     ->count(),
                 'users_with_connections' => \App\Models\User::whereHas('sentRequests', function($q) {
-                        $q->withTrashed()
+                        $q->where('deleted_flag', 'N')
                           ->where('status', 'accepted')
                           ->where('sender_status', 'accepted')
                           ->where('receiver_status', 'accepted');
                     })
                     ->orWhereHas('receivedRequests', function($q) {
-                        $q->withTrashed()
+                        $q->where('deleted_flag', 'N')
                           ->where('status', 'accepted')
                           ->where('sender_status', 'accepted')
                           ->where('receiver_status', 'accepted');
