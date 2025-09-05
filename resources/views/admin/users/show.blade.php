@@ -34,7 +34,7 @@
                         <!-- Profile Picture -->
                         <div class="flex-shrink-0">
                             <img class="h-20 w-20 rounded-full object-cover border-4 border-gray-200"
-                                 src="https://connectapp.talosmart.xyz/uploads/profiles/{{ $user->profile}}"
+                                 src="{{ $user->profile_url}}"
                                  alt="{{ $user->name }}">
                         </div>
 
@@ -173,6 +173,103 @@
                     <div class="text-center py-8">
                         <i class="fas fa-users text-4xl text-gray-300 mb-4"></i>
                         <p class="text-gray-500">This user is not a member of any social circles yet.</p>
+                    </div>
+                </div>
+            </div>
+            @endif
+
+            <!-- Profile Media Section -->
+            @if(($user->profile && $user->profile_url) || ($user->profileUploads && $user->profileUploads->count() > 0))
+            <div class="bg-white rounded-lg shadow-md mt-6">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900">Profile Media ({{ ($user->profile ? 1 : 0) + ($user->profileUploads ? $user->profileUploads->count() : 0) }})</h3>
+                    <p class="text-sm text-gray-600">User's uploaded images and videos</p>
+                </div>
+                <div class="p-6">
+                    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        @if($user->profile && $user->profile_url)
+                        <!-- Main Profile Picture -->
+                        <div class="relative group">
+                            <div class="aspect-square bg-gray-100 rounded-lg overflow-hidden">
+                                <img src="{{ $user->profile_url }}"
+                                     alt="Main profile picture"
+                                     class="w-full h-full object-cover hover:scale-105 transition-transform duration-200">
+                            </div>
+
+                            <!-- Main badge -->
+                            <div class="absolute top-2 left-2 bg-blue-600 text-white px-2 py-1 rounded text-xs font-medium">
+                                MAIN
+                            </div>
+
+                            <!-- Overlay with info -->
+                            <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all duration-200 rounded-lg flex items-end">
+                                <div class="p-3 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                    <p class="text-xs font-medium">Main Profile</p>
+                                    <p class="text-xs">{{ $user->created_at->format('M d, Y') }}</p>
+                                </div>
+                            </div>
+
+                            <!-- View button -->
+                            <button onclick="viewMedia('{{ $user->profile_url  }}', 'image', 'Main Profile Picture')"
+                                    class="absolute top-2 right-2 bg-white bg-opacity-80 hover:bg-opacity-100 text-gray-700 p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                <i class="fas fa-eye text-sm"></i>
+                            </button>
+                        </div>
+                        @endif
+
+                        @if($user->profileUploads && $user->profileUploads->count() > 0)
+                        @foreach($user->profileUploads as $upload)
+                        <div class="relative group">
+                            @if($upload->file_type === 'video')
+                            <!-- Video Thumbnail -->
+                            <div class="aspect-square bg-gray-100 rounded-lg overflow-hidden">
+                                <video class="w-full h-full object-cover" preload="metadata">
+                                    <source src="{{ $upload->file_url . '/' . $upload->file_name }}" type="video/mp4">
+                                </video>
+                                <div class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30">
+                                    <i class="fas fa-play text-white text-2xl"></i>
+                                </div>
+                            </div>
+                            @else
+                            <!-- Image -->
+                            <div class="aspect-square bg-gray-100 rounded-lg overflow-hidden">
+                                <img src="{{ $upload->file_url . '/' . $upload->file_name }}"
+                                     alt="{{ $upload->alt_text ?? 'Profile image' }}"
+                                     class="w-full h-full object-cover hover:scale-105 transition-transform duration-200">
+                            </div>
+                            @endif
+
+                            <!-- Overlay with info -->
+                            <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all duration-200 rounded-lg flex items-end">
+                                <div class="p-3 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                    <p class="text-xs font-medium">{{ $upload->file_type === 'video' ? 'Video' : 'Image' }}</p>
+                                    <p class="text-xs">{{ $upload->created_at->format('M d, Y') }}</p>
+                                    @if($upload->caption)
+                                    <p class="text-xs mt-1 truncate">{{ Str::limit($upload->caption, 30) }}</p>
+                                    @endif
+                                </div>
+                            </div>
+
+                            <!-- View button -->
+                            <button onclick="viewMedia('{{ $upload->file_url . '/' . $upload->file_name }}', '{{ $upload->file_type }}', '{{ addslashes($upload->caption ?? '') }}')"
+                                    class="absolute top-2 right-2 bg-white bg-opacity-80 hover:bg-opacity-100 text-gray-700 p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                <i class="fas fa-eye text-sm"></i>
+                            </button>
+                        </div>
+                        @endforeach
+                        @endif
+                    </div>
+                </div>
+            </div>
+            @else
+            <div class="bg-white rounded-lg shadow-md mt-6">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900">Profile Media</h3>
+                </div>
+                <div class="p-6">
+                    <div class="text-center py-8">
+                        <i class="fas fa-images text-4xl text-gray-300 mb-4"></i>
+                        <p class="text-gray-500">No profile media uploaded.</p>
                     </div>
                 </div>
             </div>
@@ -365,6 +462,35 @@
         toast.textContent = message;
         document.body.appendChild(toast);
         setTimeout(() => toast.remove(), 3000);
+    }
+
+    function viewMedia(url, type, caption) {
+        const modal = document.createElement('div');
+        modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50';
+        modal.onclick = () => modal.remove();
+
+        const content = document.createElement('div');
+        content.className = 'max-w-4xl max-h-full p-4';
+        content.onclick = (e) => e.stopPropagation();
+
+        if (type === 'video') {
+            content.innerHTML = `
+                <video controls class="max-w-full max-h-full rounded-lg">
+                    <source src="${url}" type="video/mp4">
+                </video>
+                ${caption ? `<p class="text-white text-center mt-2">${caption}</p>` : ''}
+                <button onclick="this.closest('.fixed').remove()" class="absolute top-4 right-4 text-white text-2xl">&times;</button>
+            `;
+        } else {
+            content.innerHTML = `
+                <img src="${url}" class="max-w-full max-h-full rounded-lg" alt="Profile image">
+                ${caption ? `<p class="text-white text-center mt-2">${caption}</p>` : ''}
+                <button onclick="this.closest('.fixed').remove()" class="absolute top-4 right-4 text-white text-2xl">&times;</button>
+            `;
+        }
+
+        modal.appendChild(content);
+        document.body.appendChild(modal);
     }
 </script>
 @endpush

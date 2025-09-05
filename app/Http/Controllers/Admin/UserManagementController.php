@@ -42,8 +42,10 @@ class UserManagementController extends Controller
      */
     public function show(User $user)
     {
-        // Load relationships that exist, including social circles
-        $user->load(['posts', 'socialCircles:id,name,description,color,logo']);
+        // Load relationships that exist, including social circles and profile uploads
+        $user->load(['posts', 'socialCircles:id,name,description,color,logo', 'profileUploads' => function($query) {
+            $query->where('deleted_flag', 'N')->orderBy('created_at', 'desc');
+        }]);
         return view('admin.users.show', compact('user'));
     }
 

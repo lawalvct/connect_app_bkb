@@ -26,6 +26,9 @@ class Stream extends Model
         'currency',
         'max_viewers',
         'current_viewers',
+        'likes_count',
+        'dislikes_count',
+        'shares_count',
         'free_minutes',
         'stream_type',
         'go_live_immediately',
@@ -73,6 +76,27 @@ class Stream extends Model
     public function completedPayments(): HasMany
     {
         return $this->hasMany(StreamPayment::class)->where('status', 'completed');
+    }
+
+    // Stream interaction relationships
+    public function interactions(): HasMany
+    {
+        return $this->hasMany(StreamInteraction::class);
+    }
+
+    public function likes(): HasMany
+    {
+        return $this->hasMany(StreamInteraction::class)->where('interaction_type', 'like');
+    }
+
+    public function dislikes(): HasMany
+    {
+        return $this->hasMany(StreamInteraction::class)->where('interaction_type', 'dislike');
+    }
+
+    public function shares(): HasMany
+    {
+        return $this->hasMany(StreamInteraction::class)->where('interaction_type', 'share');
     }
 
     // Alias methods for backward compatibility with views
@@ -362,6 +386,46 @@ class Stream extends Model
             'rtmp_url' => $rtmpStream->rtmp_url,
             'stream_key' => $rtmpStream->stream_key,
             'full_url' => $rtmpStream->getFullRtmpUrl()
+        ];
+    }
+
+    // Stream interaction methods
+    public function hasUserLiked(User $user): bool
+    {
+        return StreamInteraction::hasUserLiked($this->id, $user->id);
+    }
+
+    public function hasUserDisliked(User $user): bool
+    {
+        return StreamInteraction::hasUserDisliked($this->id, $user->id);
+    }
+
+    public function getUserInteraction(User $user): ?string
+    {
+        return StreamInteraction::getUserInteraction($this->id, $user->id);
+    }
+
+    public function toggleLike(User $user): array
+    {
+        return StreamInteraction::toggleLike($this->id, $user->id);
+    }
+
+    public function toggleDislike(User $user): array
+    {
+        return StreamInteraction::toggleDislike($this->id, $user->id);
+    }
+
+    public function addShare(User $user, string $platform = null, array $metadata = null): StreamInteraction
+    {
+        return StreamInteraction::addShare($this->id, $user->id, $platform, $metadata);
+    }
+
+    public function getInteractionStats(): array
+    {
+        return [
+            'likes_count' => $this->likes_count ?? 0,
+            'dislikes_count' => $this->dislikes_count ?? 0,
+            'shares_count' => $this->shares_count ?? 0,
         ];
     }
 }

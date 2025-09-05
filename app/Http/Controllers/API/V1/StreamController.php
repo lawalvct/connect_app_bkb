@@ -7,6 +7,7 @@ use App\Http\Controllers\API\BaseController;
 use App\Models\Stream;
 use App\Models\StreamChat;
 use App\Models\StreamViewer;
+use App\Models\StreamInteraction;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -28,7 +29,7 @@ class StreamController extends BaseController
             $validator = Validator::make($request->all(), [
                 'title' => 'required|string|max:255',
                 'description' => 'nullable|string|max:1000',
-                'banner_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:5120', // 5MB max
+                'banner_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:51200', // 50MB max
                 'scheduled_at' => 'nullable|date|after:now',
                 'is_paid' => 'boolean',
                 'price' => 'required_if:is_paid,true|numeric|min:0',
@@ -176,7 +177,7 @@ class StreamController extends BaseController
             $viewer = $stream->addViewer($user, $agoraUid, $agoraToken);
 
             return $this->sendResponse('Joined stream successfully', [
-                'stream' => $this->formatStreamResponse($stream),
+                'stream' => $this->formatStreamResponse($stream, $user),
                 'agora_config' => [
                     'app_id' => AgoraHelper::getAppId(),
                     'channel_name' => $stream->channel_name,
@@ -237,7 +238,7 @@ class StreamController extends BaseController
             }
 
             return $this->sendResponse('Stream details retrieved successfully', [
-                'stream' => $this->formatStreamResponse($stream)
+                'stream' => $this->formatStreamResponse($stream, $request->user())
             ]);
 
         } catch (\Exception $e) {
@@ -619,9 +620,9 @@ class StreamController extends BaseController
     /**
      * Format stream response
      */
-    private function formatStreamResponse(Stream $stream): array
+    private function formatStreamResponse(Stream $stream, $user = null): array
     {
-        return [
+        $response = [
             'id' => $stream->id,
             'title' => $stream->title,
             'description' => $stream->description,
@@ -633,6 +634,9 @@ class StreamController extends BaseController
             'currency' => $stream->currency,
             'max_viewers' => $stream->max_viewers,
             'current_viewers' => $stream->current_viewers,
+            'likes_count' => $stream->likes_count ?? 0,
+            'dislikes_count' => $stream->dislikes_count ?? 0,
+            'shares_count' => $stream->shares_count ?? 0,
             'duration' => $stream->duration,
             'scheduled_at' => $stream->scheduled_at,
             'started_at' => $stream->started_at,
@@ -646,6 +650,15 @@ class StreamController extends BaseController
                 'profile_picture' => $stream->user->profile_picture,
             ],
         ];
+
+        // Add user-specific interaction data if user is provided
+        if ($user) {
+            $response['user_interaction'] = $stream->getUserInteraction($user);
+            $response['has_liked'] = $stream->hasUserLiked($user);
+            $response['has_disliked'] = $stream->hasUserDisliked($user);
+        }
+
+        return $response;
     }
 
 
@@ -813,6 +826,230 @@ class StreamController extends BaseController
                 'success' => false,
                 'message' => 'Failed to check watch access: ' . $e->getMessage(),
             ], 500);
+        }
+    }
+
+    /**
+     * Like a stream
+     */
+    public function likeStream(Request $request, $id)
+    {
+        try {
+            $stream = Stream::find($id);
+            $user = $request->user();
+
+            if (!$stream) {
+                return $this->sendError('Stream not found', null, 404);
+            }
+
+            $result = $stream->toggleLike($user);
+
+            return $this->sendResponse('Stream like toggled successfully', [
+                'action' => $result['action'],
+                'type' => $result['type'],
+                'from' => $result['from'] ?? null,
+                'interaction_stats' => $stream->getInteractionStats(),
+                'user_interaction' => $stream->getUserInteraction($user),
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->sendError('Failed to like stream', $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Dislike a stream
+     */
+    public function dislikeStream(Request $request, $id)
+    {
+        try {
+            $stream = Stream::find($id);
+            $user = $request->user();
+
+            if (!$stream) {
+                return $this->sendError('Stream not found', null, 404);
+            }
+
+            $result = $stream->toggleDislike($user);
+
+            return $this->sendResponse('Stream dislike toggled successfully', [
+                'action' => $result['action'],
+                'type' => $result['type'],
+                'from' => $result['from'] ?? null,
+                'interaction_stats' => $stream->getInteractionStats(),
+                'user_interaction' => $stream->getUserInteraction($user),
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->sendError('Failed to dislike stream', $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Share a stream
+     */
+    public function shareStream(Request $request, $id)
+    {
+        try {
+            $stream = Stream::find($id);
+            $user = $request->user();
+
+            if (!$stream) {
+                return $this->sendError('Stream not found', null, 404);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'platform' => 'nullable|string|in:facebook,twitter,whatsapp,instagram,telegram,email,copy_link',
+                'metadata' => 'nullable|array',
+                'metadata.message' => 'nullable|string|max:1000',
+                'metadata.recipients' => 'nullable|array',
+                'metadata.url' => 'nullable|url',
+            ]);
+
+            if ($validator->fails()) {
+                return $this->sendError('Validation Error', $validator->errors(), 422);
+            }
+
+            $platform = $request->get('platform');
+            $metadata = $request->get('metadata', []);
+
+            // Add share timestamp and additional metadata
+            $metadata['shared_at'] = now()->toISOString();
+            $metadata['stream_title'] = $stream->title;
+            $metadata['streamer_name'] = $stream->user->name;
+
+            $shareInteraction = $stream->addShare($user, $platform, $metadata);
+
+            return $this->sendResponse('Stream shared successfully', [
+                'share_id' => $shareInteraction->id,
+                'platform' => $platform,
+                'shared_at' => $shareInteraction->created_at,
+                'interaction_stats' => $stream->getInteractionStats(),
+                'share_url' => url("/streams/{$stream->id}"), // You can customize this URL
+            ], 201);
+
+        } catch (\Exception $e) {
+            return $this->sendError('Failed to share stream', $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Get stream interaction stats
+     */
+    public function getInteractionStats(Request $request, $id)
+    {
+        try {
+            $stream = Stream::find($id);
+
+            if (!$stream) {
+                return $this->sendError('Stream not found', null, 404);
+            }
+
+            $user = $request->user();
+            $userInteraction = $user ? $stream->getUserInteraction($user) : null;
+
+            return $this->sendResponse('Stream interaction stats retrieved successfully', [
+                'stream_id' => $stream->id,
+                'interaction_stats' => $stream->getInteractionStats(),
+                'user_interaction' => $userInteraction,
+                'has_liked' => $user ? $stream->hasUserLiked($user) : false,
+                'has_disliked' => $user ? $stream->hasUserDisliked($user) : false,
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->sendError('Failed to retrieve interaction stats', $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Get stream shares with details
+     */
+    public function getStreamShares(Request $request, $id)
+    {
+        try {
+            $stream = Stream::find($id);
+
+            if (!$stream) {
+                return $this->sendError('Stream not found', null, 404);
+            }
+
+            $limit = $request->get('limit', 20);
+            $shares = $stream->shares()
+                ->with('user:id,name,username')
+                ->orderBy('created_at', 'desc')
+                ->limit($limit)
+                ->get()
+                ->map(function ($share) {
+                    return [
+                        'id' => $share->id,
+                        'platform' => $share->share_platform,
+                        'shared_at' => $share->created_at,
+                        'user' => [
+                            'id' => $share->user->id,
+                            'name' => $share->user->name,
+                            'username' => $share->user->username ?? $share->user->name,
+                        ],
+                        'metadata' => $share->share_metadata,
+                    ];
+                });
+
+            return $this->sendResponse('Stream shares retrieved successfully', [
+                'stream_id' => $stream->id,
+                'shares_count' => $stream->shares_count,
+                'shares' => $shares,
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->sendError('Failed to retrieve stream shares', $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Remove user's interaction (unlike/undislike)
+     */
+    public function removeInteraction(Request $request, $id)
+    {
+        try {
+            $stream = Stream::find($id);
+            $user = $request->user();
+
+            if (!$stream) {
+                return $this->sendError('Stream not found', null, 404);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'interaction_type' => 'required|string|in:like,dislike',
+            ]);
+
+            if ($validator->fails()) {
+                return $this->sendError('Validation Error', $validator->errors(), 422);
+            }
+
+            $interactionType = $request->get('interaction_type');
+
+            $interaction = StreamInteraction::forStream($stream->id)
+                ->forUser($user->id)
+                ->where('interaction_type', $interactionType)
+                ->first();
+
+            if (!$interaction) {
+                return $this->sendError("No {$interactionType} found to remove", null, 404);
+            }
+
+            $interaction->delete();
+            StreamInteraction::updateStreamCounts($stream->id);
+
+            // Refresh the stream to get updated counts
+            $stream->refresh();
+
+            return $this->sendResponse('Interaction removed successfully', [
+                'removed_interaction' => $interactionType,
+                'interaction_stats' => $stream->getInteractionStats(),
+                'user_interaction' => $stream->getUserInteraction($user),
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->sendError('Failed to remove interaction', $e->getMessage(), 500);
         }
     }
 }

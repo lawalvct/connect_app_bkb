@@ -543,6 +543,14 @@ Route::prefix('discover')->group(function () {
             Route::post('/{id}/chat', [\App\Http\Controllers\API\V1\StreamChatController::class, 'sendMessage']);
             Route::delete('/{streamId}/chats/{messageId}', [\App\Http\Controllers\API\V1\StreamChatController::class, 'deleteMessage']);
 
+            // Stream interactions (likes, dislikes, shares)
+            Route::post('/{id}/like', [StreamController::class, 'likeStream']);
+            Route::post('/{id}/dislike', [StreamController::class, 'dislikeStream']);
+            Route::post('/{id}/share', [StreamController::class, 'shareStream']);
+            Route::get('/{id}/interactions', [StreamController::class, 'getInteractionStats']);
+            Route::get('/{id}/shares', [StreamController::class, 'getStreamShares']);
+            Route::delete('/{id}/interactions', [StreamController::class, 'removeInteraction']);
+
             // Stream payments
             Route::prefix('{id}/payment')->group(function () {
                 Route::post('/stripe/initialize', [StreamPaymentController::class, 'initializeStripePayment']);
