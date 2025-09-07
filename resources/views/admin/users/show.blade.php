@@ -33,9 +33,30 @@
                     <div class="flex items-start space-x-6">
                         <!-- Profile Picture -->
                         <div class="flex-shrink-0">
+                            @php
+                                // Check if main profile is a video for the avatar
+                                $profileExtension = $user->profile ? pathinfo($user->profile, PATHINFO_EXTENSION) : '';
+                                $videoExtensions = ['mp4', 'mov', 'avi', 'wmv', 'flv', 'webm', '3gp', 'mkv', 'm4v'];
+                                $isMainVideo = in_array(strtolower($profileExtension), $videoExtensions);
+                                $profileUrl = $user->profile_url && $user->profile ? $user->profile_url . '/' . $user->profile : ($user->profile_url ?: asset('images/default-avatar.png'));
+                            @endphp
+
+                            @if($isMainVideo && $user->profile)
+                            <!-- Video Avatar -->
+                            <div class="relative h-20 w-20 rounded-full overflow-hidden border-4 border-gray-200">
+                                <video class="h-full w-full object-cover" preload="metadata">
+                                    <source src="{{ $profileUrl }}" type="video/{{ $profileExtension }}">
+                                </video>
+                                <div class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30">
+                                    <i class="fas fa-play text-white text-sm"></i>
+                                </div>
+                            </div>
+                            @else
+                            <!-- Image Avatar -->
                             <img class="h-20 w-20 rounded-full object-cover border-4 border-gray-200"
-                                 src="{{ $user->profile_url}}"
+                                 src="{{ $profileUrl }}"
                                  alt="{{ $user->name }}">
+                            @endif
                         </div>
 
                         <!-- User Info -->
@@ -190,10 +211,29 @@
                         @if($user->profile && $user->profile_url)
                         <!-- Main Profile Picture -->
                         <div class="relative group">
+                            @php
+                                // Check if main profile is a video
+                                $profileExtension = pathinfo($user->profile, PATHINFO_EXTENSION);
+                                $videoExtensions = ['mp4', 'mov', 'avi', 'wmv', 'flv', 'webm', '3gp', 'mkv', 'm4v'];
+                                $isMainVideo = in_array(strtolower($profileExtension), $videoExtensions);
+                                $profileUrl = $user->profile_url;
+                            @endphp
+
                             <div class="aspect-square bg-gray-100 rounded-lg overflow-hidden">
-                                <img src="{{ $user->profile_url }}"
+                                @if($isMainVideo)
+                                <!-- Video Main Profile -->
+                                <video class="w-full h-full object-cover" preload="metadata">
+                                    <source src="{{ $profileUrl }}" type="video/{{ $profileExtension }}">
+                                </video>
+                                <div class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30">
+                                    <i class="fas fa-play text-white text-2xl"></i>
+                                </div>
+                                @else
+                                <!-- Image Main Profile -->
+                                <img src="{{ $profileUrl }}"
                                      alt="Main profile picture"
                                      class="w-full h-full object-cover hover:scale-105 transition-transform duration-200">
+                                @endif
                             </div>
 
                             <!-- Main badge -->
@@ -204,13 +244,13 @@
                             <!-- Overlay with info -->
                             <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all duration-200 rounded-lg flex items-end">
                                 <div class="p-3 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                    <p class="text-xs font-medium">Main Profile</p>
+                                    <p class="text-xs font-medium">Main Profile {{ $isMainVideo ? '(Video)' : '(Image)' }}</p>
                                     <p class="text-xs">{{ $user->created_at->format('M d, Y') }}</p>
                                 </div>
                             </div>
 
                             <!-- View button -->
-                            <button onclick="viewMedia('{{ $user->profile_url  }}', 'image', 'Main Profile Picture')"
+                            <button onclick="viewMedia('{{ $profileUrl }}', '{{ $isMainVideo ? 'video' : 'image' }}', 'Main Profile Picture')"
                                     class="absolute top-2 right-2 bg-white bg-opacity-80 hover:bg-opacity-100 text-gray-700 p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                                 <i class="fas fa-eye text-sm"></i>
                             </button>
@@ -224,7 +264,7 @@
                             <!-- Video Thumbnail -->
                             <div class="aspect-square bg-gray-100 rounded-lg overflow-hidden">
                                 <video class="w-full h-full object-cover" preload="metadata">
-                                    <source src="{{ $upload->file_url . '/' . $upload->file_name }}" type="video/mp4">
+                                    <source src="{{url( $upload->file_url . '/' . $upload->file_name )}}" type="video/mp4">
                                 </video>
                                 <div class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30">
                                     <i class="fas fa-play text-white text-2xl"></i>
@@ -233,7 +273,7 @@
                             @else
                             <!-- Image -->
                             <div class="aspect-square bg-gray-100 rounded-lg overflow-hidden">
-                                <img src="{{ $upload->file_url . '/' . $upload->file_name }}"
+                                <img src="{{url( $upload->file_url . '/' . $upload->file_name )}}"
                                      alt="{{ $upload->alt_text ?? 'Profile image' }}"
                                      class="w-full h-full object-cover hover:scale-105 transition-transform duration-200">
                             </div>
@@ -251,7 +291,7 @@
                             </div>
 
                             <!-- View button -->
-                            <button onclick="viewMedia('{{ $upload->file_url . '/' . $upload->file_name }}', '{{ $upload->file_type }}', '{{ addslashes($upload->caption ?? '') }}')"
+                            <button onclick="viewMedia('{{url( $upload->file_url . '/' . $upload->file_name )}}', '{{ $upload->file_type }}', '{{ addslashes($upload->caption ?? '') }}')"
                                     class="absolute top-2 right-2 bg-white bg-opacity-80 hover:bg-opacity-100 text-gray-700 p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                                 <i class="fas fa-eye text-sm"></i>
                             </button>

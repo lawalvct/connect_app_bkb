@@ -246,13 +246,13 @@ class UserResource extends JsonResource
         }
 
         // Clean up profile filename
-        $cleanProfile = $this->cleanFileName($this->profile);
+     //   $cleanProfile = $this->cleanFileName($this->profile);
 
         // Check if this is a legacy user (ID 1-3354) and use old server URL
-        if ($this->id >= 1 && $this->id <= 3354) {
-            // For legacy users, always use the old server URL with clean filename
-            return 'https://connectapp.talosmart.xyz/uploads/profiles/' . $cleanProfile;
-        }
+     //   if ($this->id >= 1 && $this->id <= 3354) {
+          //  // For legacy users, always use the old server URL with clean filename
+     //       return 'https://connectapp.talosmart.xyz/uploads/profiles/' . $cleanProfile;
+    //    }
 
         // For new users (ID > 3354), use current project logic
 
@@ -300,10 +300,10 @@ class UserResource extends JsonResource
         $cleanFileName = $this->cleanFileName($fileName);
 
         // Check if this is a legacy user (ID 1-3354) and use old server URL
-        if ($this->id >= 1 && $this->id <= 3354) {
-            // For legacy users, always use the old server URL with clean filename
-            return 'https://connectapp.talosmart.xyz/uploads/profiles/' . $cleanFileName;
-        }
+        // if ($this->id >= 1 && $this->id <= 3354) {
+        //     // For legacy users, always use the old server URL with clean filename
+        //     return 'https://connectapp.talosmart.xyz/uploads/profiles/' . $cleanFileName;
+        // }
 
         // For new users (ID > 3354), use current project logic
 

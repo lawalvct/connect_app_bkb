@@ -910,11 +910,11 @@ class UserManagementController extends Controller
         // Clean up profile filename
         $cleanProfile = $this->cleanFileName($user->profile);
 
-        // Check if this is a legacy user (ID 1-3354) and use old server URL
-        if ($user->id >= 1 && $user->id <= 3354) {
-            // For legacy users, always use the old server URL with clean filename
-            return 'https://connectapp.talosmart.xyz/uploads/profiles/' . $cleanProfile;
-        }
+        // // Check if this is a legacy user (ID 1-3354) and use old server URL
+        // if ($user->id >= 1 && $user->id <= 3354) {
+        //     // For legacy users, always use the old server URL with clean filename
+        //     return 'https://connectapp.talosmart.xyz/uploads/profiles/' . $cleanProfile;
+        // }
 
         // For new users (ID > 3354), use current project logic
 

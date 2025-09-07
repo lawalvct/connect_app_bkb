@@ -227,22 +227,22 @@ private function addDefaultProfileUploads(User $user)
         $defaultUploads = [
             [
                 'file_name' => 'female1.png',
-                'file_url' => url('uploads/profiles/'),
+                'file_url' => 'uploads/profiles/',
                 'file_type' => 'image'
             ],
             [
                 'file_name' => 'female2.png',
-                'file_url' => url('uploads/profiles/'),
+                'file_url' => 'uploads/profiles/',
                 'file_type' => 'image'
             ],
             [
                 'file_name' => 'female3.png',
-                'file_url' => url('uploads/profiles/'),
+                'file_url' => 'uploads/profiles/',
                 'file_type' => 'image'
             ],
             [
                 'file_name' => 'female4.png',
-                'file_url' => url('uploads/profiles/'),
+                'file_url' => 'uploads/profiles/',
                 'file_type' => 'image'
             ]
         ];
@@ -251,22 +251,22 @@ private function addDefaultProfileUploads(User $user)
         $defaultUploads = [
             [
                 'file_name' => 'male1.png',
-                'file_url' => url('uploads/profiles/'),
+                'file_url' => 'uploads/profiles/',
                 'file_type' => 'image'
             ],
             [
                 'file_name' => 'male2.png',
-                'file_url' => url('uploads/profiles/'),
+                'file_url' => 'uploads/profiles/',
                 'file_type' => 'image'
             ],
             [
                 'file_name' => 'male3.png',
-                'file_url' => url('uploads/profiles/'),
+                'file_url' => 'uploads/profiles/',
                 'file_type' => 'image'
             ],
             [
                 'file_name' => 'male4.png',
-                'file_url' => url('uploads/profiles/'),
+                'file_url' => 'uploads/profiles/',
                 'file_type' => 'image'
             ]
         ];
