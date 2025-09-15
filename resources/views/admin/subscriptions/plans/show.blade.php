@@ -278,14 +278,16 @@
                         <div class="flex justify-between items-center">
                             <span class="text-sm text-gray-600">Monthly Revenue</span>
                             <span class="text-lg font-bold text-purple-600">
-                                ${{ number_format($plan->userSubscriptions->where('payment_status', 'completed')->whereMonth('created_at', now()->month)->sum('amount'), 2) }}
+                                ${{ number_format($plan->userSubscriptions->where('payment_status', 'completed')->filter(function($subscription) {
+                                    return $subscription->created_at->month === now()->month;
+                                })->sum('amount'), 2) }}
                             </span>
                         </div>
                     </div>
                 </div>
 
                 <!-- Quick Actions -->
-                <div class="bg-white rounded-lg shadow-md">
+                {{-- <div class="bg-white rounded-lg shadow-md">
                     <div class="px-6 py-4 border-b border-gray-200">
                         <h3 class="text-lg font-medium text-gray-900">Quick Actions</h3>
                     </div>
@@ -308,7 +310,7 @@
                             Export Subscribers
                         </button>
                     </div>
-                </div>
+                </div> --}}
 
                 <!-- Metadata -->
                 <div class="bg-white rounded-lg shadow-md">

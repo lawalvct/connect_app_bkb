@@ -304,16 +304,40 @@ class NotificationController extends Controller
 
     public function getEmailStats()
     {
-        $stats = [
-            'total' => NotificationTemplate::where('type', 'email')->count(),
-            'active' => NotificationTemplate::where('type', 'email')->where('is_active', true)->count(),
-            'inactive' => NotificationTemplate::where('type', 'email')->where('is_active', false)->count()
-        ];
+        try {
+            $totalUsers = User::whereNotNull('email_verified_at')->count();
+            $totalCircles = \App\Models\SocialCircle::active()->count();
+            $totalCountries = \App\Models\Country::where('active', true)->count();
 
-        return response()->json([
-            'success' => true,
-            'stats' => $stats
-        ]);
+            $stats = [
+                'total_users' => $totalUsers,
+                'total_circles' => $totalCircles,
+                'total_countries' => $totalCountries,
+                // Also include template stats for other parts of the system
+                'total_templates' => NotificationTemplate::where('type', 'email')->count(),
+                'active_templates' => NotificationTemplate::where('type', 'email')->where('is_active', true)->count(),
+                'inactive_templates' => NotificationTemplate::where('type', 'email')->where('is_active', false)->count()
+            ];
+
+            return response()->json([
+                'success' => true,
+                'stats' => $stats
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error fetching email stats: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'stats' => [
+                    'total_users' => 0,
+                    'total_circles' => 0,
+                    'total_countries' => 0,
+                    'total_templates' => 0,
+                    'active_templates' => 0,
+                    'inactive_templates' => 0
+                ]
+            ]);
+        }
     }
 
     // SMS Settings
@@ -624,29 +648,47 @@ class NotificationController extends Controller
     // Get social circles for targeting
     public function getSocialCircles()
     {
-        $circles = \App\Models\SocialCircle::select('id', 'name', 'description')
-            ->withCount('users')
-            ->orderBy('name')
-            ->get();
+        try {
+            $circles = \App\Models\SocialCircle::select('id', 'name', 'description')
+                ->active()
+                ->ordered()
+                ->get();
 
-        return response()->json([
-            'success' => true,
-            'social_circles' => $circles
-        ]);
+            return response()->json([
+                'success' => true,
+                'circles' => $circles
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error fetching social circles: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'circles' => []
+            ]);
+        }
     }
 
     // Get countries for targeting
     public function getCountries()
     {
-        $countries = \App\Models\Country::select('id', 'name', 'code')
-            ->withCount('users')
-            ->orderBy('name')
-            ->get();
+        try {
+            $countries = \App\Models\Country::select('id', 'name', 'code')
+                ->where('active', true)
+                ->orderBy('name')
+                ->get();
 
-        return response()->json([
-            'success' => true,
-            'countries' => $countries
-        ]);
+            return response()->json([
+                'success' => true,
+                'countries' => $countries
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error fetching countries: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'countries' => []
+            ]);
+        }
     }
 
     // Preview notification targets

@@ -160,8 +160,6 @@ Route::prefix('admin')->name('admin.')->group(function () {
                     Route::delete('/templates/{id}', [NotificationController::class, 'deleteEmailTemplate']);
                     Route::get('/stats', [NotificationController::class, 'getEmailStats']);
                 });
-    // Standalone route for sending email notification (for POST /admin/notifications/email/send)
-   // Route::post('notifications/email/send', [NotificationController::class, 'sendEmail']);
 
                 // SMS settings
                 Route::prefix('sms')->group(function () {
@@ -350,15 +348,15 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::patch('/{country}/status', [CountryController::class, 'updateStatus'])->name('update-status');
         });
 
-        // Notification Management
+        // Notification Management (View Routes)
         Route::prefix('notifications')->name('notifications.')->group(function () {
             Route::get('/push', [NotificationController::class, 'pushIndex'])->name('push.index');
-            Route::get('/subscription', [NotificationController::class, 'subscriptionIndex'])->name('subscription.index');
-            Route::get('/test-push', function() { return view('admin.test-push-notifications'); })->name('test-push');
             Route::get('/email', [NotificationController::class, 'emailIndex'])->name('email.index');
-            Route::post('/email/send', [NotificationController::class, 'sendEmail']);
+            Route::post('/email/send', [NotificationController::class, 'sendEmail'])->name('email.send');
             Route::get('/sms', [NotificationController::class, 'smsIndex'])->name('sms.index');
             Route::get('/logs', [NotificationController::class, 'logsIndex'])->name('logs.index');
+            Route::get('/subscription', [NotificationController::class, 'subscriptionIndex'])->name('subscription.index');
+            Route::get('/test-push', function() { return view('admin.test-push-notifications'); })->name('test-push');
         });
 
         // Analytics Routes
