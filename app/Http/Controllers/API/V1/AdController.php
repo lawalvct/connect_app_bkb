@@ -237,12 +237,26 @@ public function dashboard(Request $request)
             $user = $request->user();
             $perPage = $request->input('per_page', 20);
 
+            // Sanitize parameters - treat 'undefined', empty strings, and empty quoted strings as null
+            $sanitizeParam = function($value) {
+                if ($value === 'undefined' || $value === '' || $value === '""' || $value === "''") {
+                    return null;
+                }
+                return $value;
+            };
+
+            $status = $sanitizeParam($request->input('status'));
+            $adName = $sanitizeParam($request->input('ad_name'));
+            $type = $sanitizeParam($request->input('type'));
+            $startDate = $sanitizeParam($request->input('start_date'));
+            $endDate = $sanitizeParam($request->input('end_date'));
+
             $query = Ad::where('user_id', $user->id)
                 ->where('deleted_flag', 'N');
 
             // Apply filters
-            if ($request->has('status')) {
-                $query->where('status', $request->status);
+            if ($status) {
+                $query->where('status', $status);
             }
 
             // Add support for active/inactive filter (maps to status)
@@ -255,20 +269,20 @@ public function dashboard(Request $request)
             }
 
             // Add ad name search functionality
-            if ($request->has('ad_name') && !empty($request->ad_name)) {
-                $query->where('ad_name', 'LIKE', '%' . $request->ad_name . '%');
+            if ($adName) {
+                $query->where('ad_name', 'LIKE', '%' . $adName . '%');
             }
 
-            if ($request->has('type')) {
-                $query->where('type', $request->type);
+            if ($type) {
+                $query->where('type', $type);
             }
 
-            if ($request->has('start_date')) {
-                $query->where('start_date', '>=', $request->start_date);
+            if ($startDate) {
+                $query->where('start_date', '>=', $startDate);
             }
 
-            if ($request->has('end_date')) {
-                $query->where('end_date', '<=', $request->end_date);
+            if ($endDate) {
+                $query->where('end_date', '<=', $endDate);
             }
 
             // Order by
