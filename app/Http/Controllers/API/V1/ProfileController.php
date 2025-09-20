@@ -1002,7 +1002,7 @@ class ProfileController extends BaseController
                 'type' => $imageType,
                 'filename' => $newFileName,
                 'url' => $newFileUrl,
-                'full_url' => $uploadType === 's3' ? $newFileUrl : url($newFileUrl),
+                'full_url' => $uploadType === 's3' ? $newFileUrl : url($newFileUrl.$newFileName),
                 'file_type' => $imageType === 'user_profile' ? ($existingImage->file_type ?? 'image') : 'image',
                 'is_main' => $wasMainImage,
                 'created_at' => $existingImage->created_at,
