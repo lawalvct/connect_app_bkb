@@ -1301,17 +1301,13 @@ class ConnectionController extends Controller
             $countryId = $request->input('country_id');
             $offset = ($page - 1) * $perPage;
 
-            // Define the minimum date for posts - May 1st, 2025
-            $minimumDate = \Carbon\Carbon::create(2025, 9, 1, 0, 0, 0);
-
             Log::info('getUsersByPost called', [
                 'user_id' => $user->id,
                 'post_id' => $postId,
                 'social_circle_ids' => $socialCircleIds,
                 'page' => $page,
                 'per_page' => $perPage,
-                'country_id' => $countryId,
-                'minimum_date' => $minimumDate->toDateTimeString()
+                'country_id' => $countryId
             ]);
 
             // Get auth user's social circles for relevance scoring
@@ -1329,9 +1325,9 @@ class ConnectionController extends Controller
                 }
             }
 
-            // If no social circles specified, get popular social circles from recent posts (May 2025 onwards)
+            // If no social circles specified, get popular social circles from recent posts
             if (empty($socialCircleIds)) {
-                $popularCircles = \App\Models\Post::where('created_at', '>=', $minimumDate)
+                $popularCircles = \App\Models\Post::where('created_at', '>=', now()->subDays(30))
                     ->where('is_published', true)
                     ->whereNotNull('social_circle_id')
                     ->groupBy('social_circle_id')
@@ -1351,7 +1347,7 @@ class ConnectionController extends Controller
             $blockedUserIds = BlockUserHelper::blockUserList($user->id);
             $excludedUserIds = array_merge($swipedUserIds, $blockedUserIds, [$user->id]);
 
-            // Build base query for posts with multiple criteria - FILTERED BY MAY 2025 ONWARDS
+            // Build base query for posts with multiple criteria
             // ONLY POSTS WITH MEDIA
             $postsQuery = \App\Models\Post::with([
                 'user.profileImages',
@@ -1363,7 +1359,6 @@ class ConnectionController extends Controller
                 'comments'
             ])
             ->where('is_published', true)
-            ->where('created_at', '>=', $minimumDate) // Only posts from May 2025 onwards
             ->whereNull('deleted_at')
             ->whereHas('media') // Only posts that have media
             ->whereHas('user', function ($q) use ($excludedUserIds, $countryId) {
@@ -1384,7 +1379,7 @@ class ConnectionController extends Controller
             // Create multiple queries for different criteria
             $queries = [];
 
-            // 1. Most recent posts (30%) - from May 2025 onwards (already filtered by base query)
+            // 1. Most recent posts (30%)
             $recentPosts = clone $postsQuery;
             $recentPosts->orderBy('created_at', 'desc');
             $queries['recent'] = $recentPosts;
@@ -1417,21 +1412,21 @@ class ConnectionController extends Controller
             }
 
             // Calculate distribution of posts per category
-            // $distributions = [
-            //     'relevant' => $relevantPosts ? (int)($perPage * 0.10) : 0, // 10%
-            //     'recent' => (int)($perPage * 0.30), // 30%
-            //     'liked' => (int)($perPage * 0.25),  // 25%
-            //     'commented' => (int)($perPage * 0.20), // 20%
-            //     'viewed' => (int)($perPage * 0.15)  // 15%
-            // ];
-
-               $distributions = [
-                'relevant' => $relevantPosts ? (int)($perPage * 0.0) : 0,
-                'recent' => (int)($perPage * 0.90),
-                'liked' => (int)($perPage * 0.0),
-                'commented' => (int)($perPage * 0.0),
-                'viewed' => (int)($perPage * 0.10)
+            $distributions = [
+                'relevant' => $relevantPosts ? (int)($perPage * 0.10) : 0, // 10%
+                'recent' => (int)($perPage * 0.30), // 30%
+                'liked' => (int)($perPage * 0.25),  // 25%
+                'commented' => (int)($perPage * 0.20), // 20%
+                'viewed' => (int)($perPage * 0.15)  // 15%
             ];
+
+            //    $distributions = [
+            //     'relevant' => $relevantPosts ? (int)($perPage * 0.0) : 0,
+            //     'recent' => (int)($perPage * 0.90),
+            //     'liked' => (int)($perPage * 0.0),
+            //     'commented' => (int)($perPage * 0.0),
+            //     'viewed' => (int)($perPage * 0.10)
+            // ];
 
             // Collect posts from each category
             $collectedPosts = collect();
@@ -1455,43 +1450,6 @@ class ConnectionController extends Controller
                 }
             }
 
-            // Force include specific post ID 2866 - ALWAYS INCLUDE REGARDLESS OF ANY CONDITIONS (for testing)
-            $specificPost = \App\Models\Post::with([
-                'user.profileImages',
-                'user.country',
-                'user.socialCircles',
-                'media',
-                'socialCircle',
-                'likes',
-                'comments'
-            ])
-            ->withTrashed() // Include soft deleted posts
-            ->where('id', 2866)
-            ->first();
-
-            if ($specificPost) {
-                Log::info('Post 2866 found for testing', [
-                    'post_id' => $specificPost->id,
-                    'media_count' => $specificPost->media->count(),
-                    'media_items' => $specificPost->media->toArray(),
-                    'created_at' => $specificPost->created_at->toDateTimeString(),
-                    'user_id' => $specificPost->user_id,
-                    'is_published' => $specificPost->is_published,
-                    'deleted_at' => $specificPost->deleted_at
-                ]);
-
-                if (!in_array($specificPost->id, $usedPostIds)) {
-                    $specificPost->discovery_type = 'featured';
-                    $collectedPosts->prepend($specificPost);
-                    $usedPostIds[] = $specificPost->id;
-                    Log::info('Post 2866 added to collection');
-                } else {
-                    Log::info('Post 2866 already in collection');
-                }
-            } else {
-                Log::error('Post 2866 does not exist in database at all');
-            }
-
             // If we don't have enough posts, fill with random posts
             if ($collectedPosts->count() < $perPage) {
                 $remainingCount = $perPage - $collectedPosts->count();
@@ -1511,25 +1469,8 @@ class ConnectionController extends Controller
             // Shuffle the collection for random arrangement
             $collectedPosts = $collectedPosts->shuffle();
 
-            // Apply pagination - but ensure post 2866 is on first page if it exists
+            // Apply pagination
             $total = $collectedPosts->count();
-
-            // If we're on the first page and post 2866 exists, ensure it's included
-            if ($page == 1) {
-                $post2866 = $collectedPosts->firstWhere('id', 2866);
-                if ($post2866) {
-                    // Remove post 2866 from current position
-                    $collectedPosts = $collectedPosts->reject(function($post) {
-                        return $post->id == 2866;
-                    })->values();
-
-                    // Add it to the beginning
-                    $collectedPosts->prepend($post2866);
-
-                    Log::info('Post 2866 moved to first position on page 1');
-                }
-            }
-
             $paginatedPosts = $collectedPosts->slice($offset, $perPage)->values();
 
             Log::info('getUsersByPost results', [
@@ -1580,16 +1521,6 @@ class ConnectionController extends Controller
                         'order' => $media->order
                     ];
                 });
-
-                // Log media info for post 2866 specifically
-                if ($post->id == 2866) {
-                    Log::info('Formatting post 2866 media', [
-                        'post_id' => $post->id,
-                        'media_collection_count' => $post->media->count(),
-                        'formatted_media_count' => $mediaItems->count(),
-                        'media_items' => $mediaItems->toArray()
-                    ]);
-                }
 
                 return [
                     'id' => $post->id,

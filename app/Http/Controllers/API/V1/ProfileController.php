@@ -96,10 +96,21 @@ class ProfileController extends BaseController
         $user = $request->user();
 
         $validator = Validator::make($request->all(), [
-            'name' => 'nullable|string',
-            'username' => "nullable|string|unique:users,username,{$user->id},id,deleted_flag,N",
-            'bio' => 'nullable|string',
+            'name' => 'nullable|string|max:255',
+            'username' => "nullable|string|max:255|unique:users,username,{$user->id},id,deleted_flag,N",
+            'bio' => 'nullable|string|max:1000',
             'country_id' => 'nullable|exists:countries,id',
+            'phone' => 'nullable|string|max:20',
+            'birth_date' => 'nullable|date|before:today',
+            'gender' => 'nullable|in:male,female,other',
+            'city' => 'nullable|string|max:255',
+            'state' => 'nullable|string|max:255',
+            'timezone' => 'nullable|string|timezone',
+            'interests' => 'nullable|array',
+            'interests.*' => 'string|max:100',
+            'social_links' => 'nullable|array',
+            'social_links.*.platform' => 'required_with:social_links|string|max:50',
+            'social_links.*.url' => 'required_with:social_links|string|url|max:500',
         ]);
 
         if ($validator->fails()) {
@@ -122,6 +133,34 @@ class ProfileController extends BaseController
 
         if ($request->has('country_id')) {
             $updateData['country_id'] = $request->country_id;
+        }
+
+        if ($request->has('phone')) {
+            $updateData['phone'] = $request->phone;
+        }
+
+        if ($request->has('birth_date')) {
+            $updateData['birth_date'] = $request->birth_date;
+        }
+
+        if ($request->has('gender')) {
+            $updateData['gender'] = $request->gender;
+        }
+
+        if ($request->has('city')) {
+            $updateData['city'] = $request->city;
+        }
+
+        if ($request->has('state')) {
+            $updateData['state'] = $request->state;
+        }
+
+        if ($request->has('timezone')) {
+            $updateData['timezone'] = $request->timezone;
+        }
+
+        if ($request->has('interests')) {
+            $updateData['interests'] = $request->interests;
         }
 
         // Handle profile pictures
