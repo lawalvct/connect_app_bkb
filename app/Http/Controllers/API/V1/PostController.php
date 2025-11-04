@@ -12,6 +12,7 @@ use App\Models\PostComment;
 use App\Models\PostReport;
 use App\Models\PostView;
 use App\Models\PostShare;
+use App\Models\BlockUser;
 use App\Services\MediaProcessingService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -40,6 +41,12 @@ class PostController extends BaseController
             $page = $request->get('page', 1);
             $perPage = $request->get('per_page', 20);
 
+            // Get blocked user IDs
+            $blockedUserIds = BlockUser::where('user_id', $user->id)
+                ->where('deleted_flag', 'N')
+                ->pluck('block_user_id')
+                ->toArray();
+
             // Get user's social circles
          //   $userCircles = $user->socialCircles()->pluck('social_circles.id');
 
@@ -53,6 +60,7 @@ class PostController extends BaseController
                 }
             ])
           //  ->whereIn('social_circle_id', $userCircles)
+            ->whereNotIn('user_id', $blockedUserIds) // Exclude posts from blocked users
             ->published()
             ->latest('published_at')
             ->paginate($perPage);
@@ -91,11 +99,18 @@ class PostController extends BaseController
             $page = $request->input('page', 1);
             $limit = $request->input('limit', 10);
 
+            // Get blocked user IDs
+            $blockedUserIds = BlockUser::where('user_id', $user->id)
+                ->where('deleted_flag', 'N')
+                ->pluck('block_user_id')
+                ->toArray();
+
             // Get user's social circles
             $userSocialCircles = $user->socialCircles->pluck('id')->toArray();
 
             // Get posts for the feed (your existing logic)
             $posts = Post::whereIn('social_circle_id', $userSocialCircles)
+                ->whereNotIn('user_id', $blockedUserIds) // Exclude posts from blocked users
                 ->with(['user', 'socialCircle', 'media'])
                 ->latest()
                 ->paginate($limit);
@@ -812,6 +827,182 @@ class PostController extends BaseController
                 'error' => $e->getMessage()
             ]);
             throw $e;
+        }
+    }
+
+    /**
+     * Block a user's posts
+     */
+    public function blockUserPosts(Request $request): JsonResponse
+    {
+        try {
+            $user = auth()->user();
+            $userIdToBlock = $request->input('user_id');
+
+            // Validate the user ID
+            if (!$userIdToBlock) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'User ID is required'
+                ], 422);
+            }
+
+            // Check if user is trying to block themselves
+            if ($userIdToBlock == $user->id) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'You cannot block yourself'
+                ], 422);
+            }
+
+            // Check if the user exists
+            $userToBlock = \App\Models\User::find($userIdToBlock);
+            if (!$userToBlock) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'User not found'
+                ], 404);
+            }
+
+            // Check if already blocked
+            $existingBlock = BlockUser::where('user_id', $user->id)
+                ->where('block_user_id', $userIdToBlock)
+                ->where('deleted_flag', 'N')
+                ->first();
+
+            if ($existingBlock) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'User is already blocked'
+                ], 409);
+            }
+
+            // Create block record
+            BlockUser::create([
+                'user_id' => $user->id,
+                'block_user_id' => $userIdToBlock,
+                'reason' => $request->input('reason', 'Blocked posts'),
+                'created_by' => $user->id,
+                'deleted_flag' => 'N'
+            ]);
+
+            return response()->json([
+                'status' => 1,
+                'message' => 'User blocked successfully. You will no longer see their posts.',
+                'data' => [
+                    'blocked_user_id' => $userIdToBlock,
+                    'blocked_user_name' => $userToBlock->name
+                ]
+            ], $this->successStatus);
+
+        } catch (\Exception $e) {
+            Log::error('Block user posts failed', [
+                'user_id' => auth()->id(),
+                'block_user_id' => $request->input('user_id'),
+                'error' => $e->getMessage()
+            ]);
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to block user'
+            ], 500);
+        }
+    }
+
+    /**
+     * Unblock a user's posts
+     */
+    public function unblockUserPosts(Request $request): JsonResponse
+    {
+        try {
+            $user = auth()->user();
+            $userIdToUnblock = $request->input('user_id');
+
+            // Validate the user ID
+            if (!$userIdToUnblock) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'User ID is required'
+                ], 422);
+            }
+
+            // Find and soft delete the block record
+            $blockRecord = BlockUser::where('user_id', $user->id)
+                ->where('block_user_id', $userIdToUnblock)
+                ->where('deleted_flag', 'N')
+                ->first();
+
+            if (!$blockRecord) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'User is not blocked'
+                ], 404);
+            }
+
+            // Soft delete by setting deleted_flag
+            $blockRecord->deleted_flag = 'Y';
+            $blockRecord->updated_by = $user->id;
+            $blockRecord->save();
+
+            return response()->json([
+                'status' => 1,
+                'message' => 'User unblocked successfully. You will now see their posts.'
+            ], $this->successStatus);
+
+        } catch (\Exception $e) {
+            Log::error('Unblock user posts failed', [
+                'user_id' => auth()->id(),
+                'unblock_user_id' => $request->input('user_id'),
+                'error' => $e->getMessage()
+            ]);
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to unblock user'
+            ], 500);
+        }
+    }
+
+    /**
+     * Get list of blocked users
+     */
+    public function getBlockedUsers(): JsonResponse
+    {
+        try {
+            $user = auth()->user();
+
+            $blockedUsers = BlockUser::where('user_id', $user->id)
+                ->where('deleted_flag', 'N')
+                ->with('blockedUser:id,name,username,profile,profile_url')
+                ->get()
+                ->map(function ($block) {
+                    return [
+                        'id' => $block->id,
+                        'blocked_user' => [
+                            'id' => $block->blockedUser->id,
+                            'name' => $block->blockedUser->name,
+                            'username' => $block->blockedUser->username,
+                            'profile' => $block->blockedUser->profile,
+                            'profile_url' => $block->blockedUser->profile_url,
+                        ],
+                        'reason' => $block->reason,
+                        'blocked_at' => $block->created_at->toDateTimeString()
+                    ];
+                });
+
+            return response()->json([
+                'status' => 1,
+                'message' => 'Blocked users retrieved successfully',
+                'data' => $blockedUsers
+            ], $this->successStatus);
+
+        } catch (\Exception $e) {
+            Log::error('Get blocked users failed', [
+                'user_id' => auth()->id(),
+                'error' => $e->getMessage()
+            ]);
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to retrieve blocked users'
+            ], 500);
         }
     }
 }

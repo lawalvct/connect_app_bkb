@@ -332,6 +332,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Posts
     Route::prefix('posts')->group(function () {
+        // Block/Unblock user posts (must be before {post} routes)
+        Route::post('/block-user', [PostController::class, 'blockUserPosts']);
+        Route::post('/unblock-user', [PostController::class, 'unblockUserPosts']);
+        Route::get('/blocked-users', [PostController::class, 'getBlockedUsers']);
+
         Route::get('/feed', [PostController::class, 'getFeed']);
         Route::get('/scheduled', [PostController::class, 'getScheduledPosts']);
         Route::get('/user/{userId?}', [PostController::class, 'getUserPosts']);
