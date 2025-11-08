@@ -23,6 +23,7 @@
             justify-content: center;
             padding: 20px;
             position: relative;
+            flex-direction: column;
         }
 
         .login-card {
@@ -33,32 +34,29 @@
             width: 100%;
             max-width: 400px;
             text-align: center;
+            margin-top: 20px;
         }
 
         .logo-container {
             width: 100%;
             display: flex;
             justify-content: center;
-            align-items: flex-end;
-            margin-bottom: 0;
+            align-items: center;
+            margin-bottom: 24px;
         }
 
         .logo-top-center {
-            position: absolute;
-            top: 48px;
-            left: 0;
-            right: 0;
+            position: relative;
             z-index: 2;
-            pointer-events: none;
         }
 
         .logo {
             max-width: 80px;
             height: auto;
-            margin-top: -20px;
             background: #fff;
             border-radius: 50%;
             box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+            padding: 8px;
         }
 
         .page-title {
