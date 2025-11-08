@@ -254,25 +254,43 @@ class Ad extends Model
 
     public function approve($adminId, $comments = null)
     {
-        $this->update([
+        // Verify admin exists (checking Admin model, not User model)
+        $adminExists = \App\Models\Admin::find($adminId);
+
+        $updateData = [
             'admin_status' => 'approved',
             'status' => 'active',
             'admin_comments' => $comments,
-            'reviewed_by' => $adminId,
             'reviewed_at' => now(),
             'activated_at' => now()
-        ]);
+        ];
+
+        // Only set reviewed_by if the admin exists
+        if ($adminExists) {
+            $updateData['reviewed_by'] = $adminId;
+        }
+
+        $this->update($updateData);
     }
 
     public function reject($adminId, $comments)
     {
-        $this->update([
+        // Verify admin exists (checking Admin model, not User model)
+        $adminExists = \App\Models\Admin::find($adminId);
+
+        $updateData = [
             'admin_status' => 'rejected',
             'status' => 'rejected',
             'admin_comments' => $comments,
-            'reviewed_by' => $adminId,
             'reviewed_at' => now()
-        ]);
+        ];
+
+        // Only set reviewed_by if the admin user exists
+        if ($adminExists) {
+            $updateData['reviewed_by'] = $adminId;
+        }
+
+        $this->update($updateData);
     }
 
     // Check if ad should be displayed in a specific social circle

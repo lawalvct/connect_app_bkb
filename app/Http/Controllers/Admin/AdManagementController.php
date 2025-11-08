@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Ad;
 use App\Models\AdPayment;
-use App\Models\User;
+use App\Models\Admin;
 use App\Models\SocialCircle;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -168,6 +168,15 @@ class AdManagementController extends Controller
         try {
             DB::beginTransaction();
 
+            // Get admin ID and verify it exists (using admin guard)
+            $adminId = Auth::guard('admin')->id();
+            if (!$adminId || !Admin::find($adminId)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid admin user'
+                ], 401);
+            }
+
             // Check if ad has completed payment
             $hasPayment = $ad->payments()->where('status', 'completed')->exists();
 
@@ -179,14 +188,14 @@ class AdManagementController extends Controller
             }
 
             // Approve the ad
-            $ad->approve(Auth::id(), $request->admin_comments);
+            $ad->approve($adminId, $request->admin_comments);
 
             DB::commit();
 
             // Log the approval
             Log::info("Ad approved", [
                 'ad_id' => $ad->id,
-                'admin_id' => Auth::id(),
+                'admin_id' => $adminId,
                 'ad_name' => $ad->ad_name
             ]);
 
@@ -200,7 +209,7 @@ class AdManagementController extends Controller
             Log::error('Error approving ad: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to approve ad'
+                'message' => 'Failed to approve ad: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -214,15 +223,24 @@ class AdManagementController extends Controller
         try {
             DB::beginTransaction();
 
+            // Get admin ID and verify it exists (using admin guard)
+            $adminId = Auth::guard('admin')->id();
+            if (!$adminId || !Admin::find($adminId)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid admin user'
+                ], 401);
+            }
+
             // Reject the ad
-            $ad->reject(Auth::id(), $request->admin_comments);
+            $ad->reject($adminId, $request->admin_comments);
 
             DB::commit();
 
             // Log the rejection
             Log::info("Ad rejected", [
                 'ad_id' => $ad->id,
-                'admin_id' => Auth::id(),
+                'admin_id' => $adminId,
                 'ad_name' => $ad->ad_name,
                 'reason' => $request->admin_comments
             ]);
@@ -237,9 +255,19 @@ class AdManagementController extends Controller
             Log::error('Error rejecting ad: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to reject ad'
+                'message' => 'Failed to reject ad: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    public function getAdsByStatus(Request $request)
+    {
+        // This method can be implemented if needed
+        // For now, returning a placeholder
+        return response()->json([
+            'success' => true,
+            'message' => 'Method not yet implemented'
+        ], 501);
     }
 
     public function destroy(Ad $ad)
