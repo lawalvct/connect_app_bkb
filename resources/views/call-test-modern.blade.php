@@ -634,6 +634,176 @@
         ::-webkit-scrollbar-thumb:hover {
             background: var(--primary-dark);
         }
+
+        /* Incoming Call Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            animation: fadeIn 0.3s;
+        }
+
+        .incoming-call-modal {
+            background: white;
+            border-radius: 24px;
+            padding: 0;
+            max-width: 450px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            animation: slideUp 0.3s;
+            overflow: hidden;
+        }
+
+        .modal-header {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .modal-header i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 1.5rem;
+            text-transform: capitalize;
+        }
+
+        .modal-body {
+            padding: 2rem;
+        }
+
+        .caller-info {
+            text-align: center;
+        }
+
+        .caller-avatar {
+            width: 100px;
+            height: 100px;
+            margin: 0 auto 1rem;
+            border-radius: 50%;
+            overflow: hidden;
+            background: var(--light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 4px solid var(--primary);
+        }
+
+        .caller-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .caller-avatar i {
+            font-size: 3rem;
+            color: var(--primary);
+        }
+
+        .caller-info h3 {
+            margin: 0.5rem 0 0.25rem;
+            font-size: 1.5rem;
+            color: var(--dark);
+        }
+
+        .caller-info p {
+            margin: 0;
+            color: #666;
+            font-size: 0.95rem;
+        }
+
+        .call-type-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: var(--light);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            margin-top: 1rem;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 1rem;
+            padding: 1.5rem 2rem 2rem;
+        }
+
+        .modal-actions button {
+            flex: 1;
+            padding: 1rem;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            transition: all 0.3s;
+        }
+
+        .btn-reject {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-reject:hover {
+            background: var(--danger-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+        }
+
+        .btn-accept {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-accept:hover {
+            background: var(--success-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+
+        .animate-ring {
+            animation: ring 1s ease-in-out infinite;
+        }
+
+        @keyframes ring {
+            0%, 100% { transform: rotate(0deg); }
+            10%, 30% { transform: rotate(-15deg); }
+            20%, 40% { transform: rotate(15deg); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
     </style>
 </head>
 <body>
@@ -893,8 +1063,45 @@
                 </div>
             </div>
 
-            <!-- Activity Logs -->
-            <div class="card">
+            <!-- Incoming Call Modal -->
+            <div v-if="incomingCall.show" class="modal-overlay" @click.self="rejectIncomingCall">
+                <div class="incoming-call-modal">
+                    <div class="modal-header">
+                        <i class="fas fa-phone-volume animate-ring"></i>
+                        <h2>Incoming @{{ incomingCall.data && incomingCall.data.call_type ? incomingCall.data.call_type : 'Call' }}</h2>
+                    </div>
+
+                    <div class="modal-body">
+                        <div class="caller-info">
+                            <div class="caller-avatar">
+                                <img v-if="incomingCall.data && incomingCall.data.initiator && incomingCall.data.initiator.avatar_url"
+                                     :src="incomingCall.data.initiator.avatar_url"
+                                     :alt="incomingCall.data.initiator.name">
+                                <i v-else class="fas fa-user-circle"></i>
+                            </div>
+                            <h3>@{{ incomingCall.data && incomingCall.data.initiator ? incomingCall.data.initiator.name : 'Unknown' }}</h3>
+                            <p>@{{ incomingCall.data && incomingCall.data.initiator ? incomingCall.data.initiator.username : '' }}</p>
+                            <div class="call-type-badge">
+                                <i :class="incomingCall.data && incomingCall.data.call_type === 'video' ? 'fas fa-video' : 'fas fa-phone'"></i>
+                                @{{ incomingCall.data && incomingCall.data.call_type === 'video' ? 'Video Call' : 'Audio Call' }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal-actions">
+                        <button @click="rejectIncomingCall" class="btn-reject">
+                            <i class="fas fa-phone-slash"></i>
+                            Reject
+                        </button>
+                        <button @click="acceptIncomingCall" class="btn-accept">
+                            <i class="fas fa-phone"></i>
+                            Accept
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Activity Logs -->\n            <div class="card">
                 <div class="card-header">
                     <i class="fas fa-terminal"></i>
                     <h3>Activity Logs</h3>
@@ -956,6 +1163,12 @@
                         audio: null
                     },
                     hasRemoteVideo: false,
+
+                    // Incoming Call Modal
+                    incomingCall: {
+                        show: false,
+                        data: null
+                    },
 
                     // Status
                     callStatus: {
@@ -1113,17 +1326,85 @@
 
                 handleIncomingCall(data) {
                     if (data.initiator.id !== this.currentUser.id) {
-                        this.currentCall = {
+                        this.log(`📞 Incoming ${data.call_type} call from ${data.initiator.name}`, 'success');
+
+                        // Show incoming call modal
+                        this.incomingCall.show = true;
+                        this.incomingCall.data = {
                             id: data.call_id,
                             call_type: data.call_type,
-                            status: 'initiated',
+                            agora_channel_name: data.agora_channel_name,
                             initiator: data.initiator,
-                            participants: data.participants || []
+                            participants: data.participants || [],
+                            started_at: data.started_at
                         };
-                        this.config.callType = data.call_type;
-                        this.callStatus.connected = true;
-                        this.callStatus.message = 'Incoming call';
+
+                        // Play ringtone (optional)
+                        this.playRingtone();
                     }
+                },
+
+                playRingtone() {
+                    // Optional: Add ringtone audio
+                    this.log('🔔 Ringing...', 'info');
+                },
+
+                stopRingtone() {
+                    // Optional: Stop ringtone audio
+                },
+
+                async acceptIncomingCall() {
+                    if (!this.incomingCall.data) return;
+
+                    this.stopRingtone();
+                    this.loading = true;
+
+                    try {
+                        this.log('Accepting incoming call...', 'info');
+
+                        // Leave any existing Agora session first
+                        if (this.agoraStatus.connected) {
+                            this.log('⚠️ Cleaning up previous call session...', 'warning');
+                            await this.leaveAgoraChannel();
+                            await new Promise(resolve => setTimeout(resolve, 300));
+                        }
+
+                        // Set current call from incoming data
+                        this.currentCall = {
+                            id: this.incomingCall.data.id,
+                            call_type: this.incomingCall.data.call_type,
+                            status: 'initiated',
+                            initiator: this.incomingCall.data.initiator,
+                            participants: this.incomingCall.data.participants
+                        };
+                        this.config.callType = this.incomingCall.data.call_type;
+
+                        // Close modal
+                        this.incomingCall.show = false;
+
+                        // Answer the call via API
+                        await this.answerCall();
+
+                    } catch (error) {
+                        this.log(`Failed to accept call: ${error.message}`, 'error');
+                        this.incomingCall.show = false;
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                rejectIncomingCall() {
+                    if (!this.incomingCall.data) return;
+
+                    this.stopRingtone();
+                    this.log('Call rejected', 'info');
+
+                    // Reject via API
+                    this.rejectCall(this.incomingCall.data.id);
+
+                    // Close modal
+                    this.incomingCall.show = false;
+                    this.incomingCall.data = null;
                 },
 
                 // Conversations
@@ -1168,33 +1449,85 @@
 
                         this.agoraClient.on("user-published", async (user, mediaType) => {
                             try {
-                                await this.agoraClient.subscribe(user, mediaType);
-                                this.log(`Subscribed to user ${user.uid} - ${mediaType}`, 'success');
+                                this.log(`📢 User ${user.uid} published ${mediaType}`, 'info');
 
-                                if (mediaType === 'video') {
-                                    const remoteContainer = document.getElementById('remote-video');
-                                    if (remoteContainer && user.videoTrack) {
-                                        // Clear container first
-                                        remoteContainer.innerHTML = '';
-                                        // Play the remote video track
-                                        await user.videoTrack.play('remote-video');
-                                        this.hasRemoteVideo = true;
-                                        this.log('Remote video playing successfully', 'success');
-                                    } else {
-                                        this.log('Remote video container or track not found', 'warning');
+                                // Retry mechanism - wait for user to be fully in the channel
+                                let attempts = 0;
+                                const maxAttempts = 10;
+                                let subscribed = false;
+
+                                while (attempts < maxAttempts && !subscribed) {
+                                    attempts++;
+
+                                    try {
+                                        // Check if user exists in remote users
+                                        const remoteUsers = this.agoraClient.remoteUsers;
+                                        const userInChannel = remoteUsers.find(u => u.uid === user.uid);
+
+                                        if (!userInChannel) {
+                                            const waitTime = Math.min(100 * attempts, 1000); // 100ms, 200ms, 300ms... up to 1s
+                                            this.log(`⏳ Attempt ${attempts}/${maxAttempts}: User ${user.uid} not yet in channel, waiting ${waitTime}ms...`, 'warning');
+                                            await new Promise(resolve => setTimeout(resolve, waitTime));
+                                            continue;
+                                        }
+
+                                        // User found, try to subscribe
+                                        this.log(`🔄 Attempt ${attempts}: Subscribing to user ${user.uid} - ${mediaType}`, 'info');
+                                        await this.agoraClient.subscribe(user, mediaType);
+                                        this.log(`✓ Subscribed to user ${user.uid} - ${mediaType}`, 'success');
+                                        subscribed = true;
+
+                                        if (mediaType === 'video') {
+                                            const remoteContainer = document.getElementById('remote-video');
+                                            if (remoteContainer && user.videoTrack) {
+                                                this.log('🎥 Playing remote video track...', 'info');
+                                                remoteContainer.innerHTML = '';
+
+                                                // Play with retry
+                                                try {
+                                                    await user.videoTrack.play('remote-video');
+                                                    this.hasRemoteVideo = true;
+                                                    this.log('✓ Remote video playing successfully!', 'success');
+                                                } catch (playError) {
+                                                    this.log(`⚠️ Video play failed: ${playError.message}, retrying...`, 'warning');
+                                                    await new Promise(resolve => setTimeout(resolve, 500));
+                                                    await user.videoTrack.play('remote-video');
+                                                    this.hasRemoteVideo = true;
+                                                    this.log('✓ Remote video playing (retry successful)!', 'success');
+                                                }
+                                            } else {
+                                                this.log('❌ Remote video container or track not found', 'error');
+                                            }
+                                        }
+
+                                        if (mediaType === 'audio') {
+                                            if (user.audioTrack) {
+                                                user.audioTrack.play();
+                                                this.log('✓ Remote audio playing', 'success');
+                                            } else {
+                                                this.log('⚠️ Remote audio track not found', 'warning');
+                                            }
+                                        }
+
+                                    } catch (subscribeError) {
+                                        if (subscribeError.code === 'INVALID_REMOTE_USER') {
+                                            const waitTime = Math.min(100 * attempts, 1000);
+                                            this.log(`⏳ Attempt ${attempts}/${maxAttempts}: User not ready yet, waiting ${waitTime}ms...`, 'warning');
+                                            await new Promise(resolve => setTimeout(resolve, waitTime));
+                                        } else {
+                                            // Other error, don't retry
+                                            throw subscribeError;
+                                        }
                                     }
                                 }
 
-                                if (mediaType === 'audio') {
-                                    if (user.audioTrack) {
-                                        user.audioTrack.play();
-                                        this.log('Remote audio playing', 'success');
-                                    } else {
-                                        this.log('Remote audio track not found', 'warning');
-                                    }
+                                if (!subscribed) {
+                                    this.log(`✗ Failed to subscribe to user ${user.uid} after ${maxAttempts} attempts`, 'error');
                                 }
+
                             } catch (error) {
-                                this.log(`Error in user-published: ${error.message}`, 'error');
+                                this.log(`✗ Error in user-published: ${error.code || 'UNKNOWN'} - ${error.message}`, 'error');
+                                console.error('Full error:', error);
                             }
                         });
 
@@ -1273,11 +1606,12 @@
                     }
                 },
 
-                async rejectCall() {
-                    if (!this.currentCall) return;
+                async rejectCall(callId = null) {
+                    const targetCallId = callId || this.currentCall?.id;
+                    if (!targetCallId) return;
 
                     try {
-                        await axios.post(`${this.config.apiUrl}/calls/${this.currentCall.id}/reject`);
+                        await axios.post(`${this.config.apiUrl}/calls/${targetCallId}/reject`);
                         this.log('Call rejected', 'success');
                         this.resetCallState();
                     } catch (error) {
@@ -1305,6 +1639,16 @@
                     }
 
                     try {
+                        // Leave any existing channel first
+                        if (this.agoraStatus.connected) {
+                            this.log('⚠️ Already connected to a channel, leaving first...', 'warning');
+                            await this.leaveAgoraChannel();
+                            // Small delay to ensure clean disconnect
+                            await new Promise(resolve => setTimeout(resolve, 500));
+                        }
+
+                        this.log(`🔄 Joining Agora channel: ${this.agoraConfig.channel_name}`, 'info');
+
                         await this.agoraClient.join(
                             this.agoraConfig.app_id,
                             this.agoraConfig.channel_name,
@@ -1312,13 +1656,14 @@
                             this.agoraConfig.uid
                         );
 
-                        this.log(`Joined Agora channel: ${this.agoraConfig.channel_name}`, 'success');
+                        this.log(`✓ Joined Agora channel: ${this.agoraConfig.channel_name}`, 'success');
                         this.agoraStatus.connected = true;
                         this.agoraStatus.message = 'Connected';
 
                         await this.createLocalTracks();
                     } catch (error) {
-                        this.log(`Failed to join Agora: ${error.message}`, 'error');
+                        this.log(`✗ Failed to join Agora: ${error.message}`, 'error');
+                        console.error('Join Agora error:', error);
                     }
                 },
 
@@ -1350,7 +1695,9 @@
                         // Publish all tracks
                         if (tracksToPublish.length > 0) {
                             await this.agoraClient.publish(tracksToPublish);
-                            this.log(`Published ${tracksToPublish.length} track(s) to channel`, 'success');
+                            const trackTypes = tracksToPublish.map(t => t.trackMediaType).join(', ');
+                            this.log(`✓ Published ${tracksToPublish.length} track(s): ${trackTypes}`, 'success');
+                            this.log(`🎥 My UID: ${this.agoraConfig.uid} | Publishing to channel: ${this.agoraConfig.channel_name}`, 'info');
                         }
                     } catch (error) {
                         this.log(`Failed to create tracks: ${error.message}`, 'error');
@@ -1441,15 +1788,42 @@
                     this.log(`Conversation: ${this.config.conversationId || 'None'}`, 'info');
                     this.log(`Agora: ${this.agoraStatus.connected ? 'Connected' : 'Disconnected'}`, 'info');
                     this.log(`Agora Channel: ${this.agoraConfig?.channel_name || 'N/A'}`, 'info');
-                    this.log(`Agora UID: ${this.agoraConfig?.uid || 'N/A'}`, 'info');
+                    this.log(`My Agora UID: ${this.agoraConfig?.uid || 'N/A'}`, 'info');
                     this.log(`Camera: ${this.mediaStatus.camera ? 'On' : 'Off'}`, 'info');
                     this.log(`Microphone: ${this.mediaStatus.microphone ? 'On' : 'Off'}`, 'info');
 
+                    // Local tracks
+                    this.log(`--- Local Tracks ---`, 'info');
+                    this.log(`Video Track: ${this.localTracks.video ? 'Created' : 'None'}`, 'info');
+                    this.log(`Audio Track: ${this.localTracks.audio ? 'Created' : 'None'}`, 'info');
+
+                    if (this.localTracks.video) {
+                        this.log(`  Video Enabled: ${this.localTracks.video.enabled ? 'Yes' : 'No'}`, 'info');
+                        this.log(`  Video Playing: ${this.localTracks.video.isPlaying ? 'Yes' : 'No'}`, 'info');
+                    }
+
                     if (this.agoraClient && this.agoraStatus.connected) {
+                        // Published tracks
+                        const publishedTracks = this.agoraClient.localTracks;
+                        this.log(`--- Published Tracks ---`, 'info');
+                        this.log(`Published: ${publishedTracks.length} track(s)`, 'info');
+                        publishedTracks.forEach((track, index) => {
+                            this.log(`  Track ${index + 1}: ${track.trackMediaType} (enabled: ${track.enabled})`, 'info');
+                        });
+
+                        // Remote users
                         const remoteUsers = this.agoraClient.remoteUsers;
-                        this.log(`Remote Users: ${remoteUsers.length}`, 'info');
+                        this.log(`--- Remote Users ---`, 'info');
+                        this.log(`Total Remote Users: ${remoteUsers.length}`, 'info');
                         remoteUsers.forEach((user, index) => {
-                            this.log(`  User ${index + 1}: UID ${user.uid} - Video: ${user.hasVideo ? 'Yes' : 'No'}, Audio: ${user.hasAudio ? 'Yes' : 'No'}`, 'info');
+                            this.log(`  User ${index + 1}: UID ${user.uid}`, 'info');
+                            this.log(`    Has Video: ${user.hasVideo ? 'Yes' : 'No'}`, 'info');
+                            this.log(`    Has Audio: ${user.hasAudio ? 'Yes' : 'No'}`, 'info');
+                            this.log(`    Video Track: ${user.videoTrack ? 'Available' : 'None'}`, 'info');
+                            this.log(`    Audio Track: ${user.audioTrack ? 'Available' : 'None'}`, 'info');
+                            if (user.videoTrack) {
+                                this.log(`    Video Playing: ${user.videoTrack.isPlaying ? 'Yes' : 'No'}`, 'info');
+                            }
                         });
                     }
 
