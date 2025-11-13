@@ -30,7 +30,7 @@ class CallInitiated implements ShouldBroadcast
 
     public function broadcastOn()
     {
-        return new PrivateChannel('conversation.' . $this->conversation->id);
+        return new Channel('conversation.' . $this->conversation->id);
     }
 
     public function broadcastAs()

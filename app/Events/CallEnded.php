@@ -27,7 +27,7 @@ class CallEnded implements ShouldBroadcast
 
     public function broadcastOn()
     {
-        return new PrivateChannel('conversation.' . $this->call->conversation_id);
+        return new Channel('conversation.' . $this->call->conversation_id);
     }
 
     public function broadcastAs()

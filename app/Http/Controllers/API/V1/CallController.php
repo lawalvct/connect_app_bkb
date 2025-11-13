@@ -365,6 +365,24 @@ class CallController extends BaseController
             $user = $request->user();
             $call->load(['participants.user', 'conversation.users']);
 
+            // Check if call is already ended
+            if ($call->isEnded()) {
+                Log::warning('Attempted to end already ended call', [
+                    'call_id' => $call->id,
+                    'user_id' => $user->id,
+                    'call_status' => $call->status,
+                    'ended_at' => $call->ended_at
+                ]);
+
+                return $this->sendError('Call is already ended', [
+                    'call_id' => $call->id,
+                    'status' => $call->status,
+                    'ended_at' => $call->ended_at?->toISOString(),
+                    'duration' => $call->duration,
+                    'formatted_duration' => $call->formatted_duration
+                ], 400);
+            }
+
             // Check if user is a participant
             $participant = $call->participants->where('user_id', $user->id)->first();
             if (!$participant) {
@@ -375,6 +393,29 @@ class CallController extends BaseController
 
             $now = now();
 
+            // Count active participants BEFORE updating the current user's status
+            $activeParticipantsBeforeLeaving = $call->participants()
+                ->where('status', 'joined')
+                ->count();
+
+            // Log participant statuses for debugging
+            $allParticipantStatuses = $call->participants->map(function($p) {
+                return [
+                    'user_id' => $p->user_id,
+                    'status' => $p->status,
+                    'joined_at' => $p->joined_at,
+                    'left_at' => $p->left_at
+                ];
+            })->toArray();
+
+            Log::info('Call end - participant statuses', [
+                'call_id' => $call->id,
+                'current_user_id' => $user->id,
+                'current_user_participant_status' => $participant->status,
+                'active_participants_count' => $activeParticipantsBeforeLeaving,
+                'all_participants' => $allParticipantStatuses
+            ]);
+
             // Update participant
             if ($participant->status === 'joined' && !$participant->left_at) {
                 $participant->update([
@@ -384,14 +425,29 @@ class CallController extends BaseController
                 $participant->updateDuration();
             }
 
-            // End the call if initiated by caller or if all participants left
-            $activeParticipants = $call->participants()->where('status', 'joined')->count();
+            // End the call if:
+            // 1. Initiated by the caller, OR
+            // 2. This was the last active participant (activeParticipantsBeforeLeaving <= 1)
+            if ($call->initiated_by === $user->id || $activeParticipantsBeforeLeaving <= 1) {
+                Log::info('Ending call', [
+                    'call_id' => $call->id,
+                    'user_id' => $user->id,
+                    'is_initiator' => $call->initiated_by === $user->id,
+                    'active_participants_before' => $activeParticipantsBeforeLeaving,
+                    'status_before' => $call->status
+                ]);
 
-            if ($call->initiated_by === $user->id || $activeParticipants <= 1) {
                 $call->update([
                     'status' => 'ended',
                     'ended_at' => $now,
                     'end_reason' => 'ended_by_caller',
+                ]);
+
+                Log::info('Call updated', [
+                    'call_id' => $call->id,
+                    'status_after' => $call->status,
+                    'ended_at' => $call->ended_at,
+                    'end_reason' => $call->end_reason
                 ]);
 
                 // Update all remaining participants
@@ -987,6 +1043,70 @@ class CallController extends BaseController
             ]);
 
             return $this->sendError('Failed to kick participant', $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Format call data for response
+     */
+
+    /**
+     * Get detailed call status (for debugging)
+     */
+    public function getCallStatus(Request $request, Call $call)
+    {
+        try {
+            $user = $request->user();
+            $call->load(['participants.user', 'initiator', 'conversation']);
+
+            // Check if user has access to this call
+            $participant = $call->participants->where('user_id', $user->id)->first();
+            if (!$participant && $call->initiated_by !== $user->id) {
+                return $this->sendError('You do not have access to this call', null, 403);
+            }
+
+            $participantsData = $call->participants->map(function($p) {
+                return [
+                    'user_id' => $p->user_id,
+                    'user_name' => $p->user->name ?? 'Unknown',
+                    'status' => $p->status,
+                    'invited_at' => $p->invited_at?->toISOString(),
+                    'joined_at' => $p->joined_at?->toISOString(),
+                    'left_at' => $p->left_at?->toISOString(),
+                    'duration' => $p->duration
+                ];
+            })->toArray();
+
+            return $this->sendResponse('Call status retrieved successfully', [
+                'call' => [
+                    'id' => $call->id,
+                    'conversation_id' => $call->conversation_id,
+                    'status' => $call->status,
+                    'call_type' => $call->call_type,
+                    'initiated_by' => $call->initiated_by,
+                    'initiator_name' => $call->initiator->name ?? 'Unknown',
+                    'agora_channel_name' => $call->agora_channel_name,
+                    'started_at' => $call->started_at?->toISOString(),
+                    'connected_at' => $call->connected_at?->toISOString(),
+                    'ended_at' => $call->ended_at?->toISOString(),
+                    'duration' => $call->duration,
+                    'formatted_duration' => $call->formatted_duration,
+                    'end_reason' => $call->end_reason,
+                    'is_active' => $call->isActive(),
+                    'is_ended' => $call->isEnded(),
+                    'active_participants_count' => $call->participants()->where('status', 'joined')->count(),
+                    'total_participants_count' => $call->participants()->count()
+                ],
+                'participants' => $participantsData
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to get call status', [
+                'call_id' => $call->id,
+                'error' => $e->getMessage()
+            ]);
+
+            return $this->sendError('Failed to get call status', $e->getMessage(), 500);
         }
     }
 
