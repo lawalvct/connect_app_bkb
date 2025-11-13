@@ -781,6 +781,17 @@
                     </button>
                 </div>
 
+                <div v-if="conversations.length === 0" class="alert alert-info" style="text-align: center;">
+                    <div>
+                        <i class="fas fa-info-circle"></i>
+                        <p style="margin: 0.5rem 0;"><strong>No conversations found</strong></p>
+                        <p style="margin: 0.5rem 0; font-size: 0.9rem;">Create a test conversation between User 3114 and User 4098</p>
+                        <button @click="createTestConversation" class="btn btn-primary btn-sm" style="margin-top: 0.5rem;">
+                            <i class="fas fa-plus"></i> Create Test Conversation
+                        </button>
+                    </div>
+                </div>
+
                 <div class="conversation-list" v-if="conversations.length > 0">
                     <div v-for="conversation in conversations" :key="conversation.id"
                          class="conversation-item"
@@ -791,10 +802,6 @@
                         <p><i class="fas fa-clock"></i> @{{ formatDate(conversation.updated_at) }}</p>
                     </div>
                 </div>
-
-                <p v-else style="text-align: center; color: #6b7280; padding: 2rem;">
-                    <i class="fas fa-inbox"></i> No conversations found
-                </p>
             </div>
 
             <!-- Call Configuration -->
@@ -864,14 +871,14 @@
                         End Call
                     </button>
 
-                    <button @click="toggleCamera" :disabled="!agoraStatus.connected" class="btn btn-warning">
+                    <button @click="toggleCamera" :disabled="!agoraStatus.connected || config.callType !== 'video'" class="btn btn-warning">
                         <i :class="mediaStatus.camera ? 'fas fa-video-slash' : 'fas fa-video'"></i>
-                        @{{ mediaStatus.camera ? 'Turn Off' : 'Turn On' }} Camera
+                        @{{ mediaStatus.camera ? 'Turn Off Camera' : 'Turn On Camera' }}
                     </button>
 
                     <button @click="toggleMicrophone" :disabled="!agoraStatus.connected" class="btn btn-warning">
                         <i :class="mediaStatus.microphone ? 'fas fa-microphone-slash' : 'fas fa-microphone'"></i>
-                        @{{ mediaStatus.microphone ? 'Mute' : 'Unmute' }}
+                        @{{ mediaStatus.microphone ? 'Mute Mic' : 'Unmute Mic' }}
                     </button>
 
                     <button @click="getCallHistory" class="btn btn-info">
@@ -990,7 +997,7 @@
                 async loadTestUsers() {
                     this.testUsers = [
                         { id: 3114, name: 'Oz Lawal', email: 'lawalthb@gmail.com' },
-                        { id: 3152, name: 'Gerson', email: 'vick@gmail.com' }
+                        { id: 4098, name: 'Vick', email: 'vick@gmail.com' }
                     ];
                     this.log('Test users loaded', 'info');
                 },
@@ -999,6 +1006,26 @@
                     this.selectedUserId = user.id;
                     this.loginForm.email = user.email;
                     this.loginForm.password = '12345678';
+                },
+
+                async createTestConversation() {
+                    this.conversationsLoading = true;
+                    try {
+                        // Create a conversation between the two test users
+                        const response = await axios.post(`${this.config.apiUrl}/conversations`, {
+                            type: 'private',
+                            participant_ids: [3114, 4098],
+                            name: 'Test Call Conversation'
+                        });
+
+                        if (response.data.success) {
+                            this.log('Test conversation created successfully', 'success');
+                            await this.loadConversations();
+                        }
+                    } catch (error) {
+                        this.log(`Failed to create conversation: ${error.response?.data?.message || error.message}`, 'error');
+                    }
+                    this.conversationsLoading = false;
                 },
 
                 async login() {
@@ -1140,21 +1167,34 @@
                         this.agoraClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
 
                         this.agoraClient.on("user-published", async (user, mediaType) => {
-                            await this.agoraClient.subscribe(user, mediaType);
-                            this.log(`Subscribed to user ${user.uid} ${mediaType}`, 'success');
+                            try {
+                                await this.agoraClient.subscribe(user, mediaType);
+                                this.log(`Subscribed to user ${user.uid} - ${mediaType}`, 'success');
 
-                            if (mediaType === 'video') {
-                                const remoteContainer = document.getElementById('remote-video');
-                                if (remoteContainer && user.videoTrack) {
-                                    remoteContainer.innerHTML = '';
-                                    user.videoTrack.play('remote-video');
-                                    this.hasRemoteVideo = true;
-                                    this.log('Remote video playing', 'success');
+                                if (mediaType === 'video') {
+                                    const remoteContainer = document.getElementById('remote-video');
+                                    if (remoteContainer && user.videoTrack) {
+                                        // Clear container first
+                                        remoteContainer.innerHTML = '';
+                                        // Play the remote video track
+                                        await user.videoTrack.play('remote-video');
+                                        this.hasRemoteVideo = true;
+                                        this.log('Remote video playing successfully', 'success');
+                                    } else {
+                                        this.log('Remote video container or track not found', 'warning');
+                                    }
                                 }
-                            }
 
-                            if (mediaType === 'audio' && user.audioTrack) {
-                                user.audioTrack.play();
+                                if (mediaType === 'audio') {
+                                    if (user.audioTrack) {
+                                        user.audioTrack.play();
+                                        this.log('Remote audio playing', 'success');
+                                    } else {
+                                        this.log('Remote audio track not found', 'warning');
+                                    }
+                                }
+                            } catch (error) {
+                                this.log(`Error in user-published: ${error.message}`, 'error');
                             }
                         });
 
@@ -1162,6 +1202,23 @@
                             this.log(`User ${user.uid} unpublished ${mediaType}`, 'info');
                             if (mediaType === 'video') {
                                 this.hasRemoteVideo = false;
+                                const remoteContainer = document.getElementById('remote-video');
+                                if (remoteContainer) {
+                                    remoteContainer.innerHTML = '';
+                                }
+                            }
+                        });
+
+                        this.agoraClient.on("user-joined", (user) => {
+                            this.log(`User ${user.uid} joined the channel`, 'info');
+                        });
+
+                        this.agoraClient.on("user-left", (user, reason) => {
+                            this.log(`User ${user.uid} left the channel: ${reason}`, 'info');
+                            this.hasRemoteVideo = false;
+                            const remoteContainer = document.getElementById('remote-video');
+                            if (remoteContainer) {
+                                remoteContainer.innerHTML = '';
                             }
                         });
 
@@ -1267,31 +1324,37 @@
 
                 async createLocalTracks() {
                     try {
+                        const tracksToPublish = [];
+
                         // Create audio track
                         this.localTracks.audio = await AgoraRTC.createMicrophoneAudioTrack();
                         this.mediaStatus.microphone = true;
+                        tracksToPublish.push(this.localTracks.audio);
                         this.log('Audio track created', 'success');
 
                         // Create video track only for video calls
                         if (this.config.callType === 'video') {
                             this.localTracks.video = await AgoraRTC.createCameraVideoTrack();
                             this.mediaStatus.camera = true;
+                            tracksToPublish.push(this.localTracks.video);
                             this.log('Video track created', 'success');
 
+                            // Play local video
                             const localContainer = document.getElementById('local-video');
-                            if (localContainer) {
-                                this.localTracks.video.play('local-video');
+                            if (localContainer && this.localTracks.video) {
+                                await this.localTracks.video.play('local-video');
+                                this.log('Local video playing', 'success');
                             }
                         }
 
-                        // Publish tracks
-                        const tracks = Object.values(this.localTracks).filter(track => track);
-                        if (tracks.length > 0) {
-                            await this.agoraClient.publish(tracks);
-                            this.log('Local tracks published', 'success');
+                        // Publish all tracks
+                        if (tracksToPublish.length > 0) {
+                            await this.agoraClient.publish(tracksToPublish);
+                            this.log(`Published ${tracksToPublish.length} track(s) to channel`, 'success');
                         }
                     } catch (error) {
                         this.log(`Failed to create tracks: ${error.message}`, 'error');
+                        console.error('Create tracks error:', error);
                     }
                 },
 
@@ -1329,19 +1392,35 @@
                 },
 
                 async toggleCamera() {
-                    if (!this.localTracks.video) return;
+                    if (!this.localTracks.video) {
+                        this.log('Camera not available (audio call or not initialized)', 'warning');
+                        return;
+                    }
 
-                    await this.localTracks.video.setEnabled(!this.mediaStatus.camera);
-                    this.mediaStatus.camera = !this.mediaStatus.camera;
-                    this.log(`Camera ${this.mediaStatus.camera ? 'on' : 'off'}`, 'info');
+                    try {
+                        const newState = !this.mediaStatus.camera;
+                        await this.localTracks.video.setEnabled(newState);
+                        this.mediaStatus.camera = newState;
+                        this.log(`Camera ${this.mediaStatus.camera ? 'enabled' : 'disabled'}`, 'success');
+                    } catch (error) {
+                        this.log(`Failed to toggle camera: ${error.message}`, 'error');
+                    }
                 },
 
                 async toggleMicrophone() {
-                    if (!this.localTracks.audio) return;
+                    if (!this.localTracks.audio) {
+                        this.log('Microphone not available', 'warning');
+                        return;
+                    }
 
-                    await this.localTracks.audio.setEnabled(!this.mediaStatus.microphone);
-                    this.mediaStatus.microphone = !this.mediaStatus.microphone;
-                    this.log(`Microphone ${this.mediaStatus.microphone ? 'on' : 'off'}`, 'info');
+                    try {
+                        const newState = !this.mediaStatus.microphone;
+                        await this.localTracks.audio.setEnabled(newState);
+                        this.mediaStatus.microphone = newState;
+                        this.log(`Microphone ${this.mediaStatus.microphone ? 'enabled' : 'disabled'}`, 'success');
+                    } catch (error) {
+                        this.log(`Failed to toggle microphone: ${error.message}`, 'error');
+                    }
                 },
 
                 async getCallHistory() {
@@ -1356,10 +1435,24 @@
                 runDiagnostics() {
                     this.log('=== DIAGNOSTICS ===', 'info');
                     this.log(`Auth: ${this.isAuthenticated ? 'Yes' : 'No'}`, 'info');
-                    this.log(`Call: ${this.currentCall ? 'Active' : 'None'}`, 'info');
+                    this.log(`User: ${this.currentUser?.name || 'None'} (ID: ${this.currentUser?.id || 'N/A'})`, 'info');
+                    this.log(`Call: ${this.currentCall ? 'Active (ID: ' + this.currentCall.id + ')' : 'None'}`, 'info');
+                    this.log(`Call Type: ${this.config.callType || 'N/A'}`, 'info');
+                    this.log(`Conversation: ${this.config.conversationId || 'None'}`, 'info');
                     this.log(`Agora: ${this.agoraStatus.connected ? 'Connected' : 'Disconnected'}`, 'info');
+                    this.log(`Agora Channel: ${this.agoraConfig?.channel_name || 'N/A'}`, 'info');
+                    this.log(`Agora UID: ${this.agoraConfig?.uid || 'N/A'}`, 'info');
                     this.log(`Camera: ${this.mediaStatus.camera ? 'On' : 'Off'}`, 'info');
                     this.log(`Microphone: ${this.mediaStatus.microphone ? 'On' : 'Off'}`, 'info');
+
+                    if (this.agoraClient && this.agoraStatus.connected) {
+                        const remoteUsers = this.agoraClient.remoteUsers;
+                        this.log(`Remote Users: ${remoteUsers.length}`, 'info');
+                        remoteUsers.forEach((user, index) => {
+                            this.log(`  User ${index + 1}: UID ${user.uid} - Video: ${user.hasVideo ? 'Yes' : 'No'}, Audio: ${user.hasAudio ? 'Yes' : 'No'}`, 'info');
+                        });
+                    }
+
                     this.log('===================', 'info');
                 },
 
