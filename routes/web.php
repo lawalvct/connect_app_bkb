@@ -33,6 +33,11 @@ Route::get('/test-calls', function () {
     return view('call-test');
 });
 
+// Modern call testing interface
+Route::get('/test-calls-modern', function () {
+    return view('call-test-modern');
+});
+
 // Firebase configuration test page
 Route::get('/firebase-test', function () {
     return view('firebase-test');
