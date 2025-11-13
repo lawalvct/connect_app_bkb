@@ -8,6 +8,7 @@ use App\Models\CallParticipant;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Helpers\AgoraHelper;
+use App\Helpers\PusherBroadcastHelper;
 use App\Events\CallInitiated;
 use App\Events\CallAnswered;
 use App\Events\CallEnded;
@@ -475,95 +476,63 @@ class CallController extends BaseController
 
             DB::commit();
 
-            // Broadcast call ended event using direct Pusher
+            // Broadcast call ended event using improved helper with retry logic
             try {
-                Log::info('Starting CallEnded Pusher broadcast', [
-                    'conversation_id' => $call->conversation_id,
-                    'call_id' => $call->id,
-                    'channel' => 'private-conversation.' . $call->conversation_id
-                ]);
-
-                // Get Pusher configuration
-                $pusherKey = config('broadcasting.connections.pusher.key');
-                $pusherSecret = config('broadcasting.connections.pusher.secret');
-                $pusherAppId = config('broadcasting.connections.pusher.app_id');
-                $pusherCluster = config('broadcasting.connections.pusher.options.cluster');
-
-                // Validate Pusher configuration
-                if (empty($pusherKey) || empty($pusherSecret) || empty($pusherAppId)) {
-                    Log::warning('Pusher configuration missing for CallEnded, skipping broadcast', [
-                        'key_exists' => !empty($pusherKey),
-                        'secret_exists' => !empty($pusherSecret),
-                        'app_id_exists' => !empty($pusherAppId),
-                        'cluster' => $pusherCluster
-                    ]);
-                } else {
-                    // Create direct Pusher instance
-                    $pusher = new \Pusher\Pusher(
-                        $pusherKey,
-                        $pusherSecret,
-                        $pusherAppId,
-                        [
-                            'cluster' => $pusherCluster ?: 'eu',
-                            'useTLS' => true
-                        ]
-                    );
-
-                    Log::info('CallEnded Pusher instance created successfully');
-
-                    // Prepare participants data with full profile URLs
-                    $participantsData = $call->conversation->users->map(function ($participant) use ($call) {
-                        $callParticipant = $call->participants->where('user_id', $participant->id)->first();
-                        return [
-                            'id' => $participant->id,
-                            'name' => $participant->name,
-                            'username' => $participant->username,
-                            'profile_image' => $participant->profile ? $participant->profile_url : null,
-                            'avatar_url' => $participant->avatar_url,
-                            'status' => $callParticipant ? $callParticipant->status : 'left'
-                        ];
-                    })->toArray();
-
-                    // Create broadcast data
-                    $broadcastData = [
-                        'call_id' => $call->id,
-                        'call_type' => $call->call_type,
-                        'ended_by' => [
-                            'id' => $user->id,
-                            'name' => $user->name,
-                            'username' => $user->username,
-                            'profile_image' => $user->profile ? $user->profile_url : null,
-                            'avatar_url' => $user->avatar_url
-                        ],
-                        'participants' => $participantsData,
-                        'status' => $call->status,
-                        'end_reason' => $call->end_reason,
-                        'duration' => $call->duration,
-                        'formatted_duration' => $call->formatted_duration,
-                        'ended_at' => $call->ended_at ? $call->ended_at->toISOString() : null
+                // Prepare participants data with full profile URLs
+                $participantsData = $call->conversation->users->map(function ($participant) use ($call) {
+                    $callParticipant = $call->participants->where('user_id', $participant->id)->first();
+                    return [
+                        'id' => $participant->id,
+                        'name' => $participant->name,
+                        'username' => $participant->username,
+                        'profile_image' => $participant->profile ? $participant->profile_url : null,
+                        'avatar_url' => $participant->avatar_url,
+                        'status' => $callParticipant ? $callParticipant->status : 'left'
                     ];
+                })->toArray();
 
-                    Log::info('CallEnded broadcast data prepared', [
-                        'data_structure' => array_keys($broadcastData)
-                    ]);
+                // Create broadcast data
+                $broadcastData = [
+                    'call_id' => $call->id,
+                    'call_type' => $call->call_type,
+                    'ended_by' => [
+                        'id' => $user->id,
+                        'name' => $user->name,
+                        'username' => $user->username,
+                        'profile_image' => $user->profile ? $user->profile_url : null,
+                        'avatar_url' => $user->avatar_url
+                    ],
+                    'participants' => $participantsData,
+                    'status' => $call->status,
+                    'end_reason' => $call->end_reason,
+                    'duration' => $call->duration,
+                    'formatted_duration' => $call->formatted_duration,
+                    'ended_at' => $call->ended_at ? $call->ended_at->toISOString() : null
+                ];
 
-                    $result = $pusher->trigger('conversation.' . $call->conversation_id, 'call.ended', $broadcastData);
-
-                    Log::info('CallEnded broadcast successful', [
+                // Use helper with automatic retry
+                $broadcastSuccess = PusherBroadcastHelper::broadcastCallEvent(
+                    $call->conversation_id,
+                    'ended',
+                    $broadcastData,
+                    [
                         'call_id' => $call->id,
-                        'conversation_id' => $call->conversation_id,
-                        'channel' => 'conversation.' . $call->conversation_id,
-                        'pusher_result' => $result
+                        'ended_by_user_id' => $user->id
+                    ]
+                );
+
+                if (!$broadcastSuccess) {
+                    Log::warning('CallEnded broadcast failed after retries, but call ended successfully', [
+                        'call_id' => $call->id,
+                        'conversation_id' => $call->conversation_id
                     ]);
                 }
+
             } catch (\Exception $broadcastException) {
-                Log::error('Failed to broadcast CallEnded via direct Pusher', [
-                    'call_id' => $call->id ?? 'not_available',
-                    'conversation_id' => $call->conversation_id ?? 'not_available',
-                    'error_message' => $broadcastException->getMessage(),
-                    'error_code' => $broadcastException->getCode(),
-                    'error_file' => $broadcastException->getFile(),
-                    'error_line' => $broadcastException->getLine()
+                Log::error('CallEnded broadcast exception', [
+                    'call_id' => $call->id,
+                    'conversation_id' => $call->conversation_id,
+                    'error' => $broadcastException->getMessage()
                 ]);
                 // Don't fail the request if broadcast fails
             }

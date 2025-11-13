@@ -25,6 +25,10 @@ return Application::configure(basePath: dirname(__DIR__))
             // Load admin routes
             Route::middleware('web')
                 ->group(base_path('routes/admin.php'));
+
+            // Load pusher test routes
+            Route::middleware('web')
+                ->group(base_path('routes/pusher-test.php'));
         },
     )
     ->withMiddleware(function (Middleware $middleware) {
