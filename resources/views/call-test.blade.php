@@ -732,6 +732,9 @@
                     <button @click="forceRefreshRemoteVideo" class="btn btn-warning" style="margin-left: 10px;">
                         <i class="fas fa-refresh"></i> Refresh Remote Video
                     </button>
+                    <button @click="forceResubscribeRemote" class="btn btn-info" style="margin-left: 10px;">
+                        <i class="fas fa-redo"></i> Force Re-subscribe
+                    </button>
                     <button @click="verifyChannelSync" class="btn btn-primary" style="margin-left: 10px;">
                         <i class="fas fa-sync"></i> Verify Channel
                     </button>
@@ -1177,7 +1180,13 @@
 
                 async initializeAgora() {
                     try {
-                        this.agoraClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+                        // Enable debug mode for better error tracking
+                        AgoraRTC.setLogLevel(4);
+                        
+                        this.agoraClient = AgoraRTC.createClient({ 
+                            mode: "rtc", 
+                            codec: "vp8"
+                        });
 
                         // Set up event listeners
                         this.agoraClient.on("user-published", this.handleUserPublished);
@@ -1185,11 +1194,17 @@
                         this.agoraClient.on("user-left", this.handleUserLeft);
                         this.agoraClient.on("user-joined", this.handleUserJoined);
                         this.agoraClient.on("connection-state-change", this.handleConnectionStateChange);
+                        this.agoraClient.on("exception", this.handleAgoraException);
 
-                        this.log('Agora client initialized', 'success');
+                        this.log('Agora client initialized with debug mode', 'success');
                     } catch (error) {
                         this.log(`Agora initialization failed: ${error.message}`, 'error');
                     }
+                },
+                
+                handleAgoraException(evt) {
+                    this.log(`Agora exception: ${evt.code} - ${evt.msg}`, 'error');
+                    console.error('Agora Exception:', evt);
                 },
 
                 async getDevices() {
@@ -1742,21 +1757,43 @@
                         }
 
                         const remoteUsers = this.agoraClient.remoteUsers;
+                        this.log(`Found ${remoteUsers.length} remote users`, 'info');
+                        
                         const remoteVideoElement = document.getElementById('remote-video');
-
                         if (remoteVideoElement) {
                             remoteVideoElement.innerHTML = '';
+                            this.log('Cleared remote video container', 'info');
                         }
 
                         for (const user of remoteUsers) {
-                            if (user.videoTrack && user.hasVideo) {
-                                this.log(`Attempting to re-display video for user ${user.uid}`, 'info');
+                            this.log(`Checking user ${user.uid}: hasVideo=${user.hasVideo}, videoTrack=${!!user.videoTrack}`, 'info');
+                            
+                            if (user.hasVideo && user.videoTrack) {
+                                this.log(`Re-subscribing and displaying video for user ${user.uid}`, 'info');
+                                
                                 try {
-                                    user.videoTrack.play('remote-video');
-                                    this.log(`Re-played video for user ${user.uid}`, 'success');
+                                    // Unsubscribe first
+                                    await this.agoraClient.unsubscribe(user, 'video');
+                                    this.log(`Unsubscribed from user ${user.uid} video`, 'info');
+                                    
+                                    // Wait a moment
+                                    await new Promise(resolve => setTimeout(resolve, 500));
+                                    
+                                    // Re-subscribe
+                                    await this.agoraClient.subscribe(user, 'video');
+                                    this.log(`Re-subscribed to user ${user.uid} video`, 'success');
+                                    
+                                    // Wait for video track
+                                    await this.waitForVideoTrack(user, 3000);
+                                    
+                                    // Display video
+                                    await this.displayRemoteVideo(user);
+                                    
                                 } catch (error) {
-                                    this.log(`Failed to re-play video for user ${user.uid}: ${error.message}`, 'error');
+                                    this.log(`Failed to refresh video for user ${user.uid}: ${error.message}`, 'error');
                                 }
+                            } else {
+                                this.log(`User ${user.uid} has no video to display`, 'info');
                             }
                         }
 
@@ -1847,6 +1884,68 @@
                     this.log('✅ Diagnostic complete', 'success');
                 },
 
+                async forceResubscribeRemote() {
+                    try {
+                        this.log('🔄 Force re-subscribing to all remote users...', 'info');
+                        
+                        if (!this.agoraClient) {
+                            this.log('❌ Agora client not available', 'error');
+                            return;
+                        }
+                        
+                        const remoteUsers = this.agoraClient.remoteUsers;
+                        this.log(`Processing ${remoteUsers.length} remote users`, 'info');
+                        
+                        for (const user of remoteUsers) {
+                            this.log(`Processing user ${user.uid}`, 'info');
+                            
+                            // Force unsubscribe from all media types
+                            try {
+                                if (user.hasVideo) {
+                                    await this.agoraClient.unsubscribe(user, 'video');
+                                    this.log(`Unsubscribed from user ${user.uid} video`, 'info');
+                                }
+                                if (user.hasAudio) {
+                                    await this.agoraClient.unsubscribe(user, 'audio');
+                                    this.log(`Unsubscribed from user ${user.uid} audio`, 'info');
+                                }
+                            } catch (unsubError) {
+                                this.log(`Unsubscribe error for user ${user.uid}: ${unsubError.message}`, 'error');
+                            }
+                            
+                            // Wait before re-subscribing
+                            await new Promise(resolve => setTimeout(resolve, 1000));
+                            
+                            // Re-subscribe
+                            try {
+                                if (user.hasVideo) {
+                                    await this.agoraClient.subscribe(user, 'video');
+                                    this.log(`Re-subscribed to user ${user.uid} video`, 'success');
+                                    
+                                    // Wait and display video
+                                    await this.waitForVideoTrack(user, 3000);
+                                    await this.displayRemoteVideo(user);
+                                }
+                                if (user.hasAudio) {
+                                    await this.agoraClient.subscribe(user, 'audio');
+                                    this.log(`Re-subscribed to user ${user.uid} audio`, 'success');
+                                    
+                                    if (user.audioTrack) {
+                                        user.audioTrack.play();
+                                    }
+                                }
+                            } catch (subError) {
+                                this.log(`Re-subscribe error for user ${user.uid}: ${subError.message}`, 'error');
+                            }
+                        }
+                        
+                        this.log('✅ Force re-subscribe completed', 'success');
+                        
+                    } catch (error) {
+                        this.log(`❌ Force re-subscribe failed: ${error.message}`, 'error');
+                    }
+                },
+                
                 async forceReconnectAgora() {
                     try {
                         this.log('🔄 Force reconnecting to Agora channel...', 'info');
@@ -1905,109 +2004,75 @@
                     });
 
                     return remoteUsers.length > 0;
-                },                handleUserPublished(user, mediaType) {
+                },                async handleUserPublished(user, mediaType) {
                     this.log(`📡 User ${user.uid} published ${mediaType}`, 'info');
-
-                    // Use retry logic for subscription due to timing issues
-                    this.subscribeWithRetry(user, mediaType, 3, 500);
-                },
-
-                async subscribeWithRetry(user, mediaType, maxRetries = 3, delay = 500) {
-                    let retryCount = 0;
-
-                    const attemptSubscribe = async () => {
-                        try {
-                            this.log(`🔄 Subscription attempt ${retryCount + 1} for user ${user.uid} ${mediaType}`, 'info');
-
-                            await this.agoraClient.subscribe(user, mediaType);
-                            this.log(`✅ Successfully subscribed to user ${user.uid} ${mediaType}`, 'success');
-
-                            if (mediaType === 'video') {
-                                this.log(`🎥 Processing remote video from user ${user.uid}`, 'info');
-
-                                const remoteVideoElement = document.getElementById('remote-video');
-                                if (!remoteVideoElement) {
-                                    this.log('❌ Remote video container not found!', 'error');
-                                    return;
-                                }
-
-                                // Wait a moment for the video track to be properly attached
-                                setTimeout(() => {
-                                    if (!user.videoTrack) {
-                                        this.log('❌ No video track on user object after subscription', 'error');
-                                        return;
-                                    }
-
-                                    try {
-                                        // Clear any existing content first
-                                        remoteVideoElement.innerHTML = '';
-                                        this.log('Cleared remote video container', 'info');
-
-                                        // Play the video track
-                                        user.videoTrack.play('remote-video');
-                                        this.log('🎬 Remote video play() method called', 'success');
-
-                                        // Check if video was actually created after a short delay
-                                        setTimeout(() => {
-                                            const container = document.getElementById('remote-video');
-                                            if (container) {
-                                                const videoElements = container.querySelectorAll('video');
-                                                this.log(`Remote container has ${videoElements.length} video elements`, 'info');
-
-                                                videoElements.forEach((video, index) => {
-                                                    this.log(`Remote video ${index}: ${video.videoWidth}x${video.videoHeight}, playing=${!video.paused}`, 'info');
-
-                                                    // Ensure video fills container
-                                                    video.style.width = '100%';
-                                                    video.style.height = '100%';
-                                                    video.style.objectFit = 'cover';
-                                                    video.style.display = 'block';
-                                                });
-
-                                                if (videoElements.length === 0) {
-                                                    this.log('❌ No video elements were created in remote container', 'error');
-                                                } else {
-                                                    this.log('✅ Remote video should now be visible', 'success');
-                                                }
-                                            }
-                                        }, 1000);
-
-                                    } catch (videoPlayError) {
-                                        this.log(`❌ Failed to play remote video: ${videoPlayError.message}`, 'error');
-                                        console.error('Remote video play error:', videoPlayError);
-                                    }
-                                }, 200); // Wait 200ms for video track to be attached
-
-                            } else if (mediaType === 'audio') {
-                                this.log(`🔊 Processing remote audio from user ${user.uid}`, 'info');
-
-                                // Wait for audio track to be attached
-                                setTimeout(() => {
-                                    if (user.audioTrack) {
-                                        user.audioTrack.play();
-                                        this.log('✅ Remote audio playing', 'success');
-                                    } else {
-                                        this.log('❌ Remote audio track missing after subscription', 'error');
-                                    }
-                                }, 100);
-                            }
-
-                        } catch (error) {
-                            retryCount++;
-                            this.log(`❌ Subscription attempt ${retryCount} failed for user ${user.uid} ${mediaType}: ${error.message}`, 'error');
-
-                            if (retryCount < maxRetries) {
-                                this.log(`⏳ Retrying in ${delay}ms... (${retryCount}/${maxRetries})`, 'info');
-                                setTimeout(() => attemptSubscribe(), delay);
-                            } else {
-                                this.log(`💀 Max retries (${maxRetries}) reached for user ${user.uid} ${mediaType}`, 'error');
-                                console.error('Final subscription error:', error);
+                    
+                    try {
+                        // Subscribe immediately without retry logic
+                        await this.agoraClient.subscribe(user, mediaType);
+                        this.log(`✅ Subscribed to user ${user.uid} ${mediaType}`, 'success');
+                        
+                        if (mediaType === 'video') {
+                            // Wait for video track to be available
+                            await this.waitForVideoTrack(user, 5000);
+                            await this.displayRemoteVideo(user);
+                        } else if (mediaType === 'audio') {
+                            if (user.audioTrack) {
+                                user.audioTrack.play();
+                                this.log('✅ Remote audio playing', 'success');
                             }
                         }
-                    };
-
-                    // Start the first attempt
-                    attemptSubscribe();
+                    } catch (error) {
+                        this.log(`❌ Failed to subscribe to user ${user.uid} ${mediaType}: ${error.message}`, 'error');
+                    }
+                },
+                
+                async waitForVideoTrack(user, timeout = 5000) {
+                    const startTime = Date.now();
+                    
+                    while (!user.videoTrack && (Date.now() - startTime) < timeout) {
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                    }
+                    
+                    if (!user.videoTrack) {
+                        throw new Error('Video track not available after timeout');
+                    }
+                    
+                    this.log(`Video track available for user ${user.uid}`, 'success');
+                },
+                
+                async displayRemoteVideo(user) {
+                    try {
+                        const remoteContainer = document.getElementById('remote-video');
+                        if (!remoteContainer) {
+                            throw new Error('Remote video container not found');
+                        }
+                        
+                        // Clear container
+                        remoteContainer.innerHTML = '';
+                        
+                        // Play video track
+                        user.videoTrack.play('remote-video');
+                        this.log('🎬 Remote video playing', 'success');
+                        
+                        // Verify video element was created
+                        setTimeout(() => {
+                            const videos = remoteContainer.querySelectorAll('video');
+                            if (videos.length > 0) {
+                                videos.forEach(video => {
+                                    video.style.width = '100%';
+                                    video.style.height = '100%';
+                                    video.style.objectFit = 'cover';
+                                });
+                                this.log('✅ Remote video displayed successfully', 'success');
+                            } else {
+                                this.log('❌ No video elements created', 'error');
+                            }
+                        }, 500);
+                        
+                    } catch (error) {
+                        this.log(`❌ Failed to display remote video: ${error.message}`, 'error');
+                    }
                 },
 
                 handleUserUnpublished(user, mediaType) {
