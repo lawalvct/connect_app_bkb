@@ -922,11 +922,9 @@
                     try {
                         // Simulate test users - in real app you'd fetch from an endpoint
                         this.testUsers = [
-                            { id: 3114, name: 'Oz Lawal', email: 'lawal@example.com' },
+                            { id: 3114, name: 'Oz Lawal', email: 'lawalthb@gmail.com' },
                             { id: 3152, name: 'Gerson', email: 'gerson@example.com' },
-                            { id: 3001, name: 'Alice Johnson', email: 'alice@example.com' },
-                            { id: 3002, name: 'Bob Smith', email: 'bob@example.com' },
-                            { id: 3003, name: 'Carol Brown', email: 'carol@example.com' }
+
                         ];
 
                         this.log(`Loaded ${this.testUsers.length} test users`, 'info');
