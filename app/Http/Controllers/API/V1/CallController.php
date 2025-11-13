@@ -173,12 +173,12 @@ class CallController extends BaseController
                         'data_structure' => array_keys($broadcastData)
                     ]);
 
-                    $result = $pusher->trigger('private-conversation.' . $conversation->id, 'call.initiated', $broadcastData);
+                    $result = $pusher->trigger('conversation.' . $conversation->id, 'call.initiated', $broadcastData);
 
                     Log::info('CallInitiated broadcast successful', [
                         'call_id' => $call->id,
                         'conversation_id' => $conversation->id,
-                        'channel' => 'private-conversation.' . $conversation->id,
+                        'channel' => 'conversation.' . $conversation->id,
                         'pusher_result' => $result
                     ]);
                 }
@@ -318,12 +318,12 @@ class CallController extends BaseController
                         'data_structure' => array_keys($broadcastData)
                     ]);
 
-                    $result = $pusher->trigger('private-conversation.' . $call->conversation_id, 'call.answered', $broadcastData);
+                    $result = $pusher->trigger('conversation.' . $call->conversation_id, 'call.answered', $broadcastData);
 
                     Log::info('CallAnswered broadcast successful', [
                         'call_id' => $call->id,
                         'conversation_id' => $call->conversation_id,
-                        'channel' => 'private-conversation.' . $call->conversation_id,
+                        'channel' => 'conversation.' . $call->conversation_id,
                         'pusher_result' => $result
                     ]);
                 }
@@ -547,12 +547,12 @@ class CallController extends BaseController
                         'data_structure' => array_keys($broadcastData)
                     ]);
 
-                    $result = $pusher->trigger('private-conversation.' . $call->conversation_id, 'call.ended', $broadcastData);
+                    $result = $pusher->trigger('conversation.' . $call->conversation_id, 'call.ended', $broadcastData);
 
                     Log::info('CallEnded broadcast successful', [
                         'call_id' => $call->id,
                         'conversation_id' => $call->conversation_id,
-                        'channel' => 'private-conversation.' . $call->conversation_id,
+                        'channel' => 'conversation.' . $call->conversation_id,
                         'pusher_result' => $result
                     ]);
                 }
@@ -694,12 +694,12 @@ class CallController extends BaseController
                             'data_structure' => array_keys($broadcastData)
                         ]);
 
-                        $result = $pusher->trigger('private-conversation.' . $call->conversation_id, 'call.missed', $broadcastData);
+                        $result = $pusher->trigger('conversation.' . $call->conversation_id, 'call.missed', $broadcastData);
 
                         Log::info('CallMissed broadcast successful', [
                             'call_id' => $call->id,
                             'conversation_id' => $call->conversation_id,
-                            'channel' => 'private-conversation.' . $call->conversation_id,
+                            'channel' => 'conversation.' . $call->conversation_id,
                             'pusher_result' => $result
                         ]);
                     }
