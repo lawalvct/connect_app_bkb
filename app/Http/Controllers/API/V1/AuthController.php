@@ -15,6 +15,7 @@ use Illuminate\Validation\ValidationException;
 use Laravel\Socialite\Facades\Socialite;
 use App\Mail\WelcomeEmail;
 use App\Mail\VerificationEmail;
+use App\Mail\WelcomeVerificationEmail;
 use App\Models\User;
 use App\Models\AdminNotification;
 use App\Models\UserNotification;
@@ -150,11 +151,10 @@ public function register(RegisterRequest $request)
         $user->save();
 
 
-        // Queue emails instead of sending them immediately
+        // Queue combined welcome and verification email
         try {
-            // The emails will be sent in the background
-            Mail::to($user->email)->queue(new WelcomeEmail($user));
-            Mail::to($user->email)->queue(new VerificationEmail($user, $otp));
+            // Send one email with both welcome message and verification code
+            Mail::to($user->email)->queue(new WelcomeVerificationEmail($user, $otp));
 
             // Create a global admin notification (admin_id = null)
             AdminNotification::createForAllAdmins([
