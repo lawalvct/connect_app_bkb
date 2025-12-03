@@ -873,7 +873,9 @@ public function initializeNombaPaymentNGN(Request $request)
 {
     $validator = Validator::make($request->all(), [
         'subscription_id' => 'required|exists:subscribes,id',
-        'amount_ngn' => 'required|numeric|min:1'
+        'amount_ngn' => 'required|numeric|min:1',
+        'success_url' => 'nullable|url',
+        'cancel_url' => 'nullable|url'
     ]);
 
     if ($validator->fails()) {
@@ -899,7 +901,8 @@ public function initializeNombaPaymentNGN(Request $request)
         }
 
         $nombaHelper = new NombaPyamentHelper();
-        $callbackUrl = env('APP_URL') . '/api/v1/subscriptions/nomba/callback';
+        // Use route helper for proper URL generation
+        $callbackUrl = route('api.v1.subscriptions.nomba.callback.web');
 
         $paymentResult = $nombaHelper->processPayment(
             $amountNGN,
@@ -925,6 +928,8 @@ public function initializeNombaPaymentNGN(Request $request)
                     'amount' => $amountNGN,
                     'currency' => 'NGN',
                     'callback_url' => $callbackUrl,
+                    'client_success_url' => $request->success_url,
+                    'client_cancel_url' => $request->cancel_url,
                     'created_at' => now()->toISOString()
                 ]),
                 'status' => 'pending'
@@ -966,7 +971,9 @@ public function initializeNombaPaymentUSD(Request $request)
 {
     $validator = Validator::make($request->all(), [
         'subscription_id' => 'required|exists:subscribes,id',
-        'amount_usd' => 'required|numeric|min:1'
+        'amount_usd' => 'required|numeric|min:1',
+        'success_url' => 'nullable|url',
+        'cancel_url' => 'nullable|url'
     ]);
 
     if ($validator->fails()) {
@@ -992,7 +999,8 @@ public function initializeNombaPaymentUSD(Request $request)
         }
 
         $nombaHelper = new NombaPyamentHelper();
-        $callbackUrl = env('APP_URL') . '/api/v1/subscriptions/nomba/callback';
+        // Use route helper for proper URL generation
+        $callbackUrl = route('api.v1.subscriptions.nomba.callback.web');
 
         $paymentResult = $nombaHelper->processPayment(
             $amountUSD,
@@ -1018,6 +1026,8 @@ public function initializeNombaPaymentUSD(Request $request)
                     'amount' => $amountUSD,
                     'currency' => 'USD',
                     'callback_url' => $callbackUrl,
+                    'client_success_url' => $request->success_url,
+                    'client_cancel_url' => $request->cancel_url,
                     'created_at' => now()->toISOString()
                 ]),
                 'status' => 'pending'
@@ -1152,14 +1162,25 @@ public function initializeNombaPayment(Request $request)
 
 public function handleNombaCallbackWeb(Request $request)
 {
-    $orderReference = $request->query('orderid');
+    // Check for both orderId and orderReference parameters
+    $orderReference = $request->query('orderReference') ?? $request->query('orderId') ?? $request->query('orderid');
 
     if (!$orderReference) {
+        \Log::warning('No order reference found in Nomba callback', [
+            'all_params' => $request->all(),
+            'query_params' => $request->query()
+        ]);
+
         return response()->json([
             'message' => 'Reference parameter is required',
             'status' => 0
         ], 400);
     }
+
+    \Log::info('Nomba callback received', [
+        'orderReference' => $orderReference,
+        'all_params' => $request->all()
+    ]);
 
     // Initialize Nomba payment helper
     $nombaHelper = new NombaPyamentHelper();
@@ -1184,13 +1205,20 @@ public function handleNombaCallbackWeb(Request $request)
      $verificationResult = $nombaHelper->verifyPayment($orderReference);
 
      if ($verificationResult['status']) {
+         // Get client URLs from payment_details before updating
+         $paymentDetails = json_decode($userSubscription->payment_details, true);
+         $clientSuccessUrl = $paymentDetails['client_success_url'] ?? null;
+
          // Update subscription status
          UserSubscriptionHelper::update([
              'payment_status' => 'completed',
              'status' => 'active',
              'started_at' => now(),
              'expires_at' => now()->addDays(30),
-             'payment_details' => json_encode($verificationResult['data'])
+             'payment_details' => json_encode(array_merge($paymentDetails ?? [], [
+                 'verification_result' => $verificationResult['data'],
+                 'completed_at' => now()->toISOString()
+             ]))
          ], ['id' => $userSubscription->id]);
 
          // Refresh the subscription data
@@ -1201,10 +1229,26 @@ public function handleNombaCallbackWeb(Request $request)
 
          \Log::info('Payment successfully processed for order: ' . $orderReference);
 
-          // Redirect to success page
-        return redirect()->away(env('FRONTEND_URL') . '/subscription/success?reference=' . $orderReference.'&orderId='.$orderReference);
+         // Redirect to client success URL if provided, otherwise use default
+         if ($clientSuccessUrl) {
+             $separator = parse_url($clientSuccessUrl, PHP_URL_QUERY) ? '&' : '?';
+             $redirectUrl = $clientSuccessUrl . $separator . http_build_query([
+                 'reference' => $orderReference,
+                 'orderId' => $orderReference,
+                 'subscription_id' => $userSubscription->id,
+                 'status' => 'success'
+             ]);
+             return redirect()->away($redirectUrl);
+         }
+
+         // Default redirect
+         return redirect()->away(env('FRONTEND_URL') . '/subscription/success?reference=' . $orderReference.'&orderId='.$orderReference);
      } else {
          \Log::warning('Payment verification failed for order: ' . $orderReference);
+
+         // Get client cancel URL
+         $paymentDetails = json_decode($userSubscription->payment_details, true);
+         $clientCancelUrl = $paymentDetails['client_cancel_url'] ?? null;
 
          // Update as failed
          UserSubscriptionHelper::update([
@@ -1212,9 +1256,18 @@ public function handleNombaCallbackWeb(Request $request)
              'status' => 'failed'
          ], ['id' => $userSubscription->id]);
 
+         // Redirect to client cancel URL if provided, otherwise use default
+         if ($clientCancelUrl) {
+             $separator = parse_url($clientCancelUrl, PHP_URL_QUERY) ? '&' : '?';
+             $redirectUrl = $clientCancelUrl . $separator . http_build_query([
+                 'reference' => $orderReference,
+                 'status' => 'failed'
+             ]);
+             return redirect()->away($redirectUrl);
+         }
 
-             // Redirect to failure page
-    return redirect()->away(env('FRONTEND_URL') . '/subscription/failure?reference=' . $orderReference);
+         // Default redirect
+         return redirect()->away(env('FRONTEND_URL') . '/subscription/failure?reference=' . $orderReference);
      }
 
 

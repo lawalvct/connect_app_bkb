@@ -684,8 +684,8 @@ Route::prefix('discover')->group(function () {
 
 
   // Webhook routes (no auth needed)
-  Route::post('/nomba/callback', [SubscriptionController::class, 'handleNombaCallback']);
-  Route::post('/nomba/callback/web', [SubscriptionController::class, 'handleNombaCallbackWeb']);
+  Route::post('/nomba/callback', [SubscriptionController::class, 'handleNombaCallback'])->name('api.v1.subscriptions.nomba.callback');
+  Route::match(['get', 'post'], '/nomba/callback/web', [SubscriptionController::class, 'handleNombaCallbackWeb'])->name('api.v1.subscriptions.nomba.callback.web');
   Route::post('/stripe/subscription/webhook', [SubscriptionController::class, 'stripeWebhook']);
 
   // Stripe redirect routes (no auth needed - handles success/cancel from Stripe checkout)
