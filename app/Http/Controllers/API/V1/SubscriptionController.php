@@ -1296,9 +1296,14 @@ public function handleNombaCallbackWeb(Request $request)
                 \Log::info('Created new Stripe customer', ['customer_id' => $stripeCustomerId]);
             }
 
-            // Set URLs
-            $successUrl = $request->success_url ?? config('app.url') . '/subscription-success?session_id={CHECKOUT_SESSION_ID}';
-            $cancelUrl = $request->cancel_url ?? config('app.url') . '/subscription-cancel';
+            // Set URLs - Success URL should go to backend first to update DB
+            // Store client's success_url in metadata to redirect after processing
+            $clientSuccessUrl = $request->success_url ?? null;
+            $clientCancelUrl = $request->cancel_url ?? null;
+
+            // Backend URLs that will handle the payment and then redirect to client
+            $successUrl = route('api.v1.subscriptions.stripe.success') . '?session_id={CHECKOUT_SESSION_ID}';
+            $cancelUrl = route('api.v1.subscriptions.stripe.cancel');
 
             // Create pending subscription record for tracking
             $pendingSubscription = new UserSubscription();
@@ -1310,6 +1315,10 @@ public function handleNombaCallbackWeb(Request $request)
             $pendingSubscription->status = 'pending';
             $pendingSubscription->starts_at = now();
             $pendingSubscription->expires_at = now()->addDays(30);
+            $pendingSubscription->payment_details = [
+                'client_success_url' => $clientSuccessUrl,
+                'client_cancel_url' => $clientCancelUrl
+            ];
             $pendingSubscription->save();
 
             // Create Stripe checkout session
@@ -1637,9 +1646,22 @@ public function handleNombaCallbackWeb(Request $request)
             // Retrieve the session from Stripe to get subscription details
             \Stripe\Stripe::setApiKey(config('services.stripe.secret'));
 
-            $session = \Stripe\Checkout\Session::retrieve($sessionId);
+            $session = \Stripe\Checkout\Session::retrieve([
+                'id' => $sessionId,
+                'expand' => ['subscription', 'payment_intent']
+            ]);
+
+            \Log::info('Retrieved Stripe session', [
+                'session_id' => $sessionId,
+                'payment_status' => $session->payment_status,
+                'subscription_id' => $session->subscription ?? 'none'
+            ]);
 
             if ($session->payment_status !== 'paid') {
+                \Log::warning('Payment not completed', [
+                    'session_id' => $sessionId,
+                    'payment_status' => $session->payment_status
+                ]);
                 return view('subscription-result', [
                     'status' => 'error',
                     'title' => 'Payment Not Completed',
@@ -1651,34 +1673,95 @@ public function handleNombaCallbackWeb(Request $request)
             // Get the subscription from Stripe
             $stripeSubscription = null;
             if ($session->subscription) {
-                $stripeSubscription = \Stripe\Subscription::retrieve($session->subscription);
+                try {
+                    $stripeSubscription = is_object($session->subscription) ?
+                        $session->subscription :
+                        \Stripe\Subscription::retrieve($session->subscription);
+
+                    \Log::info('Retrieved Stripe subscription', [
+                        'stripe_subscription_id' => $stripeSubscription->id,
+                        'status' => $stripeSubscription->status
+                    ]);
+                } catch (\Exception $e) {
+                    \Log::error('Failed to retrieve Stripe subscription', [
+                        'error' => $e->getMessage()
+                    ]);
+                }
             }
 
+            // Get client URLs from existing payment_details before updating
+            $existingPaymentDetails = $pendingSubscription->payment_details;
+            $clientSuccessUrl = null;
+            $clientCancelUrl = null;
+
+            \Log::info('Existing payment details', [
+                'payment_details' => $existingPaymentDetails,
+                'is_array' => is_array($existingPaymentDetails),
+                'is_string' => is_string($existingPaymentDetails)
+            ]);
+
+            if (is_array($existingPaymentDetails)) {
+                $clientSuccessUrl = $existingPaymentDetails['client_success_url'] ?? null;
+                $clientCancelUrl = $existingPaymentDetails['client_cancel_url'] ?? null;
+            } elseif (is_string($existingPaymentDetails)) {
+                $decoded = json_decode($existingPaymentDetails, true);
+                if ($decoded) {
+                    $clientSuccessUrl = $decoded['client_success_url'] ?? null;
+                    $clientCancelUrl = $decoded['client_cancel_url'] ?? null;
+                }
+            }
+
+            \Log::info('Extracted client URLs', [
+                'client_success_url' => $clientSuccessUrl,
+                'client_cancel_url' => $clientCancelUrl
+            ]);
+
             // Update the user subscription record
-            $pendingSubscription->update([
+            $updateData = [
                 'status' => 'active',
                 'payment_status' => 'completed',
                 'transaction_reference' => $session->payment_intent ?? $session->id,
                 'customer_id' => $session->customer,
-                'stripe_subscription_id' => $session->subscription,
+                'stripe_subscription_id' => is_object($session->subscription) ? $session->subscription->id : $session->subscription,
                 'started_at' => now(),
-                'current_period_start' => ($stripeSubscription && $stripeSubscription->current_period_start) ?
+                'current_period_start' => ($stripeSubscription && isset($stripeSubscription->current_period_start)) ?
                     \Carbon\Carbon::createFromTimestamp($stripeSubscription->current_period_start) : now(),
-                'current_period_end' => ($stripeSubscription && $stripeSubscription->current_period_end) ?
+                'current_period_end' => ($stripeSubscription && isset($stripeSubscription->current_period_end)) ?
                     \Carbon\Carbon::createFromTimestamp($stripeSubscription->current_period_end) : now()->addMonth(),
-                'expires_at' => ($stripeSubscription && $stripeSubscription->current_period_end) ?
+                'expires_at' => ($stripeSubscription && isset($stripeSubscription->current_period_end)) ?
                     \Carbon\Carbon::createFromTimestamp($stripeSubscription->current_period_end) : now()->addMonth(),
                 'paid_at' => now(),
                 'last_payment_at' => now(),
                 'payment_details' => [
+                    'client_success_url' => $clientSuccessUrl, // Keep original client URL
+                    'client_cancel_url' => $clientCancelUrl,   // Keep original client URL
                     'stripe_session_id' => $sessionId,
                     'stripe_customer_id' => $session->customer,
-                    'stripe_subscription_id' => $session->subscription,
+                    'stripe_subscription_id' => is_object($session->subscription) ? $session->subscription->id : $session->subscription,
                     'amount_paid' => $session->amount_total / 100, // Convert from cents
                     'currency' => strtoupper($session->currency),
                     'payment_method' => 'stripe',
                     'processed_at' => now()->toISOString()
                 ]
+            ];
+
+            \Log::info('Updating subscription with data', [
+                'subscription_id' => $pendingSubscription->id,
+                'update_data' => $updateData
+            ]);
+
+            $updated = $pendingSubscription->update($updateData);
+
+            if (!$updated) {
+                \Log::error('Failed to update subscription', [
+                    'subscription_id' => $pendingSubscription->id
+                ]);
+                throw new \Exception('Failed to update subscription in database');
+            }
+
+            \Log::info('Subscription updated successfully in database', [
+                'subscription_id' => $pendingSubscription->id,
+                'status' => $pendingSubscription->fresh()->status
             ]);
 
             // Update user's Stripe customer ID if not already set
@@ -1693,15 +1776,30 @@ public function handleNombaCallbackWeb(Request $request)
                 'stripe_subscription_id' => $session->subscription
             ]);
 
+            // If client provided a success URL, redirect there with session info
+            if ($clientSuccessUrl) {
+                $separator = parse_url($clientSuccessUrl, PHP_URL_QUERY) ? '&' : '?';
+                $redirectUrl = $clientSuccessUrl . $separator . http_build_query([
+                    'session_id' => $sessionId,
+                    'subscription_id' => $pendingSubscription->id,
+                    'status' => 'success'
+                ]);
+
+                \Log::info('Redirecting to client success URL', [
+                    'client_url' => $redirectUrl
+                ]);
+
+                return redirect()->away($redirectUrl);
+            }
+
+            // Otherwise show success view
             return view('subscription-result', [
                 'status' => 'success',
                 'title' => 'Subscription Activated!',
                 'message' => 'Your subscription has been successfully activated. Welcome to the premium experience!',
                 'subscription' => $pendingSubscription->fresh(),
-                'redirect_url' => env('FRONTEND_URL', config('app.url')) . '/dashboard' // Redirect to frontend
-            ]);
-
-        } catch (\Exception $e) {
+                'redirect_url' => env('FRONTEND_URL', config('app.url')) . '/dashboard'
+            ]);        } catch (\Exception $e) {
             \Log::error('Stripe subscription success handling failed', [
                 'session_id' => $request->get('session_id'),
                 'error' => $e->getMessage(),
