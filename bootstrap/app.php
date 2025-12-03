@@ -36,11 +36,16 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'swipe.limit' => SwipeRateLimit::class,
             'admin.permissions' => \App\Http\Middleware\AdminPermissions::class,
+            'check.subscriptions' => \App\Http\Middleware\CheckExpiredSubscriptions::class,
         ]);
 
         // API middleware group configuration
         $middleware->api(prepend: [
             \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
+        ]);
+        
+        $middleware->api(append: [
+            \App\Http\Middleware\CheckExpiredSubscriptions::class,
         ]);
           // Disable CSRF for API routes
           $middleware->validateCsrfTokens(except: [
