@@ -1162,22 +1162,24 @@ public function initializeNombaPayment(Request $request)
 
 public function handleNombaCallbackWeb(Request $request)
 {
-    // Check for both orderId and orderReference parameters
-    $orderReference = $request->query('orderReference') ?? $request->query('orderId') ?? $request->query('orderid');
+    // Nomba sends both orderId (transaction ID) and orderReference (our custom reference)
+    $orderId = $request->query('orderId') ?? $request->query('orderid');
+    $orderReference = $orderId ;
 
-    if (!$orderReference) {
-        \Log::warning('No order reference found in Nomba callback', [
+    if (!$orderId && !$orderReference) {
+        \Log::warning('No order ID or reference found in Nomba callback', [
             'all_params' => $request->all(),
             'query_params' => $request->query()
         ]);
 
         return response()->json([
-            'message' => 'Reference parameter is required',
+            'message' => 'Order ID or reference parameter is required',
             'status' => 0
         ], 400);
     }
 
     \Log::info('Nomba callback received', [
+        'orderId' => $orderId,
         'orderReference' => $orderReference,
         'all_params' => $request->all()
     ]);
@@ -1185,26 +1187,62 @@ public function handleNombaCallbackWeb(Request $request)
     // Initialize Nomba payment helper
     $nombaHelper = new NombaPyamentHelper();
 
-    // Verify the payment
-    $verification = $nombaHelper->verifyPayment($orderReference);
+    // Get payment details from database using our custom orderReference
+    $userSubscription = null;
 
-    // Get payment details from database
-      $userSubscription = UserSubscription::where('transaction_reference', $orderReference)->first();
+    if ($orderReference) {
+        $userSubscription = UserSubscription::where('transaction_reference', $orderReference)->first();
+    }
 
-     if (!$userSubscription) {
-         \Log::warning('Subscription not found for order reference: ' . $orderReference);
-         return response()->json(['status' => 'error', 'message' => 'Subscription not found'], 404);
-     }
+    // If not found by orderReference, try to find by orderId stored in payment_details
+    if (!$userSubscription && $orderId) {
+        $userSubscription = UserSubscription::where('payment_details', 'like', '%' . $orderId . '%')
+            ->where('payment_status', 'pending')
+            ->first();
+    }
 
-     // Check if already processed
-     if ($userSubscription->payment_status === 'completed') {
-         \Log::info('Payment already processed for order: ' . $orderReference);
-         return response()->json(['status' => 'success', 'message' => 'Already processed'], 200);
-     }
+    if (!$userSubscription) {
+        \Log::warning('Subscription not found', [
+            'orderReference' => $orderReference,
+            'orderId' => $orderId
+        ]);
+        return response()->json(['status' => 'error', 'message' => 'Subscription not found'], 404);
+    }
 
-     $verificationResult = $nombaHelper->verifyPayment($orderReference);
+    // Check if already processed
+    if ($userSubscription->payment_status === 'completed') {
+        \Log::info('Payment already processed', [
+            'subscription_id' => $userSubscription->id,
+            'orderReference' => $orderReference
+        ]);
 
-     if ($verificationResult['status']) {
+        // Get client URL and redirect
+        $paymentDetails = json_decode($userSubscription->payment_details, true);
+        $clientSuccessUrl = $paymentDetails['client_success_url'] ?? null;
+
+        if ($clientSuccessUrl) {
+            $separator = parse_url($clientSuccessUrl, PHP_URL_QUERY) ? '&' : '?';
+            $redirectUrl = $clientSuccessUrl . $separator . http_build_query([
+                'reference' => $orderReference ?? $orderId,
+                'orderId' => $orderId,
+                'subscription_id' => $userSubscription->id,
+                'status' => 'success'
+            ]);
+            return redirect()->away($redirectUrl);
+        }
+
+        return response()->json(['status' => 'success', 'message' => 'Already processed'], 200);
+    }
+
+    // Verify payment with Nomba using orderId (not orderReference)
+    $verificationResult = $nombaHelper->verifyPayment($orderId);
+
+    \Log::info('Nomba verification result', [
+        'orderId' => $orderId,
+        'result' => $verificationResult
+    ]);
+
+    if ($verificationResult['status']) {
          // Get client URLs from payment_details before updating
          $paymentDetails = json_decode($userSubscription->payment_details, true);
          $clientSuccessUrl = $paymentDetails['client_success_url'] ?? null;
