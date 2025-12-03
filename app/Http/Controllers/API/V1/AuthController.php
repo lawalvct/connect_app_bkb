@@ -300,6 +300,9 @@ private function addDefaultProfileUploads(User $user)
             }
             $user = Auth::user();
 
+            // Expire any subscriptions that have passed their expiration date
+            UserSubscriptionHelper::expireUserSubscriptions($user->id);
+
             // Save device_token to user_fcm_tokens if provided
             if ($request->filled('device_token')) {
                 $fcmToken = $request['device_token'];

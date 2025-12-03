@@ -490,9 +490,13 @@
                                     class="flex items-center space-x-3 p-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors duration-200">
                                 <!-- Admin Profile Image -->
                                 @if(auth('admin')->user()->profile_image)
-                                    <img src="{{ Storage::url(auth('admin')->user()->profile_image) }}"
+                                    <img src="{{ asset('storage/' . auth('admin')->user()->profile_image) }}"
                                          alt="Profile Image"
-                                         class="w-8 h-8 rounded-full object-cover border-2 border-primary">
+                                         class="w-8 h-8 rounded-full object-cover border-2 border-primary"
+                                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                    <div class="w-8 h-8 rounded-full bg-primary items-center justify-center text-white font-bold text-sm" style="display:none;">
+                                        {{ strtoupper(substr(auth('admin')->user()->name, 0, 1)) }}
+                                    </div>
                                 @else
                                     <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white font-bold text-sm">
                                         {{ strtoupper(substr(auth('admin')->user()->name, 0, 1)) }}

@@ -131,26 +131,38 @@ class DashboardController extends Controller
             ];
         }
 
-        // Recent posts (last 10)
-        $recentPosts = Post::with('user:id,name')->latest()->take(10)->get(['id', 'user_id', 'content', 'created_at', 'type']);
+        // Recent posts (last 10) - FIX: Handle null users
+        $recentPosts = Post::with('user:id,name')
+            ->whereHas('user') // Only get posts where user exists
+            ->latest()
+            ->take(10)
+            ->get(['id', 'user_id', 'content', 'created_at', 'type']);
+
         foreach ($recentPosts as $post) {
+            $userName = $post->user ? $post->user->name : 'Unknown User';
             $activities[] = [
                 'id' => 'post_' . $post->id,
                 'type' => 'post_created',
-                'description' => "New {$post->type} by {$post->user->name}",
+                'description' => "New {$post->type} by {$userName}",
                 'time_ago' => $post->created_at->diffForHumans(),
                 'timestamp' => $post->created_at->timestamp,
                 'content' => \Str::limit($post->content, 50)
             ];
         }
 
-        // Recent ads (last 10)
-        $recentAds = Ad::with('user:id,name')->latest()->take(10)->get(['id', 'user_id', 'ad_name', 'status', 'created_at']);
+        // Recent ads (last 10) - FIX: Handle null users
+        $recentAds = Ad::with('user:id,name')
+            ->whereHas('user') // Only get ads where user exists
+            ->latest()
+            ->take(10)
+            ->get(['id', 'user_id', 'ad_name', 'status', 'created_at']);
+
         foreach ($recentAds as $ad) {
+            $userName = $ad->user ? $ad->user->name : 'Unknown User';
             $activities[] = [
                 'id' => 'ad_' . $ad->id,
                 'type' => $ad->status === 'active' ? 'ad_approved' : ($ad->status === 'rejected' ? 'ad_rejected' : 'ad_submitted'),
-                'description' => "Ad '{$ad->ad_name}' by {$ad->user->name} - {$ad->status}",
+                'description' => "Ad '{$ad->ad_name}' by {$userName} - {$ad->status}",
                 'time_ago' => $ad->created_at->diffForHumans(),
                 'timestamp' => $ad->created_at->timestamp,
                 'ad_name' => $ad->ad_name,
@@ -158,14 +170,19 @@ class DashboardController extends Controller
             ];
         }
 
-        // Recent subscriptions (last 10)
+        // Recent subscriptions (last 10) - FIX: Handle null users
         $recentSubscriptions = UserSubscription::with('user:id,name')
-            ->latest()->take(10)->get(['id', 'user_id', 'subscription_id', 'status', 'amount', 'created_at']);
+            ->whereHas('user') // Only get subscriptions where user exists
+            ->latest()
+            ->take(10)
+            ->get(['id', 'user_id', 'subscription_id', 'status', 'amount', 'created_at']);
+
         foreach ($recentSubscriptions as $subscription) {
+            $userName = $subscription->user ? $subscription->user->name : 'Unknown User';
             $activities[] = [
                 'id' => 'subscription_' . $subscription->id,
                 'type' => 'payment_received',
-                'description' => "New subscription by {$subscription->user->name} - $ {$subscription->amount}",
+                'description' => "New subscription by {$userName} - $ {$subscription->amount}",
                 'time_ago' => $subscription->created_at->diffForHumans(),
                 'timestamp' => $subscription->created_at->timestamp,
                 'amount' => $subscription->amount,
@@ -173,13 +190,19 @@ class DashboardController extends Controller
             ];
         }
 
-        // Recent streams (last 10)
-        $recentStreams = Stream::with('user:id,name')->latest()->take(10)->get(['id', 'user_id', 'title', 'status', 'created_at']);
+        // Recent streams (last 10) - FIX: Handle null users
+        $recentStreams = Stream::with('user:id,name')
+            ->whereHas('user') // Only get streams where user exists
+            ->latest()
+            ->take(10)
+            ->get(['id', 'user_id', 'title', 'status', 'created_at']);
+
         foreach ($recentStreams as $stream) {
+            $userName = $stream->user ? $stream->user->name : 'Unknown User';
             $activities[] = [
                 'id' => 'stream_' . $stream->id,
                 'type' => 'stream_started',
-                'description' => "Stream '{$stream->title}' by {$stream->user->name} - {$stream->status}",
+                'description' => "Stream '{$stream->title}' by {$userName} - {$stream->status}",
                 'time_ago' => $stream->created_at->diffForHumans(),
                 'timestamp' => $stream->created_at->timestamp,
                 'stream_title' => $stream->title,

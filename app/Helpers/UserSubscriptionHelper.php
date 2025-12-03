@@ -197,6 +197,17 @@ class UserSubscriptionHelper
     }
 
     /**
+     * Expire subscriptions for a specific user
+     */
+    public static function expireUserSubscriptions($userId)
+    {
+        return UserSubscription::where('user_id', $userId)
+            ->where('expires_at', '<=', Carbon::now())
+            ->where('status', 'active')
+            ->update(['status' => 'expired']);
+    }
+
+    /**
      * Cancel subscription
      */
     public static function cancelSubscription($userId, $subscriptionId)
