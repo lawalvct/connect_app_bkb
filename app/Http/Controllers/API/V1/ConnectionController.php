@@ -480,9 +480,39 @@ class ConnectionController extends Controller
             \Log::info('Connection request result', $result);
 
             if (!$result['success']) {
+                // Even if request failed (e.g., already sent), still provide a suggested user
+                // so the user can continue swiping without getting stuck
+
+                // Get updated swipe stats
+                $swipeStats = UserHelper::getSwipeStats($user->id);
+
+                // Get a random user from the same social circle
+                $randomUser = null;
+                $socialCircleName = null;
+                if (isset($data['social_id']) && !empty($data['social_id'])) {
+                    // Get the social circle name
+                    $socialCircle = \App\Models\SocialCircle::find($data['social_id']);
+                    $socialCircleName = $socialCircle ? $socialCircle->name : null;
+
+                    $randomUser = UserHelper::getRandomUserFromSocialCircle(
+                        $data['social_id'],
+                        $user->id,
+                        [$data['user_id']] // Exclude the user we just swiped on
+                    );
+
+                    if ($randomUser) {
+                        $randomUser = Utility::convertString($randomUser);
+                    }
+                }
+
                 return response()->json([
                     'status' => 0,
-                    'message' => $result['message']
+                    'message' => $result['message'],
+                    'data' => [
+                        'swipe_stats' => $swipeStats,
+                        'suggested_user' => $randomUser, // Still provide next user to swipe
+                        'social_circle_name' => $socialCircleName
+                    ]
                 ], 400);
             }
 
