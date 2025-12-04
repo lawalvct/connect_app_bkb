@@ -497,6 +497,15 @@ class StreamController extends BaseController
                 return $this->sendError('You must be viewing the stream to send messages', null, 403);
             }
 
+            // Check if user has exceeded free minutes for paid streams
+            if ($stream->is_paid && !$isOwner && $stream->hasUserExceededFreeMinutes($user)) {
+                return $this->sendError('Your free viewing time has expired. Please make a payment to continue participating in chat.', [
+                    'free_minutes_expired' => true,
+                    'free_minutes' => $stream->free_minutes,
+                    'requires_payment' => true
+                ], 402);
+            }
+
             $validator = Validator::make($request->all(), [
                 'message' => 'required|string|max:500',
             ]);
