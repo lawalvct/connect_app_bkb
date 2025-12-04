@@ -287,7 +287,18 @@ class Stream extends Model
         }
 
         if ($this->is_paid) {
-            return $this->completedPayments()->where('user_id', $user->id)->exists();
+            // Check if user has already paid
+            if ($this->completedPayments()->where('user_id', $user->id)->exists()) {
+                return true;
+            }
+
+            // Check if stream has free minutes
+            if ($this->free_minutes > 0) {
+                return true; // Allow join, but will check duration later
+            }
+
+            // No free minutes and hasn't paid
+            return false;
         }
 
         return true;
@@ -300,6 +311,31 @@ class Stream extends Model
         }
 
         return $this->completedPayments()->where('user_id', $user->id)->exists();
+    }
+
+    public function hasUserExceededFreeMinutes(User $user): bool
+    {
+        // If not paid stream or user has paid, they haven't exceeded
+        if (!$this->is_paid || $this->hasUserPaid($user)) {
+            return false;
+        }
+
+        // If no free minutes, they've exceeded from the start
+        if (!$this->free_minutes || $this->free_minutes <= 0) {
+            return true;
+        }
+
+        // Get the first viewer record for this user
+        $viewer = $this->viewers()->where('user_id', $user->id)->orderBy('joined_at', 'asc')->first();
+
+        if (!$viewer || !$viewer->joined_at) {
+            return false; // First time joining
+        }
+
+        // Calculate minutes watched
+        $minutesWatched = $viewer->joined_at->diffInMinutes(now());
+
+        return $minutesWatched >= $this->free_minutes;
     }
 
     // Multi-camera methods

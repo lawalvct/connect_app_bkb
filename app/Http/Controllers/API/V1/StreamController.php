@@ -165,6 +165,15 @@ class StreamController extends BaseController
                 }
             }
 
+            // Check if user has exceeded free minutes
+            if ($stream->is_paid && $stream->hasUserExceededFreeMinutes($user)) {
+                return $this->sendError('Your free viewing time has expired. Please make a payment to continue watching.', [
+                    'free_minutes_expired' => true,
+                    'free_minutes' => $stream->free_minutes,
+                    'requires_payment' => true
+                ], 402);
+            }
+
             // Generate Agora token for viewer
             $agoraUid = StreamViewer::generateAgoraUid();
             $agoraToken = AgoraHelper::generateRtcToken($stream->channel_name, (int)$agoraUid, 3600, 'subscriber'); // 1 hour
@@ -176,7 +185,23 @@ class StreamController extends BaseController
             // Add user as viewer
             $viewer = $stream->addViewer($user, $agoraUid, $agoraToken);
 
-            return $this->sendResponse('Joined stream successfully', [
+            // Calculate remaining free minutes if applicable
+            $freeMinutesInfo = null;
+            if ($stream->is_paid && $stream->free_minutes > 0 && !$stream->hasUserPaid($user)) {
+                $firstViewer = $stream->viewers()->where('user_id', $user->id)->orderBy('joined_at', 'asc')->first();
+                $minutesWatched = $firstViewer && $firstViewer->joined_at ? $firstViewer->joined_at->diffInMinutes(now()) : 0;
+                $remainingMinutes = max(0, $stream->free_minutes - $minutesWatched);
+
+                $freeMinutesInfo = [
+                    'total_free_minutes' => $stream->free_minutes,
+                    'minutes_watched' => $minutesWatched,
+                    'remaining_minutes' => $remainingMinutes,
+                    'has_paid' => false,
+                    'requires_payment_after_free_period' => true
+                ];
+            }
+
+            $response = [
                 'stream' => $this->formatStreamResponse($stream, $user),
                 'agora_config' => [
                     'app_id' => AgoraHelper::getAppId(),
@@ -189,7 +214,13 @@ class StreamController extends BaseController
                     'id' => $viewer->id,
                     'joined_at' => $viewer->joined_at
                 ]
-            ]);
+            ];
+
+            if ($freeMinutesInfo) {
+                $response['free_minutes_info'] = $freeMinutesInfo;
+            }
+
+            return $this->sendResponse('Joined stream successfully', $response);
 
         } catch (\Exception $e) {
             return $this->sendError('Failed to join stream', $e->getMessage(), 500);
