@@ -468,6 +468,45 @@ class ConnectionController extends Controller
                 ], 404);
             }
 
+            // Special handling for Connect Travel (social_id 11)
+            // Users can only swipe 10 profiles within 12 hours in this social circle
+            if (isset($data['social_id']) && $data['social_id'] == 11) {
+                $travelSwipeCheck = \App\Models\UserSocialCircleSwipe::canSwipeInCircle(
+                    $user->id,
+                    11, // Connect Travel social circle ID
+                    10, // Maximum 10 swipes
+                    12  // Within 12 hours
+                );
+
+                if (!$travelSwipeCheck['can_swipe']) {
+                    // Get updated swipe stats
+                    $swipeStats = UserHelper::getSwipeStats($user->id);
+
+                    // Get a random user from Connect Travel for next swipe opportunity
+                    $randomUser = null;
+                    $socialCircleName = 'Connect Travel';
+
+                    return response()->json([
+                        'status' => 0,
+                        'message' => sprintf(
+                            'Connect Travel swipe limit reached. You have used %d out of %d swipes in the last 12 hours. Resets at %s',
+                            $travelSwipeCheck['swipes_used'],
+                            $travelSwipeCheck['limit'],
+                            $travelSwipeCheck['resets_at']->format('Y-m-d H:i:s')
+                        ),
+                        'data' => [
+                            'swipes_used' => $travelSwipeCheck['swipes_used'],
+                            'swipe_limit' => $travelSwipeCheck['limit'],
+                            'remaining_swipes' => $travelSwipeCheck['remaining_swipes'],
+                            'resets_at' => $travelSwipeCheck['resets_at'],
+                            'swipe_stats' => $swipeStats,
+                            'suggested_user' => $randomUser,
+                            'social_circle_name' => $socialCircleName
+                        ]
+                    ], 429); // 429 Too Many Requests
+                }
+            }
+
             // Send connection request
             $result = UserRequestsHelper::sendConnectionRequest(
                 $user->id,
@@ -533,6 +572,25 @@ class ConnectionController extends Controller
                     'error' => $notificationException->getMessage()
                 ]);
                 // Don't fail the connection request if notification fails
+            }
+
+            // Record swipe in Connect Travel (social_id 11) for tracking 12-hour limit
+            if (isset($data['social_id']) && $data['social_id'] == 11) {
+                try {
+                    \App\Models\UserSocialCircleSwipe::recordSwipe(
+                        $user->id,
+                        11, // Connect Travel
+                        $data['user_id'],
+                        $data['request_type']
+                    );
+                } catch (\Exception $swipeException) {
+                    \Log::error('Failed to record Connect Travel swipe', [
+                        'user_id' => $user->id,
+                        'target_user_id' => $data['user_id'],
+                        'error' => $swipeException->getMessage()
+                    ]);
+                    // Don't fail the connection request if swipe recording fails
+                }
             }
 
             // Get updated swipe stats
