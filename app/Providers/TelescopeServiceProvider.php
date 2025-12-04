@@ -57,8 +57,10 @@ class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
     {
         Gate::define('viewTelescope', function ($user) {
             return in_array($user->email, [
-                //
-            ]);
+                'lawalthb@gmail.com',
+                'connectinc2020@gmail.com',
+                // Add more admin emails here
+            ]) || $user->role === 'admin' || $user->role === 'super_admin';
         });
     }
 }
