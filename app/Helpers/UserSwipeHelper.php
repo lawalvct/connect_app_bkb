@@ -158,14 +158,8 @@ class UserSwipeHelper
      */
     public static function canSwipeInWindow($userId, $baseLimit = 50, $hours = 12)
     {
-        // Get user's subscription to check for Connect Boost
-        $user = \App\Models\User::find($userId);
-        $hasBoost = false;
-
-        if ($user && $user->activeSubscription) {
-            // Check if user has Connect Boost subscription (ID 4)
-            $hasBoost = $user->activeSubscription->subscription_plan_id == 4;
-        }
+        // Check if user has Connect Boost subscription (ID 4)
+        $hasBoost = \App\Helpers\UserSubscriptionHelper::hasConnectBoost($userId);
 
         // Calculate total limit
         $totalLimit = $baseLimit;
