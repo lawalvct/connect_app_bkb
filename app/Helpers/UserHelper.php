@@ -426,6 +426,7 @@ public static function getAllDetailByUserId($id)
             $recentSwipes = \App\Models\UserSwipe::where('user_id', $userId)
                 ->where('swiped_at', '>=', \Carbon\Carbon::now()->subHours(12))
                 ->selectRaw('
+                    SUM(total_swipes) as total_swipes,
                     SUM(left_swipes) as left_swipes,
                     SUM(right_swipes) as right_swipes,
                     SUM(super_likes) as super_likes
@@ -434,6 +435,7 @@ public static function getAllDetailByUserId($id)
 
             if (!$recentSwipes) {
                 $recentSwipes = (object) [
+                    'total_swipes' => 0,
                     'left_swipes' => 0,
                     'right_swipes' => 0,
                     'super_likes' => 0
@@ -441,7 +443,7 @@ public static function getAllDetailByUserId($id)
             }
 
             return (object) [
-                'total_swipes' => $windowStats['swipes_used'],
+                'total_swipes' => $recentSwipes->total_swipes ?? 0,
                 'left_swipes' => $recentSwipes->left_swipes ?? 0,
                 'right_swipes' => $recentSwipes->right_swipes ?? 0,
                 'super_likes' => $recentSwipes->super_likes ?? 0,

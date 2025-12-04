@@ -145,7 +145,7 @@ class UserSwipeHelper
     {
         return UserSwipe::where('user_id', $userId)
             ->where('swiped_at', '>=', Carbon::now()->subHours($hours))
-            ->count();
+            ->sum('total_swipes') ?? 0;
     }
 
     /**
