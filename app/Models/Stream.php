@@ -400,7 +400,7 @@ class Stream extends Model
     public function createRtmpStream($softwareType = 'manycam'): RtmpStream
     {
         return $this->rtmpStream()->create([
-            'rtmp_url' => config('streaming.rtmp.server_url', 'rtmp://localhost/live'),
+            'rtmp_url' => 'rtmp://admin.connectinc.app/live',
             'stream_key' => $this->id . '_' . bin2hex(random_bytes(16)),
             'software_type' => $softwareType,
             'resolution' => config('streaming.streaming_software.default_resolution', '1920x1080'),
