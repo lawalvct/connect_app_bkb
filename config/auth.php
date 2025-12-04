@@ -122,4 +122,21 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | API Token Expiration
+    |--------------------------------------------------------------------------
+    |
+    | Configure how long API tokens (Sanctum) should remain valid.
+    | This is especially important for mobile apps and SPAs that need
+    | long-lived authentication without frequent re-login.
+    |
+    | Default: 30 days for regular tokens
+    | Remember: 365 days (1 year) for "remember me" tokens
+    |
+    */
+
+    'token_expiration_days' => env('AUTH_TOKEN_EXPIRATION_DAYS', 30),
+    'token_remember_expiration_days' => env('AUTH_TOKEN_REMEMBER_EXPIRATION_DAYS', 365),
+
 ];

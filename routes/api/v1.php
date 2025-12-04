@@ -228,6 +228,13 @@ Route::post('register', [AuthController::class, 'register'])
 Route::post('forgot-password', [AuthController::class, 'forgotPassword']);
 Route::post('verify-reset-otp', [AuthController::class, 'verifyResetOTP']);
 Route::post('reset-password', [AuthController::class, 'resetPassword']);
+
+// Token management routes (require authentication)
+Route::middleware('auth:sanctum')->group(function () {
+    Route::post('refresh-token', [AuthController::class, 'refreshToken']);
+    Route::get('check-token', [AuthController::class, 'checkToken']);
+});
+
 Route::get('countries', [UserController::class, 'getCountries']);
 Route::get('states/{country}', [UserController::class, 'getStatesByCountry']);
 Route::get('social-circles', [SocialCircleController::class, 'index']);

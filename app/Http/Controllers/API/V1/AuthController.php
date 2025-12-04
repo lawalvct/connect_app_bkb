@@ -1384,6 +1384,77 @@ public function tempGetResetOTP(Request $request)
         return $this->sendError('Failed to get reset OTP: ' . $e->getMessage(), null, 500);
     }
 }
+
+    /**
+     * Refresh authentication token
+     * Allows mobile/web apps to extend token expiration without re-login
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function refreshToken(Request $request)
+    {
+        try {
+            $user = $request->user();
+
+            if (!$user) {
+                return $this->sendError('Unauthenticated', null, 401);
+            }
+
+            // Delete current token
+            $request->user()->currentAccessToken()->delete();
+
+            // Create new token with extended expiration
+            $token = $this->authService->createToken($user, true); // Use remember=true for longer expiration
+
+            return $this->sendResponse('Token refreshed successfully', [
+                'token' => $token,
+                'token_type' => 'Bearer',
+                'expires_in' => now()->addYear()->timestamp, // 1 year from now
+                'user' => new UserResource($user)
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Token refresh failed', [
+                'error' => $e->getMessage(),
+                'user_id' => $request->user()->id ?? null
+            ]);
+            return $this->sendError('Failed to refresh token', $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Check token validity
+     * Allows frontend to verify if current token is still valid
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function checkToken(Request $request)
+    {
+        try {
+            $user = $request->user();
+
+            if (!$user) {
+                return $this->sendError('Invalid or expired token', null, 401);
+            }
+
+            $currentToken = $user->currentAccessToken();
+            $expiresAt = $currentToken->expires_at;
+            $isExpiringSoon = $expiresAt && $expiresAt->diffInDays(now()) < 7; // Less than 7 days remaining
+
+            return $this->sendResponse('Token is valid', [
+                'valid' => true,
+                'expires_at' => $expiresAt,
+                'expires_in_days' => $expiresAt ? $expiresAt->diffInDays(now()) : null,
+                'expires_soon' => $isExpiringSoon,
+                'user' => new UserResource($user)
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->sendError('Failed to check token', $e->getMessage(), 500);
+        }
+    }
   }
 
 

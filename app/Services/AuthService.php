@@ -197,8 +197,14 @@ private function assignSocialCircles(User $user, array $socialCircleIds): void
         // Revoke previous tokens if needed
         // $user->tokens()->delete();
 
-        // Create new token
-        $tokenExpiration = $remember ? now()->addMonths(6) : now()->addDay();
+        // Create new token with long expiration for mobile/SPA apps
+        // Get expiration days from config (.env file)
+        $defaultDays = (int) config('auth.token_expiration_days', 30);
+        $rememberDays = (int) config('auth.token_remember_expiration_days', 365);
+
+        $tokenExpiration = $remember
+            ? now()->addDays($rememberDays)
+            : now()->addDays($defaultDays);
 
         $token = $user->createToken('auth_token', ['*'], $tokenExpiration);
 

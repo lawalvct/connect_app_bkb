@@ -45,9 +45,12 @@ return [
     | considered expired. This will override any values set in the token's
     | "expires_at" attribute, but first-party sessions are not affected.
     |
+    | Set to null to use the expires_at from createToken() in AuthService
+    | This allows mobile apps and SPAs to stay logged in for extended periods
+    |
     */
 
-    'expiration' => null,
+    'expiration' => null, // Use expires_at from database (30 days default)
 
     /*
     |--------------------------------------------------------------------------
