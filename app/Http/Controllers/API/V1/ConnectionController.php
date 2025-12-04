@@ -510,7 +510,12 @@ class ConnectionController extends Controller
 
             // Get a random user from the same social circle
             $randomUser = null;
+            $socialCircleName = null;
             if (isset($data['social_id']) && !empty($data['social_id'])) {
+                // Get the social circle name
+                $socialCircle = \App\Models\SocialCircle::find($data['social_id']);
+                $socialCircleName = $socialCircle ? $socialCircle->name : null;
+
                 $randomUser = UserHelper::getRandomUserFromSocialCircle(
                     $data['social_id'],
                     $user->id,
@@ -528,7 +533,8 @@ class ConnectionController extends Controller
                 'data' => [
                     'request_id' => $result['request_id'],
                     'swipe_stats' => $swipeStats,
-                    'suggested_user' => $randomUser // Add random user from same social circle
+                    'suggested_user' => $randomUser, // Add random user from same social circle
+                    'social_circle_name' => $socialCircleName // Add social circle name being filtered
                 ]
             ], 201);
 
