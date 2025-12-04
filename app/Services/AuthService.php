@@ -259,7 +259,15 @@ private function assignSocialCircles(User $user, array $socialCircleIds): void
 
         $otp = sprintf("%04d", mt_rand(1000, 9999));
         $user->reset_otp = $otp;
-        $user->save();
+        $saved = $user->save();
+
+        \Log::info('OTP generation attempted', [
+            'email' => $email,
+            'user_id' => $user->id,
+            'otp' => $otp,
+            'saved' => $saved,
+            'reset_otp_after_save' => $user->reset_otp
+        ]);
 
         return $otp;
     }
