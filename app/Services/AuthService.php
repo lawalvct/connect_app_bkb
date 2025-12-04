@@ -275,7 +275,22 @@ private function assignSocialCircles(User $user, array $socialCircleIds): void
     {
         $user = User::where('email', $email)->first();
 
-        if (!$user || $user->reset_otp !== $otp) {
+        if (!$user) {
+            return false;
+        }
+
+        // Trim whitespace and compare both as strings
+        $storedOtp = trim((string) $user->reset_otp);
+        $providedOtp = trim($otp);
+
+        if ($storedOtp !== $providedOtp) {
+            \Log::warning('OTP verification failed', [
+                'email' => $email,
+                'stored_otp' => $storedOtp,
+                'provided_otp' => $providedOtp,
+                'stored_length' => strlen($storedOtp),
+                'provided_length' => strlen($providedOtp)
+            ]);
             return false;
         }
 
