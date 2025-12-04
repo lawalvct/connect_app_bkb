@@ -26,12 +26,12 @@ class SwipeRateLimit
 
                 return response()->json([
                     'status' => 0,
-                    'message' => 'Daily swipe limit reached. You have used ' . $swipeStats->total_swipes . ' out of ' . $swipeStats->daily_limit . ' swipes today.',
+                    'message' => 'Swipe limit reached. You have used ' . $swipeStats->total_swipes . ' out of ' . $swipeStats->swipe_limit . ' swipes in the last 12 hours.',
                     'data' => [
                         'swipes_used' => $swipeStats->total_swipes,
-                        'daily_limit' => $swipeStats->daily_limit,
+                        'swipe_limit' => $swipeStats->swipe_limit,
                         'remaining_swipes' => $swipeStats->remaining_swipes,
-                        'resets_at' => now()->addDay()->startOfDay()->toISOString()
+                        'resets_at' => $swipeStats->resets_at
                     ]
                 ], 429);
             }

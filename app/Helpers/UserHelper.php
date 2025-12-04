@@ -391,12 +391,12 @@ public static function getAllDetailByUserId($id)
     }
 
     /**
-     * Check if user can swipe today
+     * Check if user can swipe (has remaining swipes in 12-hour window)
      */
     public static function canUserSwipe($userId)
     {
         $swipeStats = self::getSwipeStats($userId);
-        return $swipeStats->total_swipes < $swipeStats->daily_limit;
+        return $swipeStats->remaining_swipes > 0;
     }
 
     /**
@@ -412,33 +412,43 @@ public static function getAllDetailByUserId($id)
                     'left_swipes' => 0,
                     'right_swipes' => 0,
                     'super_likes' => 0,
-                    'daily_limit' => 50,
-                    'remaining_swipes' => 50
+                    'swipe_limit' => 50,
+                    'remaining_swipes' => 50,
+                    'resets_at' => null,
+                    'has_boost' => false
                 ];
             }
 
-            // Get today's swipe record
-            $todaySwipes = UserSwipeHelper::getTodayRecord($userId);
+            // Use 12-hour rolling window instead of daily
+            $windowStats = UserSwipeHelper::canSwipeInWindow($userId, 50, 12);
 
-            if (!$todaySwipes) {
-                $todaySwipes = (object) [
-                    'total_swipes' => 0,
+            // Get swipe type breakdown for last 12 hours
+            $recentSwipes = \App\Models\UserSwipe::where('user_id', $userId)
+                ->where('swiped_at', '>=', \Carbon\Carbon::now()->subHours(12))
+                ->selectRaw('
+                    SUM(left_swipes) as left_swipes,
+                    SUM(right_swipes) as right_swipes,
+                    SUM(super_likes) as super_likes
+                ')
+                ->first();
+
+            if (!$recentSwipes) {
+                $recentSwipes = (object) [
                     'left_swipes' => 0,
                     'right_swipes' => 0,
                     'super_likes' => 0
                 ];
             }
 
-            // Determine daily limit based on subscription
-            $dailyLimit = self::getUserDailySwipeLimit($userId);
-
             return (object) [
-                'total_swipes' => $todaySwipes->total_swipes,
-                'left_swipes' => $todaySwipes->left_swipes,
-                'right_swipes' => $todaySwipes->right_swipes,
-                'super_likes' => $todaySwipes->super_likes,
-                'daily_limit' => $dailyLimit,
-                'remaining_swipes' => max(0, $dailyLimit - $todaySwipes->total_swipes)
+                'total_swipes' => $windowStats['swipes_used'],
+                'left_swipes' => $recentSwipes->left_swipes ?? 0,
+                'right_swipes' => $recentSwipes->right_swipes ?? 0,
+                'super_likes' => $recentSwipes->super_likes ?? 0,
+                'swipe_limit' => $windowStats['limit'],
+                'remaining_swipes' => $windowStats['remaining_swipes'],
+                'resets_at' => $windowStats['resets_at'],
+                'has_boost' => $windowStats['has_boost']
             ];
         } catch (\Exception $e) {
             // Return default stats if there's an error
@@ -447,8 +457,10 @@ public static function getAllDetailByUserId($id)
                 'left_swipes' => 0,
                 'right_swipes' => 0,
                 'super_likes' => 0,
-                'daily_limit' => 50,
-                'remaining_swipes' => 50
+                'swipe_limit' => 50,
+                'remaining_swipes' => 50,
+                'resets_at' => null,
+                'has_boost' => false
             ];
         }
     }
@@ -480,11 +492,11 @@ public static function getAllDetailByUserId($id)
     }
 
     /**
-     * Increment user's swipe count
+     * Increment user's swipe count (now using 12-hour rolling window)
      */
     public static function incrementSwipeCount($userId, $swipeType = 'right')
     {
-        return UserSwipeHelper::incrementSwipe($userId, $swipeType);
+        return UserSwipeHelper::recordSwipeWithTimestamp($userId, $swipeType);
     }
 
     /**

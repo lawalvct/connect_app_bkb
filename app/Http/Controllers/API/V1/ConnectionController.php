@@ -468,6 +468,67 @@ class ConnectionController extends Controller
                 ], 404);
             }
 
+            // Check general 12-hour rolling window swipe limit (50 swipes per 12 hours for free users, 100 for Connect Boost)
+            $swipeLimitCheck = \App\Helpers\UserSwipeHelper::canSwipeInWindow($user->id, 50, 12);
+
+            if (!$swipeLimitCheck['can_swipe']) {
+                // Get updated swipe stats
+                $swipeStats = UserHelper::getSwipeStats($user->id);
+
+                // Get a random user from the same social circle if filtering
+                $randomUser = null;
+                $socialCircleName = null;
+                if (isset($data['social_id']) && !empty($data['social_id'])) {
+                    $socialCircle = \App\Models\SocialCircle::find($data['social_id']);
+                    $socialCircleName = $socialCircle ? $socialCircle->name : null;
+
+                    $randomUser = UserHelper::getRandomUserFromSocialCircle(
+                        $data['social_id'],
+                        $user->id,
+                        [$data['user_id']]
+                    );
+
+                    if ($randomUser) {
+                        $randomUser = Utility::convertString($randomUser);
+                    }
+                }
+
+                // Build subscription prompt message for free users (without Connect Boost)
+                $subscriptionPrompt = null;
+                if (!$swipeLimitCheck['has_boost']) {
+                    $subscriptionPrompt = [
+                        'message' => 'Upgrade to Connect Boost for 50 more swipes every 12 hours!',
+                        'benefits' => [
+                            '100 total swipes per 12 hours (50 base + 50 bonus)',
+                            'Priority in suggested profiles',
+                            'Enhanced profile visibility'
+                        ],
+                        'subscription_id' => 4 // Connect Boost subscription ID
+                    ];
+                }
+
+                return response()->json([
+                    'status' => 0,
+                    'message' => sprintf(
+                        'Swipe limit reached. You have used %d out of %d swipes in the last 12 hours.%s',
+                        $swipeLimitCheck['swipes_used'],
+                        $swipeLimitCheck['limit'],
+                        $swipeLimitCheck['resets_at'] ? ' Limit resets at ' . \Carbon\Carbon::parse($swipeLimitCheck['resets_at'])->format('Y-m-d H:i:s') : ''
+                    ),
+                    'data' => [
+                        'swipes_used' => $swipeLimitCheck['swipes_used'],
+                        'swipe_limit' => $swipeLimitCheck['limit'],
+                        'remaining_swipes' => $swipeLimitCheck['remaining_swipes'],
+                        'resets_at' => $swipeLimitCheck['resets_at'],
+                        'has_boost' => $swipeLimitCheck['has_boost'],
+                        'subscription_prompt' => $subscriptionPrompt,
+                        'swipe_stats' => $swipeStats,
+                        'suggested_user' => $randomUser,
+                        'social_circle_name' => $socialCircleName
+                    ]
+                ], 429); // 429 Too Many Requests
+            }
+
             // Special handling for Connect Travel (social_id 11)
             // Users can only swipe 10 profiles within 12 hours in this social circle
             if (isset($data['social_id']) && $data['social_id'] == 11) {
