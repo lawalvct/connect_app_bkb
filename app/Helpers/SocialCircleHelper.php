@@ -78,11 +78,13 @@ class SocialCircleHelper
 
             return $socialCircles->map(function($circle) {
                 return [
+                   
                     'id' => $circle->id,
                     'name' => $circle->name,
                     'description' => $circle->description,
                     'logo' => $circle->logo,
-                    'logo_url' => $circle->logo_full_url,
+                    'logo_url' => $circle->logo_url,
+                    'logo_full_url' => url($circle->logo_url . $circle->logo), // Full URL for frontend
                     'color' => $circle->color,
                     'is_default' => $circle->is_default,
                     'is_private' => $circle->is_private,

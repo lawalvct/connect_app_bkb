@@ -107,34 +107,39 @@ class UserResource extends JsonResource
                 });
             }),
 
-            // Social Circles (detailed)
-            'social_circles' => $this->when(isset($this->social_circles_detailed), $this->social_circles_detailed),
-
-            // Social Circles (from relationship)
-            'social_circles' => $this->when($this->relationLoaded('socialCircles'), function () {
-                // Add null check for socialCircles collection
-                if (!$this->socialCircles) {
-                    return [];
-                }
-
-                return $this->socialCircles->map(function ($circle) {
-                    // Add null check for individual circle
-                    if (!$circle) {
-                        return null;
+            // Social Circles (prefer detailed if available, otherwise use relationship)
+            'social_circles' => $this->when(
+                isset($this->social_circles_detailed) || $this->relationLoaded('socialCircles'),
+                function () {
+                    // Use detailed social circles if available (includes logo_full_url)
+                    if (isset($this->social_circles_detailed)) {
+                        return $this->social_circles_detailed;
                     }
 
-                    return [
-                        'id' => $circle->id ?? null,
-                        'name' => $circle->name ?? null,
-                        'logo' => $circle->logo ?? null,
-                        'logo_url' => $circle->logo_url ?? null,
-                        'color' => $circle->color ?? '#3498db',
-                        'description' => $circle->description ?? null,
-                        'is_default' => $circle->is_default ?? false,
-                        'is_private' => $circle->is_private ?? false,
-                    ];
-                })->filter(); // Remove null entries
-            }),
+                    // Fallback to relationship-based social circles
+                    if (!$this->socialCircles) {
+                        return [];
+                    }
+
+                    return $this->socialCircles->map(function ($circle) {
+                        if (!$circle) {
+                            return null;
+                        }
+
+                        return [
+                            'id' => $circle->id ?? null,
+                            'name' => $circle->name ?? null,
+                            'logo' => $circle->logo ?? null,
+                            'logo_url' => $circle->logo_url ?? null,
+                            'logo_full_url' => url(($circle->logo_url ?? '') . ($circle->logo ?? '')), // Full URL
+                            'color' => $circle->color ?? '#3498db',
+                            'description' => $circle->description ?? null,
+                            'is_default' => $circle->is_default ?? false,
+                            'is_private' => $circle->is_private ?? false,
+                        ];
+                    })->filter(); // Remove null entries
+                }
+            ),
 
             // Profile Images
             'profile_images' => $this->when($this->relationLoaded('profileImages'), function () use ($userModelInstance) {
