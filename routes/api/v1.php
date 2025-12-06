@@ -387,6 +387,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/matches', [ConnectionController::class, 'getMutualMatches']);
     });
 
+    // Singular alias for user routes (for backward compatibility)
+    Route::prefix('user')->group(function () {
+        Route::post('/{id}/like', [ConnectionController::class, 'likeUser'])->middleware(['swipe.limit']);
+        Route::get('/{id}/details', [ConnectionController::class, 'getUserDetailsById']);
+    });
+
     // Connections
     Route::prefix('connections')->group(function () {
         // Connection requests with rate limiting (since these are swipes)
