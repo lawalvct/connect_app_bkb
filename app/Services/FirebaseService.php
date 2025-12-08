@@ -18,7 +18,13 @@ class FirebaseService
     {
         $this->serverKey = config('services.firebase.server_key');
         $this->projectId = config('services.firebase.project_id');
-        $this->credentialsPath = config('services.firebase.credentials_path');
+
+        // Convert relative path to absolute path
+        $credPath = config('services.firebase.credentials_path');
+        $this->credentialsPath = str_starts_with($credPath, '/') || preg_match('/^[A-Z]:/i', $credPath)
+            ? $credPath
+            : storage_path('app/' . str_replace('storage/app/', '', $credPath));
+
         $this->fcmV1Url = 'https://fcm.googleapis.com/v1/projects/' . $this->projectId . '/messages:send';
     }
 
@@ -28,10 +34,18 @@ class FirebaseService
     public function sendNotification($fcmToken, $title, $body, $data = [], $userId = null)
     {
         try {
+            // FCM requires data to be an object/map, not an array
+            // Convert empty arrays to empty objects
+            if (is_array($data) && empty($data)) {
+                $data = new \stdClass(); // Empty object for JSON encoding
+            }
+
             // FCM requires all data values to be strings
-            $data = collect($data)->map(function($v) {
-                return is_null($v) ? '' : (string)$v;
-            })->toArray();
+            if (is_array($data) && !empty($data)) {
+                $data = collect($data)->map(function($v) {
+                    return is_null($v) ? '' : (string)$v;
+                })->toArray();
+            }
 
             // Try FCM HTTP v1 API first
             $fcmSuccess = $this->sendWithV1Api($fcmToken, $title, $body, $data);
@@ -69,7 +83,8 @@ class FirebaseService
             }
 
             // FCM failed - try Web Push for admin notifications
-            $isAdminNotification = isset($data['type']) && $data['type'] === 'admin_notification';
+            // Check if data is array before using array syntax
+            $isAdminNotification = is_array($data) && isset($data['type']) && $data['type'] === 'admin_notification';
             if ($isAdminNotification && isset($data['admin_id'])) {
                 $webPushSuccess = $this->tryWebPushForAdmin($data['admin_id'], $title, $body, $data, $userId);
                 if ($webPushSuccess) {
@@ -164,10 +179,15 @@ class FirebaseService
                 'sound' => 'default'
             ];
 
-            // Ensure all data values are strings
-            $data = collect($data)->map(function($v) {
-                return is_null($v) ? '' : (string)$v;
-            })->toArray();
+            // Ensure all data values are strings and it's an array for array_merge
+            if (is_array($data) && !empty($data)) {
+                $data = collect($data)->map(function($v) {
+                    return is_null($v) ? '' : (string)$v;
+                })->toArray();
+            } else {
+                // Empty data should be an empty array for Legacy API
+                $data = [];
+            }
 
             $payload = [
                 'to' => $fcmToken,
@@ -241,11 +261,17 @@ class FirebaseService
                 return false;
             }
 
+            // Ensure data is an object, not an array
+            if (is_array($data) && empty($data)) {
+                $data = new \stdClass();
+            }
 
             // Ensure all data values are strings
-            $data = collect($data)->map(function($v) {
-                return is_null($v) ? '' : (string)$v;
-            })->toArray();
+            if (is_array($data) && !empty($data)) {
+                $data = collect($data)->map(function($v) {
+                    return is_null($v) ? '' : (string)$v;
+                })->toArray();
+            }
 
             // Build v1 message payload
             $message = [
@@ -268,6 +294,12 @@ class FirebaseService
                 Log::info('FCM HTTP v1 API: Notification sent successfully');
                 return true;
             }
+
+            // Check for specific error - API not enabled
+            if ($response->status() === 404) {
+                Log::error('FCM HTTP v1 API: Firebase Cloud Messaging API is not enabled. Enable it at: https://console.cloud.google.com/apis/library/fcm.googleapis.com?project=' . $this->projectId);
+            }
+
             Log::warning('FCM HTTP v1 API failed', ['status' => $response->status(), 'result' => $result]);
             return false;
         } catch (\Exception $e) {

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\SendPushNotificationJob;
 use App\Models\AdminNotification;
 use App\Models\NotificationTemplate;
 use App\Models\User;
@@ -38,6 +39,13 @@ class NotificationController extends Controller
             'title' => 'required|string|max:255',
             'body' => 'required|string',
             'target_type' => 'required|in:all,specific,users,social_circles,countries',
+            'use_queue' => 'nullable|boolean',
+            'user_ids' => 'nullable|array',
+            'user_ids.*' => 'exists:users,id',
+            'social_circle_ids' => 'nullable|array',
+            'social_circle_ids.*' => 'exists:social_circles,id',
+            'country_ids' => 'nullable|array',
+            'country_ids.*' => 'exists:countries,id',
             'user_ids' => 'required_if:target_type,users|array',
             'social_circle_ids' => 'required_if:target_type,social_circles|array',
             'country_ids' => 'required_if:target_type,countries|array',
@@ -51,36 +59,71 @@ class NotificationController extends Controller
 
             switch ($request->target_type) {
                 case 'all':
+                    // Use chunk to avoid memory issues with large user bases
                     $users = User::whereHas('fcmTokens', function($q) {
                         $q->where('is_active', true);
-                    })->get();
+                    })->with('fcmTokens')->get();
                     break;
 
+                case 'specific':
                 case 'users':
-                    $users = User::whereIn('id', $request->user_ids)
+                    $users = User::whereIn('id', $request->user_ids ?? [])
                         ->whereHas('fcmTokens', function($q) {
                             $q->where('is_active', true);
-                        })->get();
+                        })->with('fcmTokens')->get();
                     break;
 
                 case 'social_circles':
                     $users = User::whereHas('socialCircles', function($q) use ($request) {
-                        $q->whereIn('social_circles.id', $request->social_circle_ids);
+                        $q->whereIn('social_circles.id', $request->social_circle_ids ?? []);
                     })->whereHas('fcmTokens', function($q) {
                         $q->where('is_active', true);
-                    })->get();
+                    })->with('fcmTokens')->get();
                     break;
 
                 case 'countries':
-                    $users = User::whereIn('country_id', $request->country_ids)
+                    $users = User::whereIn('country_id', $request->country_ids ?? [])
                         ->whereHas('fcmTokens', function($q) {
                             $q->where('is_active', true);
-                        })->get();
+                        })->with('fcmTokens')->get();
                     break;
             }
 
+            // Check if we have users to notify
+            if ($users->isEmpty()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No users found matching the specified criteria with active FCM tokens',
+                    'sent' => 0,
+                    'failed' => 0
+                ], 404);
+            }
+
+            $useQueue = $request->input('use_queue', false);
+
+            if ($useQueue) {
+                // Queue notifications for better performance
+                foreach ($users as $user) {
+                    SendPushNotificationJob::dispatch(
+                        $user->id,
+                        $request->title,
+                        $request->body,
+                        $request->data ?? []
+                    );
+                }
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Push notifications queued successfully',
+                    'queued' => $users->count(),
+                    'mode' => 'queued'
+                ]);
+            }
+
+            // Send immediately (synchronous)
             foreach ($users as $user) {
-                $tokens = $user->fcmTokens()->where('is_active', true)->pluck('fcm_token');
+                // Use eager-loaded relationship instead of querying again
+                $tokens = $user->fcmTokens->where('is_active', true)->pluck('fcm_token');
 
                 foreach ($tokens as $token) {
                     try {

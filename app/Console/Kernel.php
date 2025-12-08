@@ -12,6 +12,7 @@ class Kernel extends ConsoleKernel
        // SendAdReminders::class,
         \App\Console\Commands\TestAdSystem::class, // Add this line
         \App\Console\Commands\ExpireUserSubscriptions::class,
+        \App\Console\Commands\CleanupInactiveFcmTokens::class,
     ];
 
     /**
@@ -24,6 +25,9 @@ class Kernel extends ConsoleKernel
 
         // Check for subscription expiration daily at 6 AM
         $schedule->command('subscriptions:expire --notify')->dailyAt('06:00');
+
+        // Cleanup inactive FCM tokens weekly
+        $schedule->command('fcm:cleanup-inactive')->weekly()->sundays()->at('02:00');
 
         // You can add more scheduled tasks here
         // $schedule->command('ads:update-performance')->hourly();
