@@ -226,16 +226,25 @@ $data['is_paid'] = ($data['free_minutes'] > 0 && $data['price'] > 0);
 
             // Handle banner image upload
             if ($request->hasFile('banner_image')) {
-                // Delete old image
+                // Delete old image from local storage
                 if ($stream->banner_image) {
-                    Storage::disk('s3')->delete($stream->banner_image);
+                    $oldImagePath = public_path($stream->banner_image);
+                    if (file_exists($oldImagePath)) {
+                        unlink($oldImagePath);
+                    }
                 }
 
                 $file = $request->file('banner_image');
-                $filename = 'stream_banners/' . time() . '_' . $file->getClientOriginalName();
-                Storage::disk('s3')->put($filename, file_get_contents($file));
+                $filename = 'streams/' . time() . '_' . $file->getClientOriginalName();
+                // Save to local storage (public/streams)
+                $file->move(public_path('streams'), basename($filename));
                 $data['banner_image'] = $filename;
-                $data['banner_image_url'] = config('filesystems.disks.s3.url') . '/' . $filename;
+                $data['banner_image_url'] = asset($filename);
+                // S3 upload commented out:
+                // Storage::disk('s3')->delete($stream->banner_image);
+                // Storage::disk('s3')->put($filename, file_get_contents($file));
+                // $data['banner_image'] = $filename;
+                // $data['banner_image_url'] = config('filesystems.disks.s3.url') . '/' . $filename;
             }
 
             // Set payment status

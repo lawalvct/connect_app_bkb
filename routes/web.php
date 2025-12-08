@@ -305,6 +305,11 @@ Route::get('/payment/callback', [SubscriptionController::class, 'handleNombaCall
 Route::get('/subscription-success', [SubscriptionController::class, 'handleStripeSuccess'])->name('subscription.success');
 Route::get('/subscription-cancel', [SubscriptionController::class, 'handleStripeCancel'])->name('subscription.cancel');
 
+// Stream payment callbacks (no auth needed)
+Route::get('/stream-payment/success', [\App\Http\Controllers\API\V1\StreamPaymentController::class, 'handleStripeSuccess'])->name('api.v1.stream-payments.stripe.success');
+Route::get('/stream-payment/cancel', [\App\Http\Controllers\API\V1\StreamPaymentController::class, 'handleStripeCancel'])->name('api.v1.stream-payments.stripe.cancel');
+Route::get('/stream-payment/callback', [\App\Http\Controllers\API\V1\StreamPaymentController::class, 'handleNombaCallback'])->name('api.v1.stream-payments.nomba.callback');
+
 // Firebase service worker with dynamic config
 Route::get('/firebase-messaging-sw.js', function () {
     $config = [

@@ -430,6 +430,8 @@ function liveBroadcast() {
         // Timers
         durationTimer: null,
         statsTimer: null,
+        viewersRefreshTimer: null,
+        chatRefreshTimer: null,
 
         async init() {
             console.log('Initializing live broadcast for stream:', this.streamId);
@@ -458,8 +460,39 @@ function liveBroadcast() {
             // Load viewers and chat
             this.loadViewers();
             this.loadChat();
+            
+            // Start auto-refresh for viewers and chat
+            this.startAutoRefresh();
 
             console.log('Live broadcast initialized successfully');
+        },
+        
+        startAutoRefresh() {
+            // Refresh viewers every 5 seconds
+            this.viewersRefreshTimer = setInterval(() => {
+                this.updateViewers();
+            }, 5000);
+            
+            // Refresh chat every 5 seconds
+            this.chatRefreshTimer = setInterval(() => {
+                this.updateChat();
+            }, 5000);
+            
+            console.log('Auto-refresh started for viewers and chat');
+        },
+        
+        stopAutoRefresh() {
+            if (this.viewersRefreshTimer) {
+                clearInterval(this.viewersRefreshTimer);
+                this.viewersRefreshTimer = null;
+            }
+            
+            if (this.chatRefreshTimer) {
+                clearInterval(this.chatRefreshTimer);
+                this.chatRefreshTimer = null;
+            }
+            
+            console.log('Auto-refresh stopped');
         },
 
         // Initial load methods
@@ -1073,6 +1106,9 @@ function liveBroadcast() {
                 clearInterval(this.statsTimer);
                 this.statsTimer = null;
             }
+            
+            // Also stop auto-refresh timers
+            this.stopAutoRefresh();
         },
 
         async updateStats() {
@@ -1136,7 +1172,7 @@ function liveBroadcast() {
                         avatar: msg.user_profile_url || msg.user?.profile_picture,
                         isAdmin: msg.is_admin,
                         timestamp: new Date(msg.created_at).toLocaleTimeString()
-                    })).reverse();
+                    }));
 
                     // Scroll to bottom
                     this.$nextTick(() => {
