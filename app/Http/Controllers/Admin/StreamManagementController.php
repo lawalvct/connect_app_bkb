@@ -584,7 +584,7 @@ $data['is_paid'] = ($data['free_minutes'] > 0 && $data['price'] > 0);
 
         return response()->json([
             'success' => true,
-            'data' => $viewers
+            'viewers' => $viewers
         ]);
     }
 

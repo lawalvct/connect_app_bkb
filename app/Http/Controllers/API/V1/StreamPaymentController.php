@@ -192,18 +192,43 @@ class StreamPaymentController extends BaseController
             // Backend callback URL for Nomba
             $callbackUrl = route('api.v1.stream-payments.nomba.callback');
 
+            // Currency conversion logic
+            $streamCurrency = $stream->currency;
+            $requestedCurrency = $request->currency;
+            $streamPrice = $stream->price;
+            $conversionRate = 1500; // 1 USD = 1500 NGN
+
+            // Calculate the amount in requested currency
+            $paymentAmount = $streamPrice;
+            $originalAmount = $streamPrice;
+            $originalCurrency = $streamCurrency;
+
+            if ($streamCurrency !== $requestedCurrency) {
+                if ($streamCurrency === 'NGN' && $requestedCurrency === 'USD') {
+                    // Convert NGN to USD (NGN / 1500)
+                    $paymentAmount = round($streamPrice / $conversionRate, 2);
+                } elseif ($streamCurrency === 'USD' && $requestedCurrency === 'NGN') {
+                    // Convert USD to NGN (USD * 1500)
+                    $paymentAmount = round($streamPrice * $conversionRate, 2);
+                }
+            }
+
             // Create payment record
             $payment = StreamPayment::create([
                 'user_id' => $user->id,
                 'stream_id' => $stream->id,
-                'amount' => $stream->price,
-                'currency' => $request->currency,
+                'amount' => $paymentAmount,
+                'currency' => $requestedCurrency,
                 'reference' => StreamPayment::generateReference(),
                 'payment_gateway' => 'nomba',
                 'status' => 'pending',
                 'gateway_response' => [
                     'client_success_url' => $clientSuccessUrl,
-                    'client_cancel_url' => $clientCancelUrl
+                    'client_cancel_url' => $clientCancelUrl,
+                    'original_amount' => $originalAmount,
+                    'original_currency' => $originalCurrency,
+                    'conversion_rate' => $conversionRate,
+                    'currency_converted' => $streamCurrency !== $requestedCurrency
                 ]
             ]);
 
@@ -211,8 +236,8 @@ class StreamPaymentController extends BaseController
             $nombaHelper = new NombaPyamentHelper();
 
             $nombaResponse = $nombaHelper->processPayment(
-                $payment->amount,
-                $payment->currency,
+                $paymentAmount,
+                $requestedCurrency,
                 $user->email,
                 $callbackUrl,
                 $payment->reference
@@ -228,7 +253,11 @@ class StreamPaymentController extends BaseController
                 'gateway_transaction_id' => $nombaResponse['orderReference'] ?? null,
                 'gateway_response' => array_merge($nombaResponse, [
                     'client_success_url' => $clientSuccessUrl,
-                    'client_cancel_url' => $clientCancelUrl
+                    'client_cancel_url' => $clientCancelUrl,
+                    'original_amount' => $originalAmount,
+                    'original_currency' => $originalCurrency,
+                    'conversion_rate' => $conversionRate,
+                    'currency_converted' => $streamCurrency !== $requestedCurrency
                 ]),
             ]);
 
@@ -236,16 +265,25 @@ class StreamPaymentController extends BaseController
                 'payment_id' => $payment->id,
                 'reference' => $payment->reference,
                 'stream_id' => $stream->id,
-                'user_id' => $user->id
+                'user_id' => $user->id,
+                'original_amount' => $originalAmount,
+                'original_currency' => $originalCurrency,
+                'payment_amount' => $paymentAmount,
+                'payment_currency' => $requestedCurrency,
+                'currency_converted' => $streamCurrency !== $requestedCurrency
             ]);
 
             return $this->sendResponse('Nomba payment initialized successfully', [
                 'payment' => [
                     'id' => $payment->id,
                     'reference' => $payment->reference,
-                    'amount' => $payment->amount,
-                    'currency' => $payment->currency,
+                    'amount' => $paymentAmount,
+                    'currency' => $requestedCurrency,
                     'status' => $payment->status,
+                    'original_amount' => $originalAmount,
+                    'original_currency' => $originalCurrency,
+                    'currency_converted' => $streamCurrency !== $requestedCurrency,
+                    'conversion_rate' => $conversionRate
                 ],
                 'nomba' => [
                     'checkout_url' => $nombaResponse['checkoutLink'],
@@ -254,8 +292,8 @@ class StreamPaymentController extends BaseController
                 'stream' => [
                     'id' => $stream->id,
                     'title' => $stream->title,
-                    'price' => $stream->price,
-                    'currency' => $stream->currency,
+                    'price' => $streamPrice,
+                    'currency' => $streamCurrency,
                 ]
             ]);
 
