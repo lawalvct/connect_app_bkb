@@ -11,6 +11,7 @@ use App\Models\CameraSwitch;
 use App\Models\StreamMixerSetting;
 use App\Models\User;
 use App\Helpers\AgoraHelper;
+use App\Jobs\SendLiveStreamNotifications;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
@@ -124,9 +125,20 @@ $data['is_paid'] = ($data['free_minutes'] > 0 && $data['price'] > 0);
 
             $stream = Stream::create($data);
 
+            // Dispatch job to send email notifications to all active users
+            // Using queue to handle 3000+ users efficiently in chunks
+            SendLiveStreamNotifications::dispatch($stream);
+
+            Log::info('Stream created and email notifications queued', [
+                'stream_id' => $stream->id,
+                'stream_title' => $stream->title,
+                'status' => $stream->status,
+                'admin_id' => auth('admin')->id()
+            ]);
+
             return response()->json([
                 'success' => true,
-                'message' => "Stream created successfully for {$user->name}",
+                'message' => "Stream created successfully for {$user->name}. Email notifications are being sent to active users.",
                 'data' => $stream->load('user'),
                 'admin_created' => true
             ]);
