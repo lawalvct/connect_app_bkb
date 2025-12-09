@@ -22,6 +22,7 @@ use App\Http\Controllers\API\V1\StreamController;
 use App\Http\Controllers\API\V1\StreamPaymentController;
 use App\Http\Controllers\API\V1\StreamChatMvpController;
 use App\Http\Controllers\API\V1\SettingsController;
+use App\Http\Controllers\API\V1\GuestStreamController;
 
 // Handle OPTIONS requests for CORS preflight (browser Postman compatibility)
 Route::options('{any}', function () {
@@ -272,6 +273,23 @@ Route::get('auth/{provider}/callback', [AuthController::class, 'handleProviderCa
 Route::post('auth/{provider}/token', [AuthController::class, 'handleSocialLoginFromApp']);
 Route::post('auth/{provider}/user-data', [AuthController::class, 'handleSocialLoginWithUserData']);
 Route::get('timezones', [UserController::class, 'getTimezones']);
+
+// Guest Stream Access Routes (Public)
+Route::prefix('guest')->group(function () {
+    Route::post('/register', [GuestStreamController::class, 'register']);
+    Route::get('/streams', [GuestStreamController::class, 'getLiveStreams']);
+    Route::get('/streams/{streamId}', [GuestStreamController::class, 'getStreamDetails']);
+    Route::get('/streams/{streamId}/viewers/count', [GuestStreamController::class, 'getViewerCount']);
+    
+    // Guest authenticated routes
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::post('/streams/{streamId}/join', [GuestStreamController::class, 'joinStream']);
+        Route::post('/streams/{streamId}/leave', [GuestStreamController::class, 'leaveStream']);
+        Route::post('/streams/{streamId}/chat', [GuestStreamController::class, 'sendChatMessage']);
+        Route::post('/streams/{streamId}/payment/stripe', [GuestStreamController::class, 'initializeStripePayment']);
+        Route::post('/streams/{streamId}/payment/nomba', [GuestStreamController::class, 'initializeNombaPayment']);
+    });
+});
 
 // Settings routes (Public)
 Route::prefix('settings')->group(function () {

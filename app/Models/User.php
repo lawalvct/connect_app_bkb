@@ -70,7 +70,9 @@ class User extends Authenticatable implements MustVerifyEmail
          'deleted_at',
         'deleted_flag',
         'registration_step',
-        'phone'
+        'phone',
+        'is_guest',
+        'guest_expires_at'
     ];
 
     /**
@@ -119,6 +121,8 @@ class User extends Authenticatable implements MustVerifyEmail
         'is_banned' => 'boolean',
         'deleted_flag' => 'string',
         'deleted_at' => 'datetime',
+        'is_guest' => 'boolean',
+        'guest_expires_at' => 'datetime',
     ];
 
 

@@ -464,4 +464,20 @@ class Stream extends Model
             'shares_count' => $this->shares_count ?? 0,
         ];
     }
+
+    // Guest user methods
+    public function canGuestJoin(User $guest): bool
+    {
+        return $this->canUserJoin($guest);
+    }
+
+    public function addGuestViewer(User $guest, string $agoraUid = null, string $agoraToken = null)
+    {
+        return $this->addViewer($guest, $agoraUid, $agoraToken);
+    }
+
+    public function hasGuestPaid(User $guest): bool
+    {
+        return $this->hasUserPaid($guest);
+    }
 }
