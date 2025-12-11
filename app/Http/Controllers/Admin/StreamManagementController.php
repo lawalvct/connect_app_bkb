@@ -97,9 +97,8 @@ class StreamManagementController extends Controller
             $data['channel_name'] = 'admin_stream_' . time() . '_' . Str::random(8);
             $data['go_live_immediately'] = $request->stream_type === 'immediate';
 
-            // Set payment status
-
-$data['is_paid'] = ($data['free_minutes'] > 0 && $data['price'] > 0);
+            // Set payment status - stream is paid if price is greater than 0
+            $data['is_paid'] = isset($data['price']) && $data['price'] > 0;
 
             // Handle banner image upload
             if ($request->hasFile('banner_image')) {
