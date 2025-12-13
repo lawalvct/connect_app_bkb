@@ -10,6 +10,7 @@ use App\Http\Requests\V1\UpdateUserRequest;
 use App\Http\Resources\V1\UserResource;
 use App\Http\Resources\V1\CountryResource;
 use App\Models\Country;
+use App\Models\User;
 use App\Helpers\UserHelper;
 use App\Helpers\PostHelper;
 use App\Helpers\UserLikeHelper;
@@ -118,9 +119,10 @@ class UserController extends BaseController
      */
     public function getUserById($id)
     {
+
         try {
             $user = User::findOrFail($id);
-
+//dd(  $user);
             // Load necessary relationships
             $user->load([
                 'country',
