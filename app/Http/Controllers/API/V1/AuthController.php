@@ -895,20 +895,23 @@ public function resendVerificationEmail(Request $request)
             // Create token
             $token = $user->createToken('auth-token')->plainTextToken;
 
-            return response()->json([
-                'message' => 'Successfully authenticated with Google',
-                'status' => 1,
-                'data' => [
-                    'user' => new UserResource($user),
-                    'token' => $token
-                ]
-            ]);
+            // Get frontend URL from env or use default
+            $frontendUrl = env('FRONTEND_URL', 'http://localhost:3000');
+
+            // Redirect back to frontend with token and user data
+            $redirectUrl = $frontendUrl . '/auth/callback?token=' . urlencode($token)
+                . '&user_id=' . $user->id
+                . '&name=' . urlencode($user->name)
+                . '&email=' . urlencode($user->email);
+
+            return redirect($redirectUrl);
+
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Google authentication failed: ' . $e->getMessage(),
-                'status' => 0,
-                'data' => []
-            ], 500);
+            // Redirect to frontend error page with error message
+            $frontendUrl = env('FRONTEND_URL', 'http://localhost:3000');
+            $errorUrl = $frontendUrl . '/auth/error?message=' . urlencode($e->getMessage());
+
+            return redirect($errorUrl);
         }
     }
 
