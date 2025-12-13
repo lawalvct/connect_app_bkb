@@ -21,10 +21,10 @@ class SendConnectionRequestNotificationJob implements ShouldQueue
     public $timeout = 60;
     public $backoff = [10, 30, 60]; // Retry after 10s, 30s, 60s
 
-    protected $senderId;
-    protected $receiverId;
-    protected $senderName;
-    protected $requestId;
+    public $senderId;
+    public $receiverId;
+    public $senderName;
+    public $requestId;
 
     /**
      * Create a new job instance.
@@ -33,7 +33,7 @@ class SendConnectionRequestNotificationJob implements ShouldQueue
     {
         $this->senderId = $senderId;
         $this->receiverId = $receiverId;
-        $this->senderName = $senderName;
+        $this->senderName = $senderName ?? 'Someone';
         $this->requestId = $requestId;
     }
 
@@ -42,6 +42,13 @@ class SendConnectionRequestNotificationJob implements ShouldQueue
      */
     public function handle(FirebaseService $firebaseService)
     {
+        Log::channel('daily')->info("=== SendConnectionRequestNotificationJob START ===", [
+            'sender_id' => $this->senderId,
+            'receiver_id' => $this->receiverId,
+            'sender_name' => $this->senderName,
+            'request_id' => $this->requestId
+        ]);
+
         try {
             Log::info("SendConnectionRequestNotificationJob: Processing", [
                 'sender_id' => $this->senderId,
@@ -52,8 +59,15 @@ class SendConnectionRequestNotificationJob implements ShouldQueue
             $sender = User::find($this->senderId);
             $receiver = User::find($this->receiverId);
 
+            Log::channel('daily')->info("Users found", [
+                'sender_exists' => !is_null($sender),
+                'sender_name' => $sender->name ?? 'N/A',
+                'receiver_exists' => !is_null($receiver),
+                'receiver_email' => $receiver->email ?? 'N/A'
+            ]);
+
             if (!$sender || !$receiver) {
-                Log::warning("SendConnectionRequestNotificationJob: User not found", [
+                Log::channel('daily')->error("User not found - aborting job", [
                     'sender_exists' => !is_null($sender),
                     'receiver_exists' => !is_null($receiver)
                 ]);
@@ -69,7 +83,7 @@ class SendConnectionRequestNotificationJob implements ShouldQueue
             // 3. Send email notification
             $this->sendEmailNotification($receiver, $sender);
 
-            Log::info("SendConnectionRequestNotificationJob: Completed successfully", [
+            Log::channel('daily')->info("=== SendConnectionRequestNotificationJob COMPLETED ===", [
                 'receiver_id' => $this->receiverId,
                 'request_id' => $this->requestId
             ]);
@@ -93,20 +107,29 @@ class SendConnectionRequestNotificationJob implements ShouldQueue
     protected function createInAppNotification($sender)
     {
         try {
-            UserNotification::createConnectionRequestNotification(
+            Log::channel('daily')->info("Creating in-app notification...", [
+                'sender_id' => $this->senderId,
+                'receiver_id' => $this->receiverId,
+                'sender_name' => $this->senderName
+            ]);
+
+            $notification = UserNotification::createConnectionRequestNotification(
                 $this->senderId,
                 $this->receiverId,
                 $this->senderName,
                 $this->requestId
             );
 
-            Log::info("SendConnectionRequestNotificationJob: In-app notification created", [
+            Log::channel('daily')->info("In-app notification created", [
+                'notification_id' => $notification->id ?? 'unknown',
                 'receiver_id' => $this->receiverId
             ]);
         } catch (\Exception $e) {
-            Log::error("SendConnectionRequestNotificationJob: Failed to create in-app notification", [
-                'error' => $e->getMessage()
+            Log::channel('daily')->error("Failed to create in-app notification", [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
+            // Don't throw - continue with push and email
         }
     }
 
@@ -116,10 +139,19 @@ class SendConnectionRequestNotificationJob implements ShouldQueue
     protected function sendPushNotification(FirebaseService $firebaseService, $receiver, $sender)
     {
         try {
+            Log::channel('daily')->info("Checking FCM tokens for push notification...", [
+                'receiver_id' => $this->receiverId
+            ]);
+
             $tokens = $receiver->fcmTokens()->where('is_active', true)->pluck('fcm_token');
 
+            Log::channel('daily')->info("FCM tokens found", [
+                'receiver_id' => $this->receiverId,
+                'token_count' => $tokens->count()
+            ]);
+
             if ($tokens->isEmpty()) {
-                Log::info("SendConnectionRequestNotificationJob: No active FCM tokens for user", [
+                Log::channel('daily')->warning("No active FCM tokens for user", [
                     'receiver_id' => $this->receiverId
                 ]);
                 return;
@@ -139,6 +171,10 @@ class SendConnectionRequestNotificationJob implements ShouldQueue
 
             foreach ($tokens as $token) {
                 try {
+                    Log::channel('daily')->info("Sending push to token...", [
+                        'token_preview' => substr($token, 0, 20) . '...'
+                    ]);
+
                     $result = $firebaseService->sendNotification(
                         $token,
                         $title,
@@ -147,20 +183,20 @@ class SendConnectionRequestNotificationJob implements ShouldQueue
                         $this->receiverId
                     );
 
-                    if ($result) {
-                        Log::info("SendConnectionRequestNotificationJob: Push sent successfully", [
-                            'receiver_id' => $this->receiverId
-                        ]);
-                    }
+                    Log::channel('daily')->info("Push notification result", [
+                        'receiver_id' => $this->receiverId,
+                        'success' => $result ? 'yes' : 'no'
+                    ]);
                 } catch (\Exception $e) {
-                    Log::warning("SendConnectionRequestNotificationJob: Push failed for token", [
+                    Log::channel('daily')->warning("Push failed for token", [
                         'error' => $e->getMessage()
                     ]);
                 }
             }
         } catch (\Exception $e) {
-            Log::error("SendConnectionRequestNotificationJob: Push notification error", [
-                'error' => $e->getMessage()
+            Log::channel('daily')->error("Push notification error", [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
         }
     }
@@ -171,23 +207,33 @@ class SendConnectionRequestNotificationJob implements ShouldQueue
     protected function sendEmailNotification($receiver, $sender)
     {
         try {
+            Log::channel('daily')->info("Checking email notification settings...", [
+                'receiver_id' => $this->receiverId,
+                'receiver_email' => $receiver->email ?? 'none'
+            ]);
+
             // Check if user has email notifications enabled
             $notificationSettings = $receiver->notification_settings ?? [];
             $emailEnabled = $notificationSettings['email_notifications'] ?? true;
 
             if (!$emailEnabled) {
-                Log::info("SendConnectionRequestNotificationJob: Email notifications disabled for user", [
+                Log::channel('daily')->info("Email notifications disabled for user", [
                     'receiver_id' => $this->receiverId
                 ]);
                 return;
             }
 
             if (empty($receiver->email)) {
-                Log::info("SendConnectionRequestNotificationJob: No email for user", [
+                Log::channel('daily')->warning("No email for user", [
                     'receiver_id' => $this->receiverId
                 ]);
                 return;
             }
+
+            Log::channel('daily')->info("Sending email notification...", [
+                'to' => $receiver->email,
+                'from_sender' => $sender->name
+            ]);
 
             // Send email
             Mail::send('emails.connection-request', [
@@ -200,15 +246,16 @@ class SendConnectionRequestNotificationJob implements ShouldQueue
                         ->subject("✨ {$sender->name} wants to connect with you on Connect!");
             });
 
-            Log::info("SendConnectionRequestNotificationJob: Email sent successfully", [
+            Log::channel('daily')->info("=== EMAIL SENT SUCCESSFULLY ===", [
                 'receiver_id' => $this->receiverId,
                 'receiver_email' => $receiver->email
             ]);
 
         } catch (\Exception $e) {
-            Log::error("SendConnectionRequestNotificationJob: Email sending failed", [
+            Log::channel('daily')->error("Email sending failed", [
                 'receiver_id' => $this->receiverId,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
         }
     }

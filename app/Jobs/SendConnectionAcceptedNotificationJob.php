@@ -21,10 +21,10 @@ class SendConnectionAcceptedNotificationJob implements ShouldQueue
     public $timeout = 60;
     public $backoff = [10, 30, 60]; // Retry after 10s, 30s, 60s
 
-    protected $accepterId;
-    protected $senderId;
-    protected $accepterName;
-    protected $requestId;
+    public $accepterId;
+    public $senderId;
+    public $accepterName;
+    public $requestId;
 
     /**
      * Create a new job instance.
@@ -33,7 +33,7 @@ class SendConnectionAcceptedNotificationJob implements ShouldQueue
     {
         $this->accepterId = $accepterId;
         $this->senderId = $senderId;
-        $this->accepterName = $accepterName;
+        $this->accepterName = $accepterName ?? 'Someone';
         $this->requestId = $requestId;
     }
 
@@ -42,18 +42,26 @@ class SendConnectionAcceptedNotificationJob implements ShouldQueue
      */
     public function handle(FirebaseService $firebaseService)
     {
-        try {
-            Log::info("SendConnectionAcceptedNotificationJob: Processing", [
-                'accepter_id' => $this->accepterId,
-                'sender_id' => $this->senderId,
-                'request_id' => $this->requestId
-            ]);
+        Log::channel('daily')->info("=== SendConnectionAcceptedNotificationJob START ===", [
+            'accepter_id' => $this->accepterId,
+            'sender_id' => $this->senderId,
+            'accepter_name' => $this->accepterName,
+            'request_id' => $this->requestId
+        ]);
 
+        try {
             $accepter = User::find($this->accepterId);
             $sender = User::find($this->senderId);
 
+            Log::channel('daily')->info("Users found", [
+                'accepter_exists' => !is_null($accepter),
+                'accepter_name' => $accepter->name ?? 'N/A',
+                'sender_exists' => !is_null($sender),
+                'sender_email' => $sender->email ?? 'N/A'
+            ]);
+
             if (!$accepter || !$sender) {
-                Log::warning("SendConnectionAcceptedNotificationJob: User not found", [
+                Log::channel('daily')->error("User not found - aborting job", [
                     'accepter_exists' => !is_null($accepter),
                     'sender_exists' => !is_null($sender)
                 ]);
@@ -69,7 +77,7 @@ class SendConnectionAcceptedNotificationJob implements ShouldQueue
             // 3. Send email notification to original sender
             $this->sendEmailNotification($sender, $accepter);
 
-            Log::info("SendConnectionAcceptedNotificationJob: Completed successfully", [
+            Log::channel('daily')->info("=== SendConnectionAcceptedNotificationJob COMPLETED ===", [
                 'sender_id' => $this->senderId,
                 'request_id' => $this->requestId
             ]);
