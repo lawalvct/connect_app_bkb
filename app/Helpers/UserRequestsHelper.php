@@ -259,15 +259,15 @@ class UserRequestsHelper
             // Check if request already exists
             $existingRequest = self::getByCheckRequest($senderId, $receiverId);
             if ($existingRequest) {
-                \Log::warning("Request already exists", ['existing_request' => $existingRequest]);
-                return ['success' => false, 'message' => 'Request already sent'];
+                \Log::info("Request already exists, returning success to continue swipe flow", ['existing_request' => $existingRequest]);
+                return ['success' => true, 'message' => 'Request already sent', 'already_exists' => true, 'request_id' => $existingRequest->id];
             }
 
             // Check reverse request too
             $reverseRequest = self::getByCheckRequest($receiverId, $senderId);
             if ($reverseRequest) {
-                \Log::warning("Reverse request exists", ['reverse_request' => $reverseRequest]);
-                return ['success' => false, 'message' => 'Connection request already exists'];
+                \Log::info("Reverse request exists, returning success to continue swipe flow", ['reverse_request' => $reverseRequest]);
+                return ['success' => true, 'message' => 'Connection request already exists', 'already_exists' => true, 'request_id' => $reverseRequest->id];
             }
 
             // Check swipe limits

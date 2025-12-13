@@ -580,9 +580,7 @@ class ConnectionController extends Controller
             \Log::info('Connection request result', $result);
 
             if (!$result['success']) {
-                // Even if request failed (e.g., already sent), still provide a suggested user
-                // so the user can continue swiping without getting stuck
-
+                // Request failed for reasons other than already existing
                 // Get updated swipe stats
                 $swipeStats = UserHelper::getSwipeStats($user->id);
 
@@ -610,7 +608,7 @@ class ConnectionController extends Controller
                     'message' => $result['message'],
                     'data' => [
                         'swipe_stats' => $swipeStats,
-                        'suggested_user' => $randomUser, // Still provide next user to swipe
+                        'suggested_user' => $randomUser,
                         'social_circle_name' => $socialCircleName
                     ]
                 ], 400);
