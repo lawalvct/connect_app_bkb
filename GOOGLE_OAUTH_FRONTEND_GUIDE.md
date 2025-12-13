@@ -37,11 +37,18 @@ FRONTEND_URL=https://www.connectinc.app
 1. User clicks "Sign in with Google"
 2. Frontend redirects → https://admin.connectinc.app/api/v1/auth/google
 3. Backend redirects → Google OAuth
-4. User authorizes
+4. User authorizes on Google
 5. Google redirects → https://admin.connectinc.app/api/v1/auth/google/callback
-6. Backend processes → Redirects to: http://localhost:3000/auth/callback?token=xxx&user_id=3114&name=Lawal%20Victor&email=lawalthb@gmail.com
-7. Frontend receives token and completes login
+6. Backend processes:
+   - Creates/finds user
+   - Generates token
+   - Gets active subscriptions (same as email/password login)
+   - Encodes full user data + token as base64
+7. Backend redirects → http://localhost:3000/auth/callback?data=eyJ1c2VyIjp7...
+8. Frontend decodes data and completes login (same flow as email/password)
 ```
+
+**Key Point:** Google login now returns the **same response format** as email/password login!
 
 ---
 
@@ -66,24 +73,30 @@ export default function GoogleAuthCallback() {
     const searchParams = useSearchParams();
 
     useEffect(() => {
-        // Get token from URL params
-        const token = searchParams.get("token");
-        const userId = searchParams.get("user_id");
-        const name = searchParams.get("name");
-        const email = searchParams.get("email");
+        // Get encoded auth data from URL params
+        const encodedData = searchParams.get("data");
 
-        if (token) {
-            // Store token in localStorage or secure storage
-            localStorage.setItem("auth_token", token);
-            localStorage.setItem("user_id", userId);
-            localStorage.setItem("user_name", name);
-            localStorage.setItem("user_email", email);
+        if (encodedData) {
+            try {
+                // Decode the auth data (same format as email/password login)
+                const decodedData = atob(decodeURIComponent(encodedData));
+                const authData = JSON.parse(decodedData);
 
-            // Fetch full user profile from backend
-            fetchUserProfile(token, userId);
+                // Store token and user data (same as login flow)
+                localStorage.setItem("auth_token", authData.token);
+                localStorage.setItem("user", JSON.stringify(authData.user));
 
-            // Redirect to home/dashboard
-            router.push("/home");
+                console.log("Google login successful:", authData.message);
+
+                // Redirect to home/dashboard
+                router.push("/home");
+            } catch (error) {
+                console.error("Failed to parse auth data:", error);
+                router.push(
+                    "/login?error=" +
+                        encodeURIComponent("Authentication data invalid")
+                );
+            }
         } else {
             // Handle error case
             const errorMessage =
@@ -103,28 +116,6 @@ export default function GoogleAuthCallback() {
             </div>
         </div>
     );
-}
-
-async function fetchUserProfile(token, userId) {
-    try {
-        const response = await fetch(
-            `https://admin.connectinc.app/api/v1/users/${userId}`,
-            {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    Accept: "application/json",
-                },
-            }
-        );
-
-        if (response.ok) {
-            const userData = await response.json();
-            // Store complete user data
-            localStorage.setItem("user", JSON.stringify(userData.data));
-        }
-    } catch (error) {
-        console.error("Failed to fetch user profile:", error);
-    }
 }
 ```
 
@@ -149,17 +140,21 @@ export default function GoogleAuthCallback({ route }) {
 
     const handleCallback = async () => {
         try {
-            if (token) {
-                // Store auth data
+            // Parse the data from URL (passed via deep link)
+            const { data } = route.params;
+
+            if (data) {
+                // Decode the auth data (same format as email/password login)
+                const decodedData = atob(decodeURIComponent(data));
+                const authData = JSON.parse(decodedData);
+
+                // Store token and user data (same as login flow)
                 await AsyncStorage.multiSet([
-                    ["auth_token", token],
-                    ["user_id", user_id.toString()],
-                    ["user_name", name],
-                    ["user_email", email],
+                    ["auth_token", authData.token],
+                    ["user", JSON.stringify(authData.user)],
                 ]);
 
-                // Fetch full user profile
-                await fetchUserProfile(token, user_id);
+                console.log("Google login successful:", authData.message);
 
                 // Navigate to home
                 navigation.reset({
@@ -175,30 +170,6 @@ export default function GoogleAuthCallback({ route }) {
         } catch (error) {
             console.error("Auth callback error:", error);
             navigation.navigate("Login", { error: error.message });
-        }
-    };
-
-    const fetchUserProfile = async (token, userId) => {
-        try {
-            const response = await fetch(
-                `https://admin.connectinc.app/api/v1/users/${userId}`,
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        Accept: "application/json",
-                    },
-                }
-            );
-
-            if (response.ok) {
-                const userData = await response.json();
-                await AsyncStorage.setItem(
-                    "user",
-                    JSON.stringify(userData.data)
-                );
-            }
-        } catch (error) {
-            console.error("Failed to fetch user profile:", error);
         }
     };
 
@@ -425,38 +396,87 @@ await SecureStore.setItemAsync("auth_token", token);
 ❌ **Problem:** Frontend can't access token
 ✅ **Fix:** Not applicable - backend redirects, no CORS needed
 
----
+#### Issue 5: 405 Method Not Allowed Error
 
-## 📝 EXAMPLE RESPONSE DATA
+❌ **Problem:** Getting error: `The GET method is not supported for route api/v1/users/3114`
+✅ **Fix:** Use correct endpoint `/api/v1/user/{id}` (not `users`)
+✅ **Fix:** Make sure to include `Authorization: Bearer {token}` header
 
-After successful authentication, your callback URL will receive:
-
-```
-http://localhost:3000/auth/callback?token=710|3asR3Hap2iauXDZm10dtLJKhrQMPEYWW04AV55nwa86b9a9b&user_id=3114&name=Lawal%20Victor&email=lawalthb@gmail.com
-```
-
-**Parsed params:**
+**Example:**
 
 ```javascript
-{
-  token: "710|3asR3Hap2iauXDZm10dtLJKhrQMPEYWW04AV55nwa86b9a9b",
-  user_id: "3114",
-  name: "Lawal Victor",
-  email: "lawalthb@gmail.com"
-}
-```
+// ❌ WRONG - uses /users/ (plural) and might be missing auth header
+fetch("https://admin.connectinc.app/api/v1/users/3114");
 
-Use the token for subsequent API requests:
-
-```javascript
-fetch("https://admin.connectinc.app/api/v1/users/3114", {
+// ✅ CORRECT - uses /user/ (singular) with auth header
+fetch("https://admin.connectinc.app/api/v1/user/3114", {
     headers: {
-        Authorization:
-            "Bearer 710|3asR3Hap2iauXDZm10dtLJKhrQMPEYWW04AV55nwa86b9a9b",
+        Authorization: "Bearer YOUR_TOKEN_HERE",
         Accept: "application/json",
     },
 });
 ```
+
+---
+
+## 📝 EXAMPLE RESPONSE DATA
+
+### ✅ New Format (Same as Email/Password Login)
+
+After successful authentication, your callback URL will receive:
+
+```
+http://localhost:3000/auth/callback?data=eyJ1c2VyIjp7ImlkIjozMTE0LCJuYW1lIjoiTGF3YWwgVmljdG9yIi...
+```
+
+The `data` parameter contains a **base64-encoded JSON** with the same structure as email/password login:
+
+**Decoded data structure:**
+
+```javascript
+{
+  "message": "Login successful",
+  "user": {
+    "id": 3114,
+    "name": "Lawal Victor",
+    "email": "lawalthb@gmail.com",
+    "username": "Lawalthb",
+    "email_verified_at": "-000001-11-30T00:00:00.000000Z",
+    "is_verified": false,
+    "bio": "Updated bio description",
+    "profile": "1757847916_68c6a16cc7705.jpeg",
+    "profile_url": "https://admin.connectinc.app/uploads/profiles/1757847916_68c6a16cc7705.jpeg",
+    "country_id": 160,
+    "gender": null,
+    "phone": "+2348132712715",
+    "age": 16,
+    "active_subscriptions": [],
+    // ... other user fields
+  },
+  "token": "710|3asR3Hap2iauXDZm10dtLJKhrQMPEYWW04AV55nwa86b9a9b"
+}
+```
+
+**To decode in your frontend:**
+
+```javascript
+const encodedData = searchParams.get("data");
+const decodedData = atob(decodeURIComponent(encodedData));
+const authData = JSON.parse(decodedData);
+
+// Now you have:
+// - authData.token
+// - authData.user (full user object with all fields)
+// - authData.message
+```
+
+**Benefits:**
+
+-   ✅ Same response format as email/password login
+-   ✅ No extra API call needed
+-   ✅ Complete user data immediately available
+-   ✅ Includes active subscriptions
+-   ✅ Consistent frontend handling for both login methods
 
 ---
 

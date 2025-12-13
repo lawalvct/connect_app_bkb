@@ -876,7 +876,7 @@ public function resendVerificationEmail(Request $request)
                     'provider_id' => $googleUser->id,
                     'provider' => 'google',
                     'avatar' => $googleUser->avatar,
-                    'username' => $googleUser->nickname,
+                    'username' => $googleUser->nickname ?? strtolower(str_replace(' ', '', $googleUser->name)),
                     'password' => Hash::make(Str::random(24)),
                     'email_verified_at' => now(), // Google accounts are already verified
                 ]);
@@ -892,17 +892,31 @@ public function resendVerificationEmail(Request $request)
                 }
             }
 
-            // Create token
+            // Expire any subscriptions that have passed their expiration date (same as login)
+            UserSubscriptionHelper::expireUserSubscriptions($user->id);
+
+            // Create token (same as login)
             $token = $user->createToken('auth-token')->plainTextToken;
+
+            // Get user's active subscriptions (same as login)
+            $activeSubscriptions = UserSubscriptionHelper::getActiveSubscriptionsWithDetails($user->id);
+            $user->active_subscriptions = $activeSubscriptions;
+
+            // Prepare user data using UserResource (same format as login)
+            $userData = new UserResource($user);
 
             // Get frontend URL from env or use default
             $frontendUrl = env('FRONTEND_URL', 'http://localhost:3000');
 
-            // Redirect back to frontend with token and user data
-            $redirectUrl = $frontendUrl . '/auth/callback?token=' . urlencode($token)
-                . '&user_id=' . $user->id
-                . '&name=' . urlencode($user->name)
-                . '&email=' . urlencode($user->email);
+            // Encode user data and token as base64 to safely pass in URL
+            $authData = base64_encode(json_encode([
+                'user' => $userData,
+                'token' => $token,
+                'message' => 'Login successful'
+            ]));
+
+            // Redirect back to frontend with encoded auth data
+            $redirectUrl = $frontendUrl . '/auth/callback?data=' . urlencode($authData);
 
             return redirect($redirectUrl);
 

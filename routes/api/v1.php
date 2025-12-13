@@ -280,7 +280,7 @@ Route::prefix('guest')->group(function () {
     Route::get('/streams', [GuestStreamController::class, 'getLiveStreams']);
     Route::get('/streams/{streamId}', [GuestStreamController::class, 'getStreamDetails']);
     Route::get('/streams/{streamId}/viewers/count', [GuestStreamController::class, 'getViewerCount']);
-    
+
     // Guest authenticated routes
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/streams/{streamId}/join', [GuestStreamController::class, 'joinStream']);
@@ -308,7 +308,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // User Profile
     Route::get('user', [UserController::class, 'show']);
-    Route::get('user/{id}', [UserController::class, 'getUserById']);
+    // Route removed: getUserById - not needed, user data comes from Google callback
     Route::post('profile', [ProfileController::class, 'update']);
     Route::get('profile', [ProfileController::class, 'index']);
     Route::post('profile/social-links', [ProfileController::class, 'updateSocialLinks']);
