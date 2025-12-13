@@ -308,7 +308,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // User Profile
     Route::get('user', [UserController::class, 'show']);
-    // Route removed: getUserById - not needed, user data comes from Google callback
+    Route::get('user/{id}', [UserController::class, 'getUserById']);
     Route::post('profile', [ProfileController::class, 'update']);
     Route::get('profile', [ProfileController::class, 'index']);
     Route::post('profile/social-links', [ProfileController::class, 'updateSocialLinks']);

@@ -111,6 +111,63 @@ class UserController extends BaseController
     }
 
     /**
+     * Get user by ID (for viewing other users' profiles)
+     *
+     * @param int $id
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getUserById($id)
+    {
+        try {
+            $user = User::findOrFail($id);
+
+            // Load necessary relationships
+            $user->load([
+                'country',
+                'profileUploads',
+                'socialCircles',
+                'profileImages'
+            ]);
+
+            // Get user statistics
+            $totalConnections = UserRequestsHelper::getConnectionCount($user->id);
+            $totalLikes = UserLikeHelper::getReceivedLikesCount($user->id);
+            $totalPosts = PostHelper::getTotalPostByUserId($user->id);
+
+            // Get recent posts (last 10)
+            $recentPosts = PostHelper::getPostsByUserId($user->id, 10, 0);
+
+            // Get user's social circles with details
+            $socialCircles = SocialCircleHelper::getUserSocialCircles($user->id);
+
+            // Get user's active subscriptions
+            $activeSubscriptions = UserSubscriptionHelper::getActiveSubscriptionsWithDetails($user->id);
+
+            // Add computed fields to user object
+            $user->total_connections = $totalConnections;
+            $user->total_likes = $totalLikes;
+            $user->total_posts = $totalPosts;
+            $user->recent_posts = $recentPosts;
+            $user->social_circles_detailed = $socialCircles;
+            $user->active_subscriptions = $activeSubscriptions;
+            $user->profile_completion_percentage = $user->profile_completion;
+
+            return $this->sendResponse('User profile retrieved successfully', [
+                'user' => new UserResource($user),
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error retrieving user profile by ID', [
+                'user_id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return $this->sendError('Failed to retrieve user profile', $e->getMessage(), 500);
+        }
+    }
+
+    /**
      * Update the authenticated user
      *
      * @param UpdateUserRequest $request
