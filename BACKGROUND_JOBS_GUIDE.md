@@ -68,7 +68,7 @@ Your current config is mostly correct, but needs a few improvements:
 ```ini
 [program:laravel-worker]
 process_name=%(program_name)s_%(process_num)02d
-command=php /www/wwwroot/admin.connectinc.app/artisan queue:work database --sleep=3 --tries=3 --max-time=3600
+command=php /www/wwwroot/admin.connectinc.app/artisan queue:work database --queue=default,notifications --sleep=3 --tries=3 --max-time=3600
 directory=/www/wwwroot/admin.connectinc.app
 autostart=true
 autorestart=true
@@ -145,14 +145,16 @@ crontab -l | grep artisan
 
 These jobs are dispatched to the queue and processed by your supervisor workers:
 
-| Job                           | Triggered By                 | Description                        |
-| ----------------------------- | ---------------------------- | ---------------------------------- |
-| `SendLiveStreamNotifications` | Admin creates stream         | Email notifications to 3587+ users |
-| `SendAdExpiryRemindersJob`    | `ads:send-reminders` command | Ad expiry emails                   |
-| `SendPushNotificationJob`     | Various actions              | Push notifications                 |
-| `ExportUsersJob`              | Admin exports users          | Large user data export             |
-| `ProcessAdMetricsJob`         | Ad system                    | Process ad metrics                 |
-| `SendAdminNotificationEmail`  | Admin actions                | Admin email notifications          |
+| Job                                     | Queue         | Triggered By                    | Description                        |
+| --------------------------------------- | ------------- | ------------------------------- | ---------------------------------- |
+| `SendLiveStreamNotifications`           | default       | Admin creates stream            | Email notifications to 3587+ users |
+| `SendAdExpiryRemindersJob`              | default       | `ads:send-reminders` command    | Ad expiry emails                   |
+| `SendPushNotificationJob`               | default       | Various actions                 | Push notifications                 |
+| `ExportUsersJob`                        | default       | Admin exports users             | Large user data export             |
+| `ProcessAdMetricsJob`                   | default       | Ad system                       | Process ad metrics                 |
+| `SendAdminNotificationEmail`            | default       | Admin actions                   | Admin email notifications          |
+| `SendConnectionRequestNotificationJob`  | notifications | User sends connection request   | Push + Email to receiver           |
+| `SendConnectionAcceptedNotificationJob` | notifications | User accepts connection request | Push + Email to requester          |
 
 ---
 

@@ -523,11 +523,11 @@ public static function getAllDetailByUserId($id)
     public static function getRandomUserFromSocialCircle($socialCircleId, $currentUserId, $excludeUserIds = [])
     {
         try {
-            Log::info('Getting random user from social circle', [
-                'social_circle_id' => $socialCircleId,
-                'current_user_id' => $currentUserId,
-                'exclude_user_ids' => $excludeUserIds
-            ]);
+            // Log::info('Getting random user from social circle', [
+            //     'social_circle_id' => $socialCircleId,
+            //     'current_user_id' => $currentUserId,
+            //     'exclude_user_ids' => $excludeUserIds
+            // ]);
 
             // Make sure we exclude the current user
             $excludeUserIds[] = $currentUserId;

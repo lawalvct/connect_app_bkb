@@ -21,6 +21,8 @@ use App\Models\UserRequest;
 use App\Models\UserSwipe;
 use App\Models\UserNotification;
 use App\Models\Ad;
+use App\Jobs\SendConnectionRequestNotificationJob;
+use App\Jobs\SendConnectionAcceptedNotificationJob;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
@@ -623,23 +625,30 @@ class ConnectionController extends Controller
                 ], 400);
             }
 
-            // Create notification for the target user about the connection request
+            // Dispatch background job for notifications (push + email)
+            // This runs in the background and doesn't affect response time
             try {
-                if ($data['request_type'] === 'right_swipe') {
-                    UserNotification::createConnectionRequestNotification(
+                if ($data['request_type'] === 'right_swipe' && isset($result['request_id'])) {
+                    SendConnectionRequestNotificationJob::dispatch(
                         $user->id,
                         $data['user_id'],
                         $user->name,
                         $result['request_id']
-                    );
+                    )->onQueue('notifications');
+
+                    \Log::info('Connection request notification job dispatched', [
+                        'sender_id' => $user->id,
+                        'receiver_id' => $data['user_id'],
+                        'request_id' => $result['request_id']
+                    ]);
                 }
             } catch (\Exception $notificationException) {
-                \Log::error('Failed to create connection request notification', [
+                \Log::error('Failed to dispatch connection request notification job', [
                     'sender_id' => $user->id,
                     'receiver_id' => $data['user_id'],
                     'error' => $notificationException->getMessage()
                 ]);
-                // Don't fail the connection request if notification fails
+                // Don't fail the connection request if notification dispatch fails
             }
 
             // Record swipe in Connect Travel (social_id 11) for tracking 12-hour limit
@@ -830,23 +839,30 @@ class ConnectionController extends Controller
                 ], 400);
             }
 
-            // Create notification for the sender when their request is accepted
+            // Dispatch background job for connection accepted notifications (push + email)
+            // This runs in the background and doesn't affect response time
             try {
                 if ($data['action'] === 'accept') {
-                    UserNotification::createConnectionAcceptedNotification(
+                    SendConnectionAcceptedNotificationJob::dispatch(
                         $user->id,
                         $connectionRequest->sender_id,
                         $user->name,
                         $id
-                    );
+                    )->onQueue('notifications');
+
+                    \Log::info('Connection accepted notification job dispatched', [
+                        'accepter_id' => $user->id,
+                        'sender_id' => $connectionRequest->sender_id,
+                        'request_id' => $id
+                    ]);
                 }
             } catch (\Exception $notificationException) {
-                \Log::error('Failed to create connection accepted notification', [
+                \Log::error('Failed to dispatch connection accepted notification job', [
                     'sender_id' => $connectionRequest->sender_id,
                     'accepter_id' => $user->id,
                     'error' => $notificationException->getMessage()
                 ]);
-                // Don't fail the response if notification fails
+                // Don't fail the response if notification dispatch fails
             }
 
             return response()->json([
