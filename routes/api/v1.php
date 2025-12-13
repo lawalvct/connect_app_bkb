@@ -402,6 +402,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // These don't need rate limiting
         Route::get('/likes/received', [ConnectionController::class, 'getUsersWhoLikedMe']);
+        Route::get('/likes/count', [ConnectionController::class, 'getLikedCount']);
         Route::get('/matches', [ConnectionController::class, 'getMutualMatches']);
     });
 
@@ -409,6 +410,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('user')->group(function () {
         Route::post('/{id}/like', [ConnectionController::class, 'likeUser'])->middleware(['swipe.limit']);
         Route::get('/{id}/details', [ConnectionController::class, 'getUserDetailsById']);
+        Route::get('/likes/count', [ConnectionController::class, 'getLikedCount']);
     });
 
     // Connections

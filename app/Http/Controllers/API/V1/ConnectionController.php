@@ -1161,6 +1161,40 @@ class ConnectionController extends Controller
 
     /**
      * @OA\Get(
+     *     path="/api/v1/users/likes/count",
+     *     summary="Get count of users who liked me",
+     *     tags={"Connections"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(response=200, description="Liked count retrieved successfully")
+     * )
+     */
+    public function getLikedCount(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+            $count = UserLikeHelper::getUsersWhoLikedMe($user->id)->count();
+
+            return response()->json([
+                'status' => 1,
+                'message' => 'Liked count retrieved successfully',
+                'data' => ['count' => $count]
+            ], $this->successStatus);
+
+        } catch (\Exception $e) {
+            Log::error('Get liked count failed', [
+                'user_id' => $request->user()->id,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to retrieve liked count'
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Get(
      *     path="/api/v1/user/matches",
      *     summary="Get mutual likes (matches)",
      *     tags={"Connections"},
