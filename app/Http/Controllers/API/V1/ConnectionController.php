@@ -20,6 +20,7 @@ use App\Models\User;
 use App\Models\UserRequest;
 use App\Models\UserSwipe;
 use App\Models\UserNotification;
+use App\Models\Ad;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
@@ -321,22 +322,30 @@ class ConnectionController extends Controller
         }
 
         // After getting users, check if it's time to show an ad
-        $swipeCount = UserSwipe::getTodayRecord($user->id)->total_swipes ?? 0;
+        try {
+            $swipeCount = UserSwipe::getTodayRecord($user->id)->total_swipes ?? 0;
 
-        // Show ad after every 10 swipes
-        if ($swipeCount > 0 && $swipeCount % 10 === 0) {
-            $ads = Ad::getAdsForDiscovery($user->id, 1);
-            if ($ads->isNotEmpty()) {
-                // Insert ad into the response
-                $adData = [
-                    'type' => 'advertisement',
-                    'ad_data' => $ads->first(),
-                    'is_ad' => true
-                ];
+            // Show ad after every 10 swipes
+            if ($swipeCount > 0 && $swipeCount % 10 === 0) {
+                $ads = Ad::getAdsForDiscovery($user->id, 1);
+                if ($ads->isNotEmpty()) {
+                    // Insert ad into the response
+                    $adData = [
+                        'type' => 'advertisement',
+                        'ad_data' => $ads->first(),
+                        'is_ad' => true
+                    ];
 
-                // Add ad to response
-                $getData = $getData->push($adData);
+                    // Add ad to response
+                    $getData = $getData->push($adData);
+                }
             }
+        } catch (\Exception $e) {
+            // Silently ignore ad errors - ads are optional
+            \Log::warning('Failed to load ads for discovery', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage()
+            ]);
         }
 
         if (count($getData) != 0) {
