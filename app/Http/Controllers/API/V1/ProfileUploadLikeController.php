@@ -227,11 +227,11 @@ class ProfileUploadLikeController extends BaseController
             $page = $request->input('page', 1);
 
             // Get all uploads liked by this user
-            $likedUploads = UserProfileUpload::whereHas('likes', function($query) use ($user) {
-                    $query->where('user_id', $user->id);
-                })
-                ->where('deleted_flag', 'N')
+            $likedUploads = UserProfileUpload::join('user_profile_upload_likes', 'user_profile_uploads.id', '=', 'user_profile_upload_likes.upload_id')
+                ->where('user_profile_upload_likes.user_id', $user->id)
+                ->where('user_profile_uploads.deleted_flag', 'N')
                 ->with(['user:id,name,username,profile_url'])
+                ->select('user_profile_uploads.*', 'user_profile_upload_likes.created_at as liked_at')
                 ->orderBy('user_profile_upload_likes.created_at', 'desc')
                 ->paginate($perPage, ['*'], 'page', $page);
 
