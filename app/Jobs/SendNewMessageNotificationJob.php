@@ -163,15 +163,15 @@ class SendNewMessageNotificationJob implements ShouldQueue
 
             $data = [
                 'type' => 'new_message',
-                'sender_id' => (string) $this->senderId,
-                'sender_name' => $sender->name,
-                'sender_profile' => $sender->profile_url ?? '',
-                'message_id' => (string) $this->messageId,
-                'conversation_id' => (string) $this->conversationId,
-                'message_preview' => $this->messagePreview,
-                'message_type' => $this->messageType,
-                'action_url' => '/conversations/' . $this->conversationId,
-                'click_action' => 'OPEN_CONVERSATION'
+                'senderId' => (string) $this->senderId,
+                'senderName' => $sender->name,
+                'senderProfile' => $sender->profile_url ?? '',
+                'messageId' => (string) $this->messageId,
+                'conversationId' => (string) $this->conversationId,
+                'messagePreview' => $this->messagePreview,
+                'messageType' => $this->messageType,
+                'actionUrl' => '/conversations/' . $this->conversationId,
+                'clickAction' => 'OPEN_CONVERSATION'
             ];
 
             foreach ($tokens as $token) {
