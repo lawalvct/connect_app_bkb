@@ -11,41 +11,89 @@ class UserLikeHelper
 {
     public static function insert($data)
     {
-        $userData = Auth::user();
-        $data['created_at'] = date('Y-m-d H:i:s');
+        try {
+            // Ensure all required fields are present
+            if (!isset($data['user_id']) || !isset($data['liked_user_id'])) {
+                \Log::error('UserLikeHelper::insert - Missing required fields', ['data' => $data]);
+                throw new \Exception('Missing required fields: user_id or liked_user_id');
+            }
 
-        $userLike = new UserLike($data);
-        $userLike->save();
+            // Create the like record using mass assignment
+            $userLike = UserLike::create([
+                'user_id' => $data['user_id'],
+                'liked_user_id' => $data['liked_user_id'],
+                'type' => $data['type'] ?? 'profile',
+                'is_active' => $data['is_active'] ?? true,
+            ]);
 
-        // Send notification
-        if (isset($data['liked_user_id']) && isset($data['user_id'])) {
-          //  NotificationHelper::sendUserLikeNotification(
-              //  $data['liked_user_id'],
-           //     $data['user_id']
-         //   );
+            \Log::info('UserLike created successfully', [
+                'id' => $userLike->id,
+                'user_id' => $userLike->user_id,
+                'liked_user_id' => $userLike->liked_user_id,
+                'type' => $userLike->type
+            ]);
+
+            // Send notification
+            if (isset($data['liked_user_id']) && isset($data['user_id'])) {
+              //  NotificationHelper::sendUserLikeNotification(
+              //      $data['liked_user_id'],
+              //      $data['user_id']
+              //  );
+            }
+
+            return $userLike->id;
+        } catch (\Exception $e) {
+            \Log::error('UserLikeHelper::insert failed', [
+                'error' => $e->getMessage(),
+                'data' => $data,
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
         }
-
-        return $userLike->id;
     }
 
     public static function toggleLike($userId, $likedUserId, $type = 'profile')
     {
-        $existingLike = UserLike::where('user_id', $userId)
-                               ->where('liked_user_id', $likedUserId)
-                               ->where('type', $type)
-                               ->first();
+        try {
+            \Log::info('UserLikeHelper::toggleLike called', [
+                'user_id' => $userId,
+                'liked_user_id' => $likedUserId,
+                'type' => $type
+            ]);
 
-        if ($existingLike) {
-            $existingLike->update(['is_active' => !$existingLike->is_active]);
-            return $existingLike->is_active ? 'liked' : 'unliked';
-        } else {
-            self::insert([
+            $existingLike = UserLike::where('user_id', $userId)
+                                   ->where('liked_user_id', $likedUserId)
+                                   ->where('type', $type)
+                                   ->first();
+
+            if ($existingLike) {
+                \Log::info('Existing like found, toggling is_active', [
+                    'like_id' => $existingLike->id,
+                    'current_is_active' => $existingLike->is_active
+                ]);
+
+                $existingLike->update(['is_active' => !$existingLike->is_active]);
+                return $existingLike->is_active ? 'liked' : 'unliked';
+            } else {
+                \Log::info('No existing like found, creating new like');
+
+                self::insert([
+                    'user_id' => $userId,
+                    'liked_user_id' => $likedUserId,
+                    'type' => $type,
+                    'is_active' => true
+                ]);
+                return 'liked';
+            }
+        } catch (\Exception $e) {
+            \Log::error('UserLikeHelper::toggleLike failed', [
+                'error' => $e->getMessage(),
                 'user_id' => $userId,
                 'liked_user_id' => $likedUserId,
                 'type' => $type,
-                'is_active' => true
+                'trace' => $e->getTraceAsString()
             ]);
-            return 'liked';
+            throw $e;
         }
     }
 
