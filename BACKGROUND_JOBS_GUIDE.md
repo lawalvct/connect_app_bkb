@@ -156,6 +156,7 @@ These jobs are dispatched to the queue and processed by your supervisor workers:
 | `SendConnectionRequestNotificationJob`  | notifications | User sends connection request   | Push + Email to receiver              |
 | `SendConnectionAcceptedNotificationJob` | notifications | User accepts connection request | Push + Email to requester             |
 | `SendNewMessageNotificationJob`         | notifications | User sends message in chat      | Push + Email to conversation partners |
+| `SendCallNotificationJob`               | notifications | User initiates audio/video call | HIGH PRIORITY Push to receiver        |
 
 ---
 

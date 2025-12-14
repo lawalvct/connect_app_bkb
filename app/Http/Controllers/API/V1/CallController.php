@@ -191,6 +191,32 @@ class CallController extends BaseController
 
             DB::commit();
 
+            // Dispatch push notifications to other participants (background job - URGENT)
+            try {
+                foreach ($participants as $participant) {
+                    \App\Jobs\SendCallNotificationJob::dispatch(
+                        $user->id,
+                        $participant->id,
+                        $call->id,
+                        $conversation->id,
+                        $call->call_type
+                    )->onQueue('notifications');
+
+                    Log::info('Call notification job dispatched', [
+                        'caller_id' => $user->id,
+                        'receiver_id' => $participant->id,
+                        'call_id' => $call->id,
+                        'call_type' => $call->call_type
+                    ]);
+                }
+            } catch (\Exception $notificationException) {
+                Log::error('Failed to dispatch call notification job', [
+                    'call_id' => $call->id,
+                    'error' => $notificationException->getMessage()
+                ]);
+                // Don't fail the call initiation if notification dispatch fails
+            }
+
             // Broadcast call initiated event using improved helper with retry logic
             try {
                 // Prepare participants data with full profile URLs
