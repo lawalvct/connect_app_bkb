@@ -20,6 +20,7 @@ class UserProfileUpload extends Model
         'alt_text',
         'tags',
         'metadata',
+        'like_count',
         'deleted_flag',
         'deleted_at'
     ];
@@ -30,6 +31,31 @@ class UserProfileUpload extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Get all users who liked this upload.
+     */
+    public function likes()
+    {
+        return $this->belongsToMany(User::class, 'user_profile_upload_likes', 'upload_id', 'user_id')
+                    ->withTimestamps();
+    }
+
+    /**
+     * Check if a user has liked this upload.
+     */
+    public function isLikedBy($userId)
+    {
+        return $this->likes()->where('user_id', $userId)->exists();
+    }
+
+    /**
+     * Get the like count for this upload.
+     */
+    public function getLikeCountAttribute($value)
+    {
+        return (int) $value;
     }
 
         /**

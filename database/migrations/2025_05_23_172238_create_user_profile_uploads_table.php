@@ -23,6 +23,7 @@ class CreateUserProfileUploadsTable extends Migration
             $table->string('alt_text')->nullable(); // Alt text for accessibility
             $table->json('tags')->nullable(); // Tags for the image
             $table->json('metadata')->nullable(); // Additional metadata (dimensions, etc.)
+            $table->unsignedBigInteger('like_count')->default(0); // Total likes count
             $table->enum('deleted_flag', ['Y', 'N'])->default('N');
             $table->timestamps();
             $table->timestamp('deleted_at')->nullable();

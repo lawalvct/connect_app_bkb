@@ -334,6 +334,14 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::patch('profile/images/metadata', [ProfileController::class, 'updateProfileImageMetadata']);
 
+    // Profile Upload Likes
+    Route::prefix('profile/uploads')->group(function () {
+        Route::post('{uploadId}/like', [\App\Http\Controllers\API\V1\ProfileUploadLikeController::class, 'toggleLike']);
+        Route::get('{uploadId}/likes', [\App\Http\Controllers\API\V1\ProfileUploadLikeController::class, 'getLikes']);
+        Route::get('{uploadId}/like-status', [\App\Http\Controllers\API\V1\ProfileUploadLikeController::class, 'checkLikeStatus']);
+        Route::get('my-likes', [\App\Http\Controllers\API\V1\ProfileUploadLikeController::class, 'getMyLikedUploads']);
+    });
+
     // Social Links
     Route::get('social-links', [ProfileController::class, 'getSocialLinks']);
     Route::post('social-links', [ProfileController::class, 'update']);
