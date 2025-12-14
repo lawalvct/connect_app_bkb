@@ -189,7 +189,7 @@
     <div class="email-container">
         <!-- Header -->
         <div class="header">
-            <img src="https://connect.udemics.com/images/connect_logo.png" alt="Connect Inc. App Logo" class="logo">
+            <img src="https://cadmin.connectinc.app/images/connect_logo.png" alt="Connect Inc. App Logo" class="logo">
             <div class="security-icon">
                 🔐
             </div>
