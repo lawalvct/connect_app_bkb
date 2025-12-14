@@ -145,16 +145,17 @@ crontab -l | grep artisan
 
 These jobs are dispatched to the queue and processed by your supervisor workers:
 
-| Job                                     | Queue         | Triggered By                    | Description                        |
-| --------------------------------------- | ------------- | ------------------------------- | ---------------------------------- |
-| `SendLiveStreamNotifications`           | default       | Admin creates stream            | Email notifications to 3587+ users |
-| `SendAdExpiryRemindersJob`              | default       | `ads:send-reminders` command    | Ad expiry emails                   |
-| `SendPushNotificationJob`               | default       | Various actions                 | Push notifications                 |
-| `ExportUsersJob`                        | default       | Admin exports users             | Large user data export             |
-| `ProcessAdMetricsJob`                   | default       | Ad system                       | Process ad metrics                 |
-| `SendAdminNotificationEmail`            | default       | Admin actions                   | Admin email notifications          |
-| `SendConnectionRequestNotificationJob`  | notifications | User sends connection request   | Push + Email to receiver           |
-| `SendConnectionAcceptedNotificationJob` | notifications | User accepts connection request | Push + Email to requester          |
+| Job                                     | Queue         | Triggered By                    | Description                           |
+| --------------------------------------- | ------------- | ------------------------------- | ------------------------------------- |
+| `SendLiveStreamNotifications`           | default       | Admin creates stream            | Email notifications to 3587+ users    |
+| `SendAdExpiryRemindersJob`              | default       | `ads:send-reminders` command    | Ad expiry emails                      |
+| `SendPushNotificationJob`               | default       | Various actions                 | Push notifications                    |
+| `ExportUsersJob`                        | default       | Admin exports users             | Large user data export                |
+| `ProcessAdMetricsJob`                   | default       | Ad system                       | Process ad metrics                    |
+| `SendAdminNotificationEmail`            | default       | Admin actions                   | Admin email notifications             |
+| `SendConnectionRequestNotificationJob`  | notifications | User sends connection request   | Push + Email to receiver              |
+| `SendConnectionAcceptedNotificationJob` | notifications | User accepts connection request | Push + Email to requester             |
+| `SendNewMessageNotificationJob`         | notifications | User sends message in chat      | Push + Email to conversation partners |
 
 ---
 

@@ -10,9 +10,11 @@ use App\Http\Resources\V1\MessageResource;
 use App\Events\MessageSent;
 use App\Helpers\FileUploadHelper;
 use App\Http\Resources\V1\ConversationResource;
+use App\Jobs\SendNewMessageNotificationJob;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Pusher\Pusher;
 
 class MessageController extends BaseController
@@ -213,6 +215,42 @@ class MessageController extends BaseController
 
             // Load relationships for response
             $message->load(['user', 'replyToMessage.user']);
+
+            // Dispatch notification job for other participants (background job)
+            try {
+                $currentUserId = $request->user()->id;
+
+                // Get other participants in the conversation
+                $otherParticipants = $conversation->participants()
+                    ->where('user_id', '!=', $currentUserId)
+                    ->where('is_active', true)
+                    ->pluck('user_id');
+
+                $messagePreview = $this->getMessagePreview($message);
+
+                foreach ($otherParticipants as $participantId) {
+                    \App\Jobs\SendNewMessageNotificationJob::dispatch(
+                        $currentUserId,
+                        $participantId,
+                        $message->id,
+                        $conversation->id,
+                        $messagePreview,
+                        $message->type
+                    )->onQueue('notifications');
+
+                    Log::info('Message notification job dispatched', [
+                        'sender_id' => $currentUserId,
+                        'receiver_id' => $participantId,
+                        'message_id' => $message->id
+                    ]);
+                }
+            } catch (\Exception $notificationException) {
+                Log::error('Failed to dispatch message notification job', [
+                    'message_id' => $message->id,
+                    'error' => $notificationException->getMessage()
+                ]);
+                // Don't fail the message sending if notification dispatch fails
+            }
 
             // Broadcast the message to Pusher for real-time updates
             try {
@@ -659,6 +697,29 @@ class MessageController extends BaseController
             ], 201);
         } catch (\Exception $e) {
             return $this->sendError('Failed to send message', $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Get message preview for notifications
+     */
+    private function getMessagePreview($message)
+    {
+        switch ($message->type) {
+            case 'text':
+                return Str::limit($message->message, 100);
+            case 'image':
+                return '📷 Photo';
+            case 'video':
+                return '🎥 Video';
+            case 'audio':
+                return '🎵 Audio';
+            case 'file':
+                return '📎 File';
+            case 'location':
+                return '📍 Location';
+            default:
+                return 'Sent a message';
         }
     }
 }
