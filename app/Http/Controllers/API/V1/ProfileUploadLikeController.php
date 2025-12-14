@@ -147,7 +147,7 @@ class ProfileUploadLikeController extends BaseController
 
             // Get users who liked this upload with pagination
             $likes = $upload->likes()
-                ->select('users.id', 'users.name', 'users.username', 'users.profile_image')
+                ->select('users.id', 'users.name', 'users.username', 'users.profile_url')
                 ->paginate($perPage, ['*'], 'page', $page);
 
             return $this->sendResponse('Likes retrieved successfully', [
@@ -231,7 +231,7 @@ class ProfileUploadLikeController extends BaseController
                     $query->where('user_id', $user->id);
                 })
                 ->where('deleted_flag', 'N')
-                ->with(['user:id,name,username,profile_image'])
+                ->with(['user:id,name,username,profile_url'])
                 ->orderBy('user_profile_upload_likes.created_at', 'desc')
                 ->paginate($perPage, ['*'], 'page', $page);
 
