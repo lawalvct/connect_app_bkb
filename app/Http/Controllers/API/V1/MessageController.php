@@ -603,6 +603,32 @@ class MessageController extends BaseController
             // Load relationships for response
             $message->load(['user']);
 
+            // Dispatch notification job to recipient (background job)
+            try {
+                $messagePreview = $this->getMessagePreview($message);
+
+                SendNewMessageNotificationJob::dispatch(
+                    $currentUser->id,
+                    $recipientId,
+                    $message->id,
+                    $conversation->id,
+                    $messagePreview,
+                    $message->type
+                )->onQueue('notifications');
+
+                Log::info('Direct message notification job dispatched', [
+                    'sender_id' => $currentUser->id,
+                    'receiver_id' => $recipientId,
+                    'message_id' => $message->id
+                ]);
+            } catch (\Exception $notificationException) {
+                Log::error('Failed to dispatch direct message notification job', [
+                    'message_id' => $message->id,
+                    'error' => $notificationException->getMessage()
+                ]);
+                // Don't fail the message sending if notification dispatch fails
+            }
+
             // Broadcast the message to Pusher for real-time updates
             try {
                 Log::info('Starting direct message Pusher broadcast', [
