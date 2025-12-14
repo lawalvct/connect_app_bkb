@@ -760,6 +760,44 @@ class ConnectionController extends Controller
     }
 
     /**
+     * @OA\Get(
+     *     path="/api/v1/connections/count",
+     *     summary="Get authenticated user's connection count",
+     *     tags={"Connections"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(response=200, description="Connection count retrieved successfully")
+     * )
+     */
+    public function getConnectionCount(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+            $connectionCount = UserRequestsHelper::getConnectionCount($user->id);
+
+            return response()->json([
+                'status' => 1,
+                'message' => 'Connection count retrieved successfully',
+                'data' => [
+                    'user_id' => $user->id,
+                    'connection_count' => $connectionCount,
+                    'total_connections' => $connectionCount
+                ]
+            ], $this->successStatus);
+
+        } catch (\Exception $e) {
+            Log::error('Get connection count failed', [
+                'user_id' => $request->user()->id,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to retrieve connection count'
+            ], 500);
+        }
+    }
+
+    /**
      * @OA\Post(
      *     path="/api/v1/connections/request/{id}/respond",
      *     summary="Accept or reject connection request",
