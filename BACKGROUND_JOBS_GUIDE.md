@@ -157,6 +157,7 @@ These jobs are dispatched to the queue and processed by your supervisor workers:
 | `SendConnectionAcceptedNotificationJob` | notifications | User accepts connection request | Push + Email to requester             |
 | `SendNewMessageNotificationJob`         | notifications | User sends message in chat      | Push + Email to conversation partners |
 | `SendCallNotificationJob`               | notifications | User initiates audio/video call | HIGH PRIORITY Push to receiver        |
+| `SendProfileUploadLikeNotificationJob`  | notifications | User likes profile photo/video  | Push + In-app to upload owner         |
 
 ---
 

@@ -170,6 +170,51 @@ Get all uploads that the authenticated user has liked.
 }
 ```
 
+## Notifications
+
+### Push & In-App Notifications
+
+**Job:** `app/Jobs/SendProfileUploadLikeNotificationJob.php`
+
+When a user likes a photo/video, the upload owner receives:
+
+1. **In-App Notification**
+
+    - Title: "New Like! 📷" (or 🎥 for videos)
+    - Message: "[Liker Name] liked your photo/video"
+    - Type: `profile_upload_like`
+    - Priority: 5 (medium)
+
+2. **Push Notification** (via Firebase)
+    - Sent to all active FCM tokens
+    - Same title and message as in-app
+    - Data payload includes: liker details, upload info, total likes
+
+**Features:**
+
+-   Background job processing (queue: `notifications`)
+-   Doesn't notify if user likes own upload
+-   Retry logic: 3 attempts with backoff [10, 30, 60] seconds
+-   Comprehensive logging for debugging
+-   CamelCase keys for FCM v1 API compatibility
+
+**Notification Data Payload:**
+
+```json
+{
+    "type": "profile_upload_like",
+    "likerId": "123",
+    "likerName": "John Doe",
+    "likerUsername": "johndoe",
+    "likerProfile": "https://...",
+    "uploadId": "456",
+    "uploadType": "image",
+    "uploadUrl": "https://...",
+    "totalLikes": "42",
+    "actionUrl": "/profile/789/uploads/456"
+}
+```
+
 ## Implementation Details
 
 ### Controller
@@ -183,6 +228,8 @@ Get all uploads that the authenticated user has liked.
 -   Comprehensive error logging
 -   Prevents duplicate likes with unique constraint
 -   Efficient pagination for large datasets
+-   Dispatches notification job on like (not unlike)
+-   Skips notification if user likes own upload
 
 **Error Handling:**
 

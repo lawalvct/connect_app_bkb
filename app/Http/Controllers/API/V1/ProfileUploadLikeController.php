@@ -4,6 +4,7 @@ namespace App\Http\Controllers\API\V1;
 
 use App\Http\Controllers\API\BaseController;
 use App\Models\UserProfileUpload;
+use App\Jobs\SendProfileUploadLikeNotificationJob;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -79,6 +80,29 @@ class ProfileUploadLikeController extends BaseController
                     'upload_id' => $uploadId,
                     'new_count' => $upload->fresh()->like_count
                 ]);
+
+                // Dispatch notification job (don't send if user liked own upload)
+                if ($user->id !== $upload->user_id) {
+                    try {
+                        SendProfileUploadLikeNotificationJob::dispatch(
+                            $user->id,
+                            $upload->user_id,
+                            $uploadId
+                        )->onQueue('notifications');
+
+                        Log::channel('daily')->info('Profile upload like notification job dispatched', [
+                            'liker_id' => $user->id,
+                            'upload_owner_id' => $upload->user_id,
+                            'upload_id' => $uploadId
+                        ]);
+                    } catch (\Exception $e) {
+                        Log::channel('daily')->error('Failed to dispatch profile upload like notification', [
+                            'error' => $e->getMessage(),
+                            'liker_id' => $user->id,
+                            'upload_id' => $uploadId
+                        ]);
+                    }
+                }
 
                 return $this->sendResponse('Upload liked successfully', [
                     'liked' => true,
