@@ -1005,4 +1005,62 @@ class PostController extends BaseController
             ], 500);
         }
     }
+
+    /**
+     * Get authenticated user's post count
+     */
+    public function getPostCount(): JsonResponse
+    {
+        try {
+            $user = auth()->user();
+
+            $totalPosts = Post::where('user_id', $user->id)
+                ->where('is_published', true)
+                ->count();
+
+            $scheduledPosts = Post::where('user_id', $user->id)
+                ->where('is_published', false)
+                ->whereNotNull('scheduled_at')
+                ->count();
+
+            $postsThisMonth = Post::where('user_id', $user->id)
+                ->where('is_published', true)
+                ->whereMonth('published_at', now()->month)
+                ->whereYear('published_at', now()->year)
+                ->count();
+
+            $postsThisWeek = Post::where('user_id', $user->id)
+                ->where('is_published', true)
+                ->whereBetween('published_at', [now()->startOfWeek(), now()->endOfWeek()])
+                ->count();
+
+            $postsToday = Post::where('user_id', $user->id)
+                ->where('is_published', true)
+                ->whereDate('published_at', today())
+                ->count();
+
+            return response()->json([
+                'status' => 1,
+                'message' => 'Post count retrieved successfully',
+                'data' => [
+                    'user_id' => $user->id,
+                    'total_posts' => $totalPosts,
+                    'scheduled_posts' => $scheduledPosts,
+                    'posts_this_month' => $postsThisMonth,
+                    'posts_this_week' => $postsThisWeek,
+                    'posts_today' => $postsToday
+                ]
+            ], $this->successStatus);
+
+        } catch (\Exception $e) {
+            Log::error('Get post count failed', [
+                'user_id' => auth()->id(),
+                'error' => $e->getMessage()
+            ]);
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to retrieve post count'
+            ], 500);
+        }
+    }
 }

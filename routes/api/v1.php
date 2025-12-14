@@ -372,6 +372,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('/feed', [PostController::class, 'getFeed']);
         Route::get('/scheduled', [PostController::class, 'getScheduledPosts']);
+        Route::get('/count', [PostController::class, 'getPostCount']);
         Route::get('/user/{userId?}', [PostController::class, 'getUserPosts']);
         Route::post('/', [PostController::class, 'store']);
         Route::get('/{post}', [PostController::class, 'show']);
