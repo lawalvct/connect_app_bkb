@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use App\Helpers\TimezoneHelper;
 use App\Models\User;
+use App\Models\UserLike;
 
 class UserResource extends JsonResource
 {
@@ -66,7 +67,10 @@ class UserResource extends JsonResource
 
             // Statistics
             'total_connections' => $this->when(isset($this->total_connections), $this->total_connections),
-            'total_likes' => $this->when(isset($this->total_likes), $this->total_likes),
+            'total_likes' => UserLike::where('liked_user_id', $this->id)
+                                ->profileLikes()
+                                ->where('is_active', true)
+                                ->count(),
             'total_posts' => $this->when(isset($this->total_posts), $this->total_posts),
             'likes_given' => $this->when(isset($this->likes_given), $this->likes_given),
             'likes_received' => $this->when(isset($this->likes_received), $this->likes_received),
