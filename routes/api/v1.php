@@ -607,7 +607,7 @@ Route::prefix('discover')->group(function () {
 
             // Payment management
             Route::prefix('payments')->group(function () {
-                Route::post('/verify', [StreamPaymentController::class, 'verifyPayment']);
+                Route::match(['get', 'post'], '/verify', [StreamPaymentController::class, 'verifyPayment']);
                 Route::get('/{paymentId}/status', [StreamPaymentController::class, 'getPaymentStatus']);
                 Route::get('/my-payments', [StreamPaymentController::class, 'getUserPayments']);
             });

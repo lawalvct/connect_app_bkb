@@ -309,34 +309,80 @@ class StreamPaymentController extends BaseController
     }
 
     /**
-     * Verify payment status
+     * Verify payment status (Mobile-friendly - accepts multiple ID types)
      */
     public function verifyPayment(Request $request)
     {
         try {
             $validator = Validator::make($request->all(), [
-                'reference' => 'required|string',
-                'gateway' => 'required|in:stripe,nomba',
+                'reference' => 'nullable|string',
+                'transaction_id' => 'nullable|string',
+                'session_id' => 'nullable|string',
+                'payment_intent' => 'nullable|string',
+                'gateway' => 'nullable|in:stripe,nomba',
             ]);
 
             if ($validator->fails()) {
                 return $this->sendError('Validation Error', $validator->errors(), 422);
             }
 
-            $payment = StreamPayment::where('reference', $request->reference)
-                ->where('payment_gateway', $request->gateway)
-                ->first();
+            // Find payment by reference, transaction_id, session_id, or payment_intent
+            $payment = null;
+            $gateway = $request->gateway;
+
+            // Try to find by reference first (most common)
+            if ($request->reference) {
+                $query = StreamPayment::where('reference', $request->reference);
+                if ($gateway) {
+                    $query->where('payment_gateway', $gateway);
+                }
+                $payment = $query->first();
+            }
+
+            // Try to find by Stripe session ID or payment intent
+            if (!$payment && ($request->session_id || $request->payment_intent || $request->transaction_id)) {
+                $transactionId = $request->session_id ?? $request->payment_intent ?? $request->transaction_id;
+                $query = StreamPayment::where('gateway_transaction_id', $transactionId);
+                if ($gateway) {
+                    $query->where('payment_gateway', $gateway);
+                }
+                $payment = $query->first();
+            }
 
             if (!$payment) {
+                // If no payment found, try to verify directly with Stripe
+                if ($request->session_id || $request->payment_intent) {
+                    return $this->verifyStripeDirectly($request);
+                }
+
                 return $this->sendError('Payment not found', null, 404);
+            }
+
+            // If payment already completed, return success
+            if ($payment->status === 'completed') {
+                return $this->sendResponse('Payment already verified', [
+                    'payment' => [
+                        'id' => $payment->id,
+                        'reference' => $payment->reference,
+                        'amount' => $payment->amount,
+                        'currency' => $payment->currency,
+                        'status' => $payment->status,
+                        'paid_at' => $payment->paid_at,
+                    ],
+                    'stream' => [
+                        'id' => $payment->stream->id,
+                        'title' => $payment->stream->title,
+                        'access_granted' => true,
+                    ]
+                ]);
             }
 
             $verified = false;
             $verificationData = [];
 
-            if ($request->gateway === 'stripe') {
+            if ($payment->payment_gateway === 'stripe') {
                 $verified = $this->verifyStripePayment($payment, $verificationData);
-            } elseif ($request->gateway === 'nomba') {
+            } elseif ($payment->payment_gateway === 'nomba') {
                 $verified = $this->verifyNombaPayment($payment, $verificationData);
             }
 
@@ -366,10 +412,93 @@ class StreamPaymentController extends BaseController
         } catch (\Exception $e) {
             Log::error('Payment verification failed', [
                 'error' => $e->getMessage(),
-                'reference' => $request->reference ?? null
+                'reference' => $request->reference ?? null,
+                'transaction_id' => $request->transaction_id ?? null
             ]);
 
             return $this->sendError('Failed to verify payment', $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Verify Stripe payment directly without pre-existing payment record
+     */
+    private function verifyStripeDirectly(Request $request)
+    {
+        try {
+            $sessionId = $request->session_id ?? $request->payment_intent;
+
+            if (!$sessionId) {
+                return $this->sendError('Session ID or Payment Intent required', null, 400);
+            }
+
+            Log::info('Verifying Stripe payment directly', ['session_id' => $sessionId]);
+
+            // Try as checkout session first
+            try {
+                $session = StripeSession::retrieve($sessionId);
+
+                if ($session->payment_status === 'paid') {
+                    $paymentId = $session->metadata->payment_id ?? null;
+                    $streamId = $session->metadata->stream_id ?? null;
+                    $userId = $session->metadata->user_id ?? null;
+
+                    // Find or create payment record
+                    $payment = null;
+                    if ($paymentId) {
+                        $payment = StreamPayment::find($paymentId);
+                    }
+
+                    if ($payment) {
+                        if ($payment->status !== 'completed') {
+                            $payment->markAsCompleted($session->id, $session->toArray());
+                        }
+
+                        return $this->sendResponse('Payment verified successfully', [
+                            'payment' => [
+                                'id' => $payment->id,
+                                'reference' => $payment->reference,
+                                'amount' => $payment->amount,
+                                'currency' => $payment->currency,
+                                'status' => $payment->status,
+                                'paid_at' => $payment->paid_at,
+                            ],
+                            'stream' => [
+                                'id' => $payment->stream->id,
+                                'title' => $payment->stream->title,
+                                'access_granted' => true,
+                            ]
+                        ]);
+                    } else {
+                        return $this->sendResponse('Payment successful on Stripe', [
+                            'verified' => true,
+                            'session_id' => $session->id,
+                            'payment_status' => $session->payment_status,
+                            'amount_total' => $session->amount_total / 100,
+                            'currency' => strtoupper($session->currency),
+                            'message' => 'Payment verified with Stripe, but local record not found'
+                        ]);
+                    }
+                }
+
+                return $this->sendError('Payment not completed on Stripe', [
+                    'session_id' => $session->id,
+                    'payment_status' => $session->payment_status
+                ], 400);
+
+            } catch (\Stripe\Exception\InvalidRequestException $e) {
+                // Not a session, might be a payment intent
+                Log::info('Not a Stripe session, might be payment intent', ['error' => $e->getMessage()]);
+                return $this->sendError('Invalid session or payment not found', $e->getMessage(), 404);
+            }
+
+        } catch (\Exception $e) {
+            Log::error('Direct Stripe verification failed', [
+                'error' => $e->getMessage(),
+                'session_id' => $request->session_id ?? null
+            ]);
+
+            return $this->sendError('Failed to verify payment with Stripe', $e->getMessage(), 500);
         }
     }
 
