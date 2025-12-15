@@ -71,6 +71,15 @@ class UserResource extends JsonResource
                                 ->profileLikes()
                                 ->where('is_active', true)
                                 ->count(),
+            'is_liked' => auth()->check() ? UserLike::where('user_id', auth()->id())
+                                ->where('liked_user_id', $this->id)
+                                ->where('type', 'profile')
+                                ->where('is_active', true)
+                                ->exists() : false,
+            'likes_count' => UserLike::where('liked_user_id', $this->id)
+                                ->profileLikes()
+                                ->where('is_active', true)
+                                ->count(),
             'total_posts' => $this->when(isset($this->total_posts), $this->total_posts),
             'likes_given' => $this->when(isset($this->likes_given), $this->likes_given),
             'likes_received' => $this->when(isset($this->likes_received), $this->likes_received),
