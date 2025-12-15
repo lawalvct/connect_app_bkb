@@ -6,6 +6,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use App\Helpers\TimezoneHelper;
+use App\Helpers\UserRequestsHelper;
 use App\Models\User;
 use App\Models\UserLike;
 
@@ -76,6 +77,7 @@ class UserResource extends JsonResource
                                 ->where('type', 'profile')
                                 ->where('is_active', true)
                                 ->exists() : false,
+            'is_connected' => auth()->check() ? UserRequestsHelper::areUsersConnected(auth()->id(), $this->id) : false,
             'likes_count' => UserLike::where('liked_user_id', $this->id)
                                 ->profileLikes()
                                 ->where('is_active', true)
