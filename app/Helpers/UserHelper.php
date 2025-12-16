@@ -105,6 +105,7 @@ class UserHelper
 
     // New method to get latest users with some randomness based on user ID
     // Excludes testing users (ID < 500) to only show real users
+    // Prioritizes Connect Boost users (plan ID 4) to appear in front of line
     public static function getLatestSocialCircleUsers($socialIds, $currentUserId, $lastId = null, $countryId = null, $limit = 10)
     {
         Log::info('getLatestSocialCircleUsers called with params:', [
@@ -162,8 +163,7 @@ class UserHelper
         $totalCount = $query->count();
         Log::info('Total users found before limit:', ['count' => $totalCount]);
 
-        // Order by ID descending (latest users first) with some randomness
-        // We'll get more users than needed and then shuffle for randomness
+        // Fetch more users than needed for sorting and shuffling
         $fetchLimit = min($limit * 3, 50); // Get 3x the needed amount or max 50
 
         $results = $query->with(['profileImages', 'country', 'socialCircles'])
@@ -171,18 +171,51 @@ class UserHelper
             ->limit($fetchLimit)
             ->get();
 
-        // Add some randomness by shuffling and taking only the needed amount
-        $shuffledResults = $results->shuffle()->take($limit);
+        // Separate Connect Boost users from regular users
+        $boostUsers = collect();
+        $regularUsers = collect();
 
-        Log::info('Final results after shuffle:', ['count' => $shuffledResults->count()]);
+        foreach ($results as $user) {
+            // Check if user has active Connect Boost subscription (plan ID 4)
+            $hasBoost = UserSubscriptionHelper::hasBoostAccess($user->id);
+
+            if ($hasBoost) {
+                $boostUsers->push($user);
+            } else {
+                $regularUsers->push($user);
+            }
+        }
+
+        Log::info('Separated users by boost status:', [
+            'boost_users' => $boostUsers->count(),
+            'regular_users' => $regularUsers->count()
+        ]);
+
+        // Take up to 5 boost users and shuffle them for variety
+        $priorityBoostUsers = $boostUsers->shuffle()->take(5);
+
+        // Calculate how many regular users we need
+        $remainingSlots = $limit - $priorityBoostUsers->count();
+
+        // Shuffle regular users and take what we need
+        $selectedRegularUsers = $regularUsers->shuffle()->take(max(0, $remainingSlots));
+
+        // Combine: Boost users first (front of line), then regular users
+        $finalResults = $priorityBoostUsers->concat($selectedRegularUsers);
+
+        Log::info('Final results with front-of-line priority:', [
+            'total_count' => $finalResults->count(),
+            'boost_users_shown' => $priorityBoostUsers->count(),
+            'regular_users_shown' => $selectedRegularUsers->count()
+        ]);
 
         // Add connection counts for each user
-        foreach ($shuffledResults as $user) {
+        foreach ($finalResults as $user) {
             $user->total_connections = UserRequestsHelper::getConnectionCount($user->id);
             $user->is_connected_to_current_user = UserRequestsHelper::areUsersConnected($currentUserId, $user->id);
         }
 
-        return $shuffledResults;
+        return $finalResults;
     }
 
     // Fallback method to get any latest users (ID >= 500) when social circle filtering fails
@@ -235,7 +268,7 @@ class UserHelper
         $totalCount = $query->count();
         Log::info('Total available users found before limit:', ['count' => $totalCount]);
 
-        // Order by ID descending (latest users first) with some randomness
+        // Fetch more users than needed for sorting and shuffling
         $fetchLimit = min($limit * 3, 50); // Get 3x the needed amount or max 50
 
         $results = $query->with(['profileImages', 'country', 'socialCircles'])
@@ -243,18 +276,51 @@ class UserHelper
             ->limit($fetchLimit)
             ->get();
 
-        // Add some randomness by shuffling and taking only the needed amount
-        $shuffledResults = $results->shuffle()->take($limit);
+        // Separate Connect Boost users from regular users (same as main method)
+        $boostUsers = collect();
+        $regularUsers = collect();
 
-        Log::info('Final results after shuffle:', ['count' => $shuffledResults->count()]);
+        foreach ($results as $user) {
+            // Check if user has active Connect Boost subscription (plan ID 4)
+            $hasBoost = UserSubscriptionHelper::hasBoostAccess($user->id);
+
+            if ($hasBoost) {
+                $boostUsers->push($user);
+            } else {
+                $regularUsers->push($user);
+            }
+        }
+
+        Log::info('Fallback: Separated users by boost status:', [
+            'boost_users' => $boostUsers->count(),
+            'regular_users' => $regularUsers->count()
+        ]);
+
+        // Take up to 5 boost users and shuffle them for variety
+        $priorityBoostUsers = $boostUsers->shuffle()->take(5);
+
+        // Calculate how many regular users we need
+        $remainingSlots = $limit - $priorityBoostUsers->count();
+
+        // Shuffle regular users and take what we need
+        $selectedRegularUsers = $regularUsers->shuffle()->take(max(0, $remainingSlots));
+
+        // Combine: Boost users first (front of line), then regular users
+        $finalResults = $priorityBoostUsers->concat($selectedRegularUsers);
+
+        Log::info('Fallback: Final results with front-of-line priority:', [
+            'total_count' => $finalResults->count(),
+            'boost_users_shown' => $priorityBoostUsers->count(),
+            'regular_users_shown' => $selectedRegularUsers->count()
+        ]);
 
         // Add connection counts for each user
-        foreach ($shuffledResults as $user) {
+        foreach ($finalResults as $user) {
             $user->total_connections = UserRequestsHelper::getConnectionCount($user->id);
             $user->is_connected_to_current_user = UserRequestsHelper::areUsersConnected($currentUserId, $user->id);
         }
 
-        return $shuffledResults;
+        return $finalResults;
     }
 
     public static function getById($id)
