@@ -761,6 +761,94 @@ class ConnectionController extends Controller
 
     /**
      * @OA\Get(
+     *     path="/api/v1/connections/online",
+     *     summary="Get online/active connections",
+     *     description="Returns connections that have been active in the last 5 minutes",
+     *     tags={"Connections"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="minutes",
+     *         in="query",
+     *         description="Minutes to consider user as active (default: 5)",
+     *         required=false,
+     *         @OA\Schema(type="integer", default=5)
+     *     ),
+     *     @OA\Parameter(
+     *         name="limit",
+     *         in="query",
+     *         description="Maximum number of users to return (default: 10)",
+     *         required=false,
+     *         @OA\Schema(type="integer", default=10)
+     *     ),
+     *     @OA\Response(response=200, description="Online connections retrieved successfully")
+     * )
+     */
+    public function getOnlineConnections(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+            $minutes = $request->input('minutes', 5);
+            $limit = min($request->input('limit', 10), 50); // Max 50
+
+            // Get all connections first
+            $connectedUsers = UserHelper::getConnectedUsers($user->id);
+
+            if ($connectedUsers->isEmpty()) {
+                return response()->json([
+                    'status' => 1,
+                    'message' => 'No online connections found',
+                    'data' => [
+                        'online_connections' => [],
+                        'online_count' => 0,
+                        'total_connections' => 0
+                    ]
+                ], $this->successStatus);
+            }
+
+            // Filter for online users (active within the specified minutes)
+            $activeThreshold = now()->subMinutes($minutes);
+
+            $onlineConnections = $connectedUsers->filter(function ($connection) use ($activeThreshold) {
+                // Check if user has last_activity_at and it's recent
+                return $connection->last_activity_at &&
+                       $connection->last_activity_at->gte($activeThreshold) &&
+                       ($connection->privacy_show_online_status ?? true); // Respect privacy setting
+            })
+            ->sortByDesc('last_activity_at')
+            ->take($limit)
+            ->values();
+
+            return response()->json([
+                'status' => 1,
+                'message' => 'Online connections retrieved successfully',
+                'data' => [
+                    'online_connections' => UserProfileResource::collection($onlineConnections),
+                    'online_count' => $onlineConnections->count(),
+                    'total_connections' => $connectedUsers->count(),
+                    'active_threshold_minutes' => $minutes
+                ]
+            ], $this->successStatus);
+
+        } catch (\Exception $e) {
+            Log::error('Get online connections failed', [
+                'user_id' => $request->user()->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to retrieve online connections',
+                'data' => [
+                    'online_connections' => [],
+                    'online_count' => 0
+                ]
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Get(
      *     path="/api/v1/connections/count",
      *     summary="Get authenticated user's connection count",
      *     tags={"Connections"},

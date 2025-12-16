@@ -72,7 +72,9 @@ class User extends Authenticatable implements MustVerifyEmail
         'registration_step',
         'phone',
         'is_guest',
-        'guest_expires_at'
+        'guest_expires_at',
+        'last_activity_at',
+        'is_online',
     ];
 
     /**

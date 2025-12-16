@@ -434,6 +434,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/incoming', [ConnectionController::class, 'getIncomingRequests']);
         Route::post('/request/{id}/respond', [ConnectionController::class, 'respondToRequest']);
         Route::get('/', [ConnectionController::class, 'getConnectedUsers']);
+        Route::get('/online', [ConnectionController::class, 'getOnlineConnections']);
         Route::get('/count', [ConnectionController::class, 'getConnectionCount']);
         Route::get('/sent', [ConnectionController::class, 'getSentRequests']);
         Route::post('/{id}/disconnect', [ConnectionController::class, 'disconnect']);

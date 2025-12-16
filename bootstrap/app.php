@@ -5,6 +5,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Support\Facades\Route;
 use App\Http\Middleware\SwipeRateLimit;
+use App\Http\Middleware\UpdateLastActivity;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -46,6 +47,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->api(append: [
             \App\Http\Middleware\CheckExpiredSubscriptions::class,
+            \App\Http\Middleware\UpdateLastActivity::class,
         ]);
           // Disable CSRF for API routes
           $middleware->validateCsrfTokens(except: [

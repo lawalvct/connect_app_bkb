@@ -54,6 +54,7 @@ class UserResource extends JsonResource
             'interests' => $this->interests, // Assuming this is already an array or JSON
             'social_links' => $this->social_links, // Assuming this is already an array or JSON
             'is_online' => (bool)$this->is_online,
+            'is_active_now' => $this->last_activity_at && $this->last_activity_at->gte(now()->subMinutes(5)),
             'last_activity_at' => $this->last_activity_at ?
                 TimezoneHelper::convertToUserTimezone($this->last_activity_at, $userModelInstance)?->toISOString() : null,
             'created_at' => $this->created_at ?
