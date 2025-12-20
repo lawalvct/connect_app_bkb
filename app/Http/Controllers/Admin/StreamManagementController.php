@@ -199,6 +199,22 @@ class StreamManagementController extends Controller
     }
 
     /**
+     * Show viewers and chat management page
+     */
+    public function viewersChat($id)
+    {
+        $stream = Stream::findOrFail($id);
+
+        // Only allow viewer/chat monitoring for live or upcoming streams
+        if (!in_array($stream->status, ['upcoming', 'live'])) {
+            return redirect()->route('admin.streams.show', $stream)
+                ->with('error', 'Cannot view chat for this stream. Stream must be upcoming or live.');
+        }
+
+        return view('admin.streams.viewers-chat', compact('stream'));
+    }
+
+    /**
      * Show edit stream form
      */
     public function edit($id)
@@ -457,6 +473,7 @@ class StreamManagementController extends Controller
                 'id' => $stream->id,
                 'title' => $stream->title,
                 'description' => $stream->description,
+                'banner_image_url' => $stream->banner_image_url,
                 'status' => $stream->status,
                 'stream_type' => $stream->stream_type,
                 'is_paid' => $stream->is_paid,

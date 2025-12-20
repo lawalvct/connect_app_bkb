@@ -15,10 +15,29 @@ return [
     ],
 
     'streaming_software' => [
-        'supported' => ['manycam', 'splitcam', 'obs', 'xsplit'],
+        'supported' => ['manycam', 'splitcam', 'obs', 'xsplit', 'hardware_encoder'],
         'default_resolution' => env('DEFAULT_STREAM_RESOLUTION', '1920x1080'),
         'default_bitrate' => env('DEFAULT_STREAM_BITRATE', 3000),
         'default_fps' => env('DEFAULT_STREAM_FPS', 30),
+    ],
+
+    'hardware_encoders' => [
+        'supported_brands' => [
+            'avmatrix' => 'AVMatrix Video Switcher',
+            'osee' => 'Osee Stream Deck',
+            'blackmagic' => 'Blackmagic ATEM',
+            'roland' => 'Roland V-Series',
+            'datavideo' => 'Datavideo',
+            'livestream' => 'Livestream Studio'
+        ],
+        'recommended_settings' => [
+            'resolution' => '1920x1080',
+            'bitrate' => 4000, // Higher for hardware encoders
+            'fps' => 30,
+            'keyframe_interval' => 2,
+            'audio_sample_rate' => 48000, // Professional audio
+            'audio_bitrate' => 128
+        ]
     ],
 
     'recommended_settings' => [

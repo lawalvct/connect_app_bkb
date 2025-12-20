@@ -233,15 +233,17 @@
                                 <tr class="hover:bg-gray-50">
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         <div class="flex items-center">
-                                            <div class="flex-shrink-0 h-12 w-12">
-                                                <img class="h-12 w-12 rounded-lg object-cover"
-                                                     :src="stream.banner_image_url || '/images/placeholder-stream.jpg'"
-                                                     :alt="stream.title">
-                                            </div>
-                                            <div class="ml-4">
-                                                <div class="text-sm font-medium text-gray-900" x-text="stream.title"></div>
-                                                <div class="text-sm text-gray-500" x-text="stream.description ? stream.description.substring(0, 50) + '...' : 'No description'"></div>
-                                            </div>
+                                            <a :href="`/admin/streams/${stream.id}`" class="flex items-center hover:underline">
+                                                <div class="flex-shrink-0 h-12 w-12">
+                                                    <img class="h-12 w-12 rounded-lg object-cover"
+                                                         :src="stream.banner_image_url || '/images/placeholder-stream.jpg'"
+                                                         :alt="stream.title">
+                                                </div>
+                                                <div class="ml-4">
+                                                    <div class="text-sm font-medium text-gray-900" x-text="stream.title"></div>
+                                                    <div class="text-sm text-gray-500" x-text="stream.description ? stream.description.substring(0, 50) + '...' : 'No description'"></div>
+                                                </div>
+                                            </a>
                                         </div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap">

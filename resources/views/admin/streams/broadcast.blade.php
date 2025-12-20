@@ -31,6 +31,9 @@
                     style="display: none;">
                 <i class="fas fa-stop mr-2"></i>End Broadcast
             </button>
+            <a href="{{ route('admin.streams.viewers-chat', $stream) }}" target="_blank" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                <i class="fas fa-users-cog mr-2"></i>Viewers & Chat
+            </a>
             <a href="{{ route('admin.streams.cameras', $stream) }}" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
                 <i class="fas fa-video mr-2"></i>Camera Setup
             </a>
@@ -43,22 +46,23 @@
 
 @section('content')
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6" x-data="liveBroadcast()" x-init="init()">
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Main Broadcast Area -->
-        <div class="lg:col-span-2">
-            <div class="bg-white shadow rounded-lg">
-                <div class="px-6 py-4 border-b border-gray-200">
-                    <div class="flex justify-between items-center">
-                        <h3 class="text-lg font-medium text-gray-900">Broadcast Camera</h3>
-                        <div class="flex items-center space-x-2">
-                            <span class="text-sm text-gray-500">Viewers: </span>
-                            <span class="text-lg font-bold text-blue-600" x-text="viewerCount">0</span>
-                        </div>
-                    </div>
+    <!-- Main Broadcast Area -->
+    <div class="bg-white shadow rounded-lg">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <div class="flex justify-between items-center">
+                <h3 class="text-lg font-medium text-gray-900">Broadcast Camera</h3>
+                <div class="flex items-center space-x-2">
+                    <span class="text-sm text-gray-500">Viewers: </span>
+                    <span class="text-lg font-bold text-blue-600" x-text="viewerCount">0</span>
                 </div>
-                <div class="p-6">
-                    <!-- Video Container -->
-                    <div class="relative bg-black rounded-lg overflow-hidden mb-4" style="aspect-ratio: 16/9;">
+            </div>
+        </div>
+        <div class="p-6">
+            <!-- Two Column Layout: Camera Preview + Controls -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Left Column: Video Container -->
+                <div>
+                    <div class="relative bg-black rounded-lg overflow-hidden" style="aspect-ratio: 16/9;">
                         <div id="localVideo" class="w-full h-full"></div>
                         <div x-show="!isStreaming" class="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-50">
                             <div class="text-center text-white">
@@ -77,11 +81,46 @@
                         </div>
                     </div>
 
-                    <!-- Broadcasting Controls -->
-                    <div class="space-y-6">
-                        <!-- Main Stream Control -->
-                        <div class="text-center">
-                            <button x-show="!isStreaming" @click="startBroadcast()"
+                    <!-- Stream Stats Below Camera -->
+                    <div x-show="isStreaming" x-transition class="mt-4 grid grid-cols-2 gap-3 text-sm">
+                        <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-3 rounded-lg border border-blue-200">
+                            <div class="flex items-center justify-between mb-1">
+                                <div class="font-semibold text-blue-700 text-xs">Bitrate</div>
+                                <i class="fas fa-tachometer-alt text-blue-600 text-xs"></i>
+                            </div>
+                            <div class="text-xl font-bold text-blue-800" x-text="(stats?.bitrate || 0) + ' kbps'">0 kbps</div>
+                        </div>
+                        <div class="bg-gradient-to-br from-purple-50 to-purple-100 p-3 rounded-lg border border-purple-200">
+                            <div class="flex items-center justify-between mb-1">
+                                <div class="font-semibold text-purple-700 text-xs">Resolution</div>
+                                <i class="fas fa-expand-alt text-purple-600 text-xs"></i>
+                            </div>
+                            <div class="text-xl font-bold text-purple-800" x-text="stats?.resolution || '0x0'">0x0</div>
+                        </div>
+                        <div class="bg-gradient-to-br from-green-50 to-green-100 p-3 rounded-lg border border-green-200">
+                            <div class="flex items-center justify-between mb-1">
+                                <div class="font-semibold text-green-700 text-xs">FPS</div>
+                                <i class="fas fa-video text-green-600 text-xs"></i>
+                            </div>
+                            <div class="text-xl font-bold text-green-800" x-text="stats?.fps || 0">0</div>
+                        </div>
+                        <div class="bg-gradient-to-br from-yellow-50 to-yellow-100 p-3 rounded-lg border border-yellow-200">
+                            <div class="flex items-center justify-between mb-1">
+                                <div class="font-semibold text-yellow-700 text-xs">Network</div>
+                                <i class="fas fa-wifi text-yellow-600 text-xs"></i>
+                            </div>
+                            <div class="text-xl font-bold"
+                                 :class="(stats?.networkQuality || 0) >= 3 ? 'text-green-600' : (stats?.networkQuality || 0) >= 2 ? 'text-yellow-600' : 'text-red-600'"
+                                 x-text="getNetworkStatus(stats?.networkQuality || 0)">Good</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Broadcasting Controls -->
+                <div class="space-y-6">
+                    <!-- Main Stream Control -->
+                    <div class="text-center">
+                        <button x-show="!isStreaming" @click="startBroadcast()"
                                     :disabled="connecting || false"
                                     class="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white px-12 py-4 rounded-xl text-xl font-bold transition-all shadow-xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">
                                 <span x-show="!connecting" class="flex items-center">
@@ -235,146 +274,6 @@
                             </div>
                         </div>
                     </div>
-
-                    <!-- Stream Stats -->
-                    <div x-show="isStreaming" x-transition class="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
-                            <div class="flex items-center justify-between mb-2">
-                                <div class="font-semibold text-blue-700">Bitrate</div>
-                                <i class="fas fa-tachometer-alt text-blue-600"></i>
-                            </div>
-                            <div class="text-2xl font-bold text-blue-800" x-text="(stats?.bitrate || 0) + ' kbps'">0 kbps</div>
-                        </div>
-                        <div class="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200">
-                            <div class="flex items-center justify-between mb-2">
-                                <div class="font-semibold text-purple-700">Resolution</div>
-                                <i class="fas fa-expand-alt text-purple-600"></i>
-                            </div>
-                            <div class="text-2xl font-bold text-purple-800" x-text="stats?.resolution || '0x0'">0x0</div>
-                        </div>
-                        <div class="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
-                            <div class="flex items-center justify-between mb-2">
-                                <div class="font-semibold text-green-700">FPS</div>
-                                <i class="fas fa-video text-green-600"></i>
-                            </div>
-                            <div class="text-2xl font-bold text-green-800" x-text="stats?.fps || 0">0</div>
-                        </div>
-                        <div class="bg-gradient-to-br from-yellow-50 to-yellow-100 p-4 rounded-lg border border-yellow-200">
-                            <div class="flex items-center justify-between mb-2">
-                                <div class="font-semibold text-yellow-700">Network</div>
-                                <i class="fas fa-wifi text-yellow-600"></i>
-                            </div>
-                            <div class="text-2xl font-bold"
-                                 :class="(stats?.networkQuality || 0) >= 3 ? 'text-green-600' : (stats?.networkQuality || 0) >= 2 ? 'text-yellow-600' : 'text-red-600'"
-                                 x-text="getNetworkStatus(stats?.networkQuality || 0)">Good</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Chat & Viewer Panel -->
-        <div class="lg:col-span-1">
-            <!-- Viewer List -->
-            <div class="bg-white shadow-lg rounded-lg mb-6 border border-gray-200">
-                <div class="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
-                    <div class="flex justify-between items-center">
-                        <h3 class="text-lg font-semibold text-gray-900 flex items-center">
-                            <i class="fas fa-users mr-2 text-blue-600"></i>
-                            Live Viewers
-                        </h3>
-                        <div class="flex items-center space-x-2">
-                            <span class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-3 py-1 rounded-full text-sm font-bold shadow-md" x-text="viewerCount || 0">0</span>
-                            <button @click="loadViewers()" class="text-blue-600 hover:text-blue-800 text-sm" title="Refresh viewers">
-                                <i class="fas fa-sync-alt"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                <div class="p-4 max-h-64 overflow-y-auto">
-                    <div x-show="!viewers || viewers.length === 0" class="text-center text-gray-500 py-8">
-                        <i class="fas fa-users text-4xl mb-3 opacity-30"></i>
-                        <p class="text-lg font-medium">No viewers yet</p>
-                        <p class="text-sm">Waiting for your audience...</p>
-                    </div>
-                    <div class="space-y-3" x-show="viewers && viewers.length > 0">
-                        <template x-for="viewer in viewers" :key="viewer.id">
-                            <div class="flex items-center space-x-3 p-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border border-gray-200 hover:shadow-md transition-all">
-                                <img :src="viewer.avatar || '/images/default-avatar.png'"
-                                     :alt="viewer.name"
-                                     class="w-10 h-10 rounded-full border-2 border-blue-200">
-                                <div class="flex-1">
-                                    <div class="text-sm font-semibold text-gray-900" x-text="viewer.name"></div>
-                                    <div class="text-xs text-gray-500 flex items-center">
-                                        <i class="fas fa-clock mr-1"></i>
-                                        <span x-text="viewer.joinedAt"></span>
-                                    </div>
-                                </div>
-                                <div class="w-3 h-3 bg-green-500 rounded-full shadow-md animate-pulse"></div>
-                            </div>
-                        </template>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Live Chat -->
-            <div class="bg-white shadow-lg rounded-lg border border-gray-200">
-                <div class="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50">
-                    <div class="flex justify-between items-center">
-                        <h3 class="text-lg font-semibold text-gray-900 flex items-center">
-                            <i class="fas fa-comments mr-2 text-green-600"></i>
-                            Live Chat
-                        </h3>
-                        <button @click="loadChat()" class="text-green-600 hover:text-green-800 text-sm" title="Refresh chat">
-                            <i class="fas fa-sync-alt"></i>
-                        </button>
-                    </div>
-                </div>
-                <div class="p-4">
-                    <!-- Chat Messages -->
-                    <div id="chatMessages" class="h-64 overflow-y-auto mb-4 bg-gradient-to-b from-gray-50 to-gray-100 rounded-lg p-3 border border-gray-200">
-                        <div x-show="!chatMessages || chatMessages.length === 0" class="text-center text-gray-500 py-8">
-                            <i class="fas fa-comments text-4xl mb-3 opacity-30"></i>
-                            <p class="text-lg font-medium">No messages yet</p>
-                            <p class="text-sm">Start the conversation!</p>
-                        </div>
-                        <div class="space-y-3" x-show="chatMessages && chatMessages.length > 0">
-                            <template x-for="message in chatMessages" :key="message.id">
-                                <div class="flex items-start space-x-3 p-2 hover:bg-white rounded-lg transition-colors">
-                                    <img :src="message.avatar || '/images/default-avatar.png'"
-                                         :alt="message.username"
-                                         class="w-8 h-8 rounded-full border-2"
-                                         :class="message.isAdmin ? 'border-red-300' : 'border-blue-300'">
-                                    <div class="flex-1">
-                                        <div class="flex items-center space-x-2 mb-1">
-                                            <span class="text-sm font-semibold"
-                                                  :class="message.isAdmin ? 'text-red-700' : 'text-gray-900'"
-                                                  x-text="message.username"></span>
-                                            <span x-show="message.isAdmin" class="px-2 py-0.5 bg-red-100 text-red-800 text-xs rounded-full font-bold">ADMIN</span>
-                                            <span class="text-xs text-gray-500" x-text="message.timestamp"></span>
-                                        </div>
-                                        <div class="text-sm text-gray-700 leading-relaxed" x-text="message.text"></div>
-                                    </div>
-                                </div>
-                            </template>
-                        </div>
-                    </div>
-
-                    <!-- Send Message -->
-                    <form @submit.prevent="sendMessage()">
-                        <div class="flex space-x-2">
-                            <input type="text"
-                                   x-model="newMessage"
-                                   placeholder="Type your message as admin..."
-                                   class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm"
-                                   maxlength="500">
-                            <button type="submit"
-                                    :disabled="!newMessage.trim()"
-                                    class="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-6 py-3 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md transform hover:scale-105">
-                                <i class="fas fa-paper-plane"></i>
-                            </button>
-                        </div>
-                    </form>
                 </div>
             </div>
         </div>
@@ -414,11 +313,6 @@ function liveBroadcast() {
         localVideoTrack: null,
         localScreenTrack: null,
 
-        // Chat & Viewers
-        viewers: [],
-        chatMessages: [],
-        newMessage: '',
-
         // Stats
         stats: {
             bitrate: 0,
@@ -430,8 +324,7 @@ function liveBroadcast() {
         // Timers
         durationTimer: null,
         statsTimer: null,
-        viewersRefreshTimer: null,
-        chatRefreshTimer: null,
+        viewerCountTimer: null,
 
         async init() {
             console.log('Initializing live broadcast for stream:', this.streamId);
@@ -439,6 +332,13 @@ function liveBroadcast() {
 
             // Small delay to ensure DOM is ready
             await new Promise(resolve => setTimeout(resolve, 100));
+
+            // Check if AgoraRTC is available
+            if (typeof AgoraRTC === 'undefined') {
+                console.error('Agora SDK not loaded');
+                alert('Streaming SDK not loaded. Please refresh the page.');
+                return;
+            }
 
             // Initialize Agora client
             this.agoraClient = AgoraRTC.createClient({ mode: "live", codec: "vp8" });
@@ -457,51 +357,7 @@ function liveBroadcast() {
             console.log('Loading camera sources...');
             await this.loadCameraSources();
 
-            // Load viewers and chat
-            this.loadViewers();
-            this.loadChat();
-            
-            // Start auto-refresh for viewers and chat
-            this.startAutoRefresh();
-
             console.log('Live broadcast initialized successfully');
-        },
-        
-        startAutoRefresh() {
-            // Refresh viewers every 5 seconds
-            this.viewersRefreshTimer = setInterval(() => {
-                this.updateViewers();
-            }, 5000);
-            
-            // Refresh chat every 5 seconds
-            this.chatRefreshTimer = setInterval(() => {
-                this.updateChat();
-            }, 5000);
-            
-            console.log('Auto-refresh started for viewers and chat');
-        },
-        
-        stopAutoRefresh() {
-            if (this.viewersRefreshTimer) {
-                clearInterval(this.viewersRefreshTimer);
-                this.viewersRefreshTimer = null;
-            }
-            
-            if (this.chatRefreshTimer) {
-                clearInterval(this.chatRefreshTimer);
-                this.chatRefreshTimer = null;
-            }
-            
-            console.log('Auto-refresh stopped');
-        },
-
-        // Initial load methods
-        loadViewers() {
-            this.updateViewers();
-        },
-
-        loadChat() {
-            this.updateChat();
         },
 
         async getStreamToken() {
@@ -871,6 +727,19 @@ function liveBroadcast() {
         },
 
         setupAgoraEventListeners() {
+            // Connection state change
+            this.agoraClient.on("connection-state-change", (curState, prevState, reason) => {
+                console.log('Connection state changed:', { curState, prevState, reason });
+
+                if (curState === 'DISCONNECTED') {
+                    this.showNotification('Connection lost. Attempting to reconnect...', 'error');
+                } else if (curState === 'CONNECTED') {
+                    this.showNotification('Connected successfully', 'success');
+                } else if (curState === 'RECONNECTING') {
+                    this.showNotification('Reconnecting...', 'warning');
+                }
+            });
+
             // User published
             this.agoraClient.on("user-published", async (user, mediaType) => {
                 console.log('User published:', user.uid, mediaType);
@@ -897,11 +766,29 @@ function liveBroadcast() {
             this.agoraClient.on("network-quality", (stats) => {
                 this.stats.networkQuality = stats.uplinkNetworkQuality;
             });
+
+            // Error handling
+            this.agoraClient.on("exception", (event) => {
+                console.error('Agora exception:', event);
+                if (event.code !== 'TRACK_IS_NOT_PUBLISHED') {
+                    this.showNotification('Streaming error: ' + event.msg, 'error');
+                }
+            });
         },
 
         async startBroadcast() {
-            if (!this.token || !this.localAudioTrack || !this.localVideoTrack) {
-                alert('Not ready to broadcast. Please wait...');
+            if (!this.token || !this.uid) {
+                alert('Authentication token not ready. Please wait or refresh the page.');
+                return;
+            }
+
+            if (!this.localAudioTrack || !this.localVideoTrack) {
+                alert('Camera and microphone not initialized. Please check permissions and refresh.');
+                return;
+            }
+
+            if (!this.agoraClient) {
+                alert('Streaming client not initialized. Please refresh the page.');
                 return;
             }
 
@@ -925,10 +812,8 @@ function liveBroadcast() {
                 // Start timers
                 this.startTimers();
 
-                // Show end broadcast button
-                document.getElementById('endBroadcastBtn').style.display = 'block';
-
                 console.log('Broadcast started successfully');
+                this.showNotification('Broadcast started successfully!', 'success');
 
             } catch (error) {
                 console.error('Error starting broadcast:', error);
@@ -955,10 +840,8 @@ function liveBroadcast() {
 
                 this.isStreaming = false;
 
-                // Hide end broadcast button
-                document.getElementById('endBroadcastBtn').style.display = 'none';
-
                 console.log('Broadcast stopped successfully');
+                this.showNotification('Broadcast ended', 'success');
 
                 // Redirect to stream details
                 setTimeout(() => {
@@ -1094,6 +977,11 @@ function liveBroadcast() {
             this.statsTimer = setInterval(() => {
                 this.updateStats();
             }, 5000);
+
+            // Viewer count timer
+            this.viewerCountTimer = setInterval(() => {
+                this.updateViewerCount();
+            }, 10000);
         },
 
         stopTimers() {
@@ -1106,9 +994,11 @@ function liveBroadcast() {
                 clearInterval(this.statsTimer);
                 this.statsTimer = null;
             }
-            
-            // Also stop auto-refresh timers
-            this.stopAutoRefresh();
+
+            if (this.viewerCountTimer) {
+                clearInterval(this.viewerCountTimer);
+                this.viewerCountTimer = null;
+            }
         },
 
         async updateStats() {
@@ -1125,91 +1015,6 @@ function liveBroadcast() {
                 } catch (error) {
                     console.error('Error getting stats:', error);
                 }
-            }
-        },
-
-        startPolling() {
-            // Poll for viewers every 10 seconds
-            setInterval(() => {
-                this.updateViewers();
-                this.updateChat();
-            }, 10000);
-
-            // Initial fetch
-            this.updateViewers();
-            this.updateChat();
-        },
-
-        async updateViewers() {
-            try {
-                const response = await fetch(`/admin/api/streams/${this.streamId}/viewers`);
-                const data = await response.json();
-
-                if (data.success) {
-                    this.viewers = data.viewers.filter(v => !v.left_at).map(viewer => ({
-                        id: viewer.id,
-                        name: viewer.user?.name || 'Anonymous',
-                        avatar: viewer.user?.profile_picture,
-                        joinedAt: new Date(viewer.joined_at).toLocaleTimeString()
-                    }));
-                    this.viewerCount = this.viewers.length;
-                }
-            } catch (error) {
-                console.error('Error updating viewers:', error);
-            }
-        },
-
-        async updateChat() {
-            try {
-                const response = await fetch(`/admin/api/streams/${this.streamId}/chats`);
-                const data = await response.json();
-
-                if (data.success) {
-                    this.chatMessages = data.data.map(msg => ({
-                        id: msg.id,
-                        username: msg.username || msg.user?.name || 'Anonymous',
-                        text: msg.message,
-                        avatar: msg.user_profile_url || msg.user?.profile_picture,
-                        isAdmin: msg.is_admin,
-                        timestamp: new Date(msg.created_at).toLocaleTimeString()
-                    }));
-
-                    // Scroll to bottom
-                    this.$nextTick(() => {
-                        const chatContainer = document.getElementById('chatMessages');
-                        chatContainer.scrollTop = chatContainer.scrollHeight;
-                    });
-                }
-            } catch (error) {
-                console.error('Error updating chat:', error);
-            }
-        },
-
-        async sendMessage() {
-            if (!this.newMessage.trim()) return;
-
-            try {
-                const response = await fetch(`/admin/api/streams/${this.streamId}/chats`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                    },
-                    body: JSON.stringify({
-                        message: this.newMessage
-                    })
-                });
-
-                const data = await response.json();
-                if (data.success) {
-                    this.newMessage = '';
-                    this.updateChat();
-                } else {
-                    alert('Failed to send message: ' + data.message);
-                }
-            } catch (error) {
-                console.error('Error sending message:', error);
-                alert('Failed to send message');
             }
         },
 
@@ -1231,8 +1036,55 @@ function liveBroadcast() {
             }
         },
 
-        updateViewerCount() {
-            this.viewerCount = this.agoraClient.remoteUsers.length;
+        async updateViewerCount() {
+            try {
+                const response = await fetch(`/admin/api/streams/${this.streamId}/viewers`);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success) {
+                        this.viewerCount = data.viewers.filter(v => !v.left_at).length;
+                    }
+                }
+            } catch (error) {
+                console.error('Error updating viewer count:', error);
+            }
+        },
+
+        async updateStreamStatus(status) {
+            try {
+                const endpoint = status === 'live' ? 'start' : 'end';
+                const response = await fetch(`/admin/api/streams/${this.streamId}/${endpoint}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to update stream status');
+                }
+
+                const data = await response.json();
+                console.log('Stream status updated:', data);
+            } catch (error) {
+                console.error('Error updating stream status:', error);
+                throw error;
+            }
+        },
+
+        copyToClipboard(text) {
+            if (!text) {
+                this.showNotification('Nothing to copy', 'error');
+                return;
+            }
+
+            navigator.clipboard.writeText(text).then(() => {
+                this.showNotification('Copied to clipboard!', 'success');
+            }).catch(err => {
+                console.error('Failed to copy:', err);
+                this.showNotification('Failed to copy', 'error');
+            });
         },
 
         // RTMP Streaming Methods
@@ -1408,10 +1260,15 @@ function liveBroadcast() {
             }, 3000);
         },
 
-        refreshStream() {
-            this.loadViewers();
-            this.loadChat();
-            this.showNotification('Stream refreshed', 'success');
+        async refreshStream() {
+            try {
+                await this.updateViewerCount();
+                await this.loadCameraSources();
+                this.showNotification('Stream refreshed', 'success');
+            } catch (error) {
+                console.error('Error refreshing stream:', error);
+                this.showNotification('Failed to refresh', 'error');
+            }
         },
 
         // Helper function to properly update video preview

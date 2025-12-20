@@ -3,10 +3,17 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Log;
+use App\Http\Controllers\Admin\RtmpController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
+
+// RTMP Server Callbacks (must be public for NGINX-RTMP to access)
+Route::prefix('rtmp')->group(function () {
+    Route::post('/auth', [RtmpController::class, 'authenticateStream']);
+    Route::post('/end', [RtmpController::class, 'streamEnded']);
+});
 
 // Test Pusher broadcasting
 Route::get('/test-pusher', [App\Http\Controllers\API\V1\TestPusherController::class, 'testPusher']);

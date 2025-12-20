@@ -12,6 +12,7 @@ use App\Http\Controllers\Admin\AdManagementController;
 use App\Http\Controllers\Admin\SubscriptionManagementController;
 use App\Http\Controllers\Admin\StreamManagementController;
 use App\Http\Controllers\Admin\RtmpController;
+use App\Http\Controllers\Admin\AdController;
 use App\Http\Controllers\Admin\NotificationController;
 use App\Http\Controllers\Admin\AdminManagementController;
 use App\Http\Controllers\Admin\AnalyticsController;
@@ -123,6 +124,16 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('/streams/{id}/rtmp-status', [RtmpController::class, 'checkRtmpStatus']);
             Route::post('/streams/{id}/rtmp-stop', [RtmpController::class, 'stopRtmpStream']);
             Route::post('/rtmp-heartbeat', [RtmpController::class, 'rtmpHeartbeat']); // Called by RTMP server
+            Route::get('/rtmp-server-status', [RtmpController::class, 'getServerStatus']); // Check RTMP server status
+
+            // Advertisement Management API
+            Route::prefix('ads')->group(function () {
+                Route::get('/available', [AdController::class, 'getAvailableAds']);
+                Route::post('/streams/{id}/trigger', [AdController::class, 'triggerAdBreak']);
+                Route::get('/streams/{id}/check-timing', [AdController::class, 'checkAdTiming']);
+                Route::get('/streams/{id}/stats', [AdController::class, 'getStreamAdStats']);
+                Route::post('/interaction', [AdController::class, 'recordAdInteraction']);
+            });
 
             // Notification Management API
             Route::prefix('notifications')->group(function () {
@@ -318,6 +329,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('/{stream}', [StreamManagementController::class, 'show'])->name('show');
             Route::get('/{stream}/edit', [StreamManagementController::class, 'edit'])->name('edit');
             Route::get('/{stream}/broadcast', [StreamManagementController::class, 'broadcast'])->name('broadcast');
+            Route::get('/{stream}/viewers-chat', [StreamManagementController::class, 'viewersChat'])->name('viewers-chat');
             Route::get('/{stream}/cameras', [StreamManagementController::class, 'cameraManagement'])->name('cameras');
             Route::put('/{stream}', [StreamManagementController::class, 'update'])->name('update');
             Route::delete('/{stream}', [StreamManagementController::class, 'destroy'])->name('destroy');
