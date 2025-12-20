@@ -39,7 +39,7 @@ class GuestStreamController extends Controller
             if ($existingUser->is_guest) {
                 // Return existing guest token
                 $token = $existingUser->createToken('guest-token')->plainTextToken;
-                
+
                 return response()->json([
                     'success' => true,
                     'guest_token' => $token,
@@ -305,7 +305,7 @@ class GuestStreamController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'guest_token' => 'required|string',
-            'payment_currency' => 'required|string|in:USD,NGN',
+            'payment_currency' => 'nullable|string|in:USD,NGN',
             'success_url' => 'required|url',
             'cancel_url' => 'required|url'
         ]);
@@ -317,6 +317,11 @@ class GuestStreamController extends Controller
                 'errors' => $validator->errors()
             ], 422);
         }
+
+        // Set default currency to NGN if not provided
+        $request->merge([
+            'payment_currency' => $request->payment_currency ?? 'NGN'
+        ]);
 
         $guest = $request->user();
         $stream = Stream::find($streamId);
@@ -344,7 +349,7 @@ class GuestStreamController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'guest_token' => 'required|string',
-            'payment_currency' => 'required|string|in:USD,NGN'
+            'payment_currency' => 'nullable|string|in:USD,NGN'
         ]);
 
         if ($validator->fails()) {
@@ -354,6 +359,11 @@ class GuestStreamController extends Controller
                 'errors' => $validator->errors()
             ], 422);
         }
+
+        // Set default currency to NGN if not provided
+        $request->merge([
+            'payment_currency' => $request->payment_currency ?? 'NGN'
+        ]);
 
         $guest = $request->user();
         $stream = Stream::find($streamId);
@@ -374,7 +384,7 @@ class GuestStreamController extends Controller
 
         // Map payment_currency to currency for StreamPaymentController
         $request->merge(['currency' => $request->payment_currency]);
-        
+
         // Use existing StreamPaymentController logic
         $controller = app(\App\Http\Controllers\API\V1\StreamPaymentController::class);
         return $controller->initializeNombaPayment($request, $streamId);
