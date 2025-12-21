@@ -12,12 +12,14 @@ use App\Models\StreamMixerSetting;
 use App\Models\User;
 use App\Helpers\AgoraHelper;
 use App\Jobs\SendLiveStreamNotifications;
+use App\Exports\StreamPaymentsExport;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
+use Maatwebsite\Excel\Facades\Excel;
 
 class StreamManagementController extends Controller
 {
@@ -1057,6 +1059,29 @@ class StreamManagementController extends Controller
                 'success' => false,
                 'message' => 'Failed to update mixer settings: ' . $e->getMessage()
             ], 500);
+        }
+    }
+
+    /**
+     * Export stream payments to Excel
+     */
+    public function exportPayments($streamId = null)
+    {
+        try {
+            $filename = $streamId
+                ? 'stream_' . $streamId . '_payments_' . Carbon::now()->format('Y-m-d_His') . '.xlsx'
+                : 'all_stream_payments_' . Carbon::now()->format('Y-m-d_His') . '.xlsx';
+
+            return Excel::download(new StreamPaymentsExport($streamId), $filename);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to export payments', [
+                'stream_id' => $streamId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return back()->with('error', 'Failed to export payments: ' . $e->getMessage());
         }
     }
 

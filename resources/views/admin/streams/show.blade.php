@@ -420,7 +420,13 @@
 
             <!-- Payments Tab -->
             <div x-show="activeTab === 'payments'">
-                <h3 class="text-lg font-semibold text-gray-900 mb-4">Payment History</h3>
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold text-gray-900">Payment History</h3>
+                    <a href="{{ route('admin.api.streams.exportPayments', $stream->id) }}"
+                       class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors inline-flex items-center">
+                        <i class="fas fa-file-excel mr-2"></i>Export to Excel
+                    </a>
+                </div>
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">

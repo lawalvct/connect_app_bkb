@@ -42,7 +42,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard.index');
 
         // API Routes for AJAX requests
-        Route::prefix('api')->group(function () {
+        Route::prefix('api')->name('api.')->group(function () {
             // Post Reports Management API
             Route::get('/post-reports', [\App\Http\Controllers\Admin\PostManagementController::class, 'getPostReports']);
             Route::patch('/post-reports/{report}/status', [\App\Http\Controllers\Admin\PostManagementController::class, 'updateReportStatus']);
@@ -107,6 +107,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::post('/streams/{id}/chats', [StreamManagementController::class, 'sendAdminMessage']);
             Route::get('/streams/{id}/token', [StreamManagementController::class, 'getStreamToken']);
             Route::delete('/chats/{chatId}', [StreamManagementController::class, 'deleteChat']);
+
+            // Export payment records
+            Route::get('/streams/{id}/export-payments', [StreamManagementController::class, 'exportPayments'])->name('streams.exportPayments');
+            Route::get('/streams/export-all-payments', [StreamManagementController::class, 'exportPayments'])->name('streams.exportAllPayments');
 
             // Multi-Camera Management API
             Route::get('/streams/{id}/cameras', [StreamManagementController::class, 'getCameras']);
