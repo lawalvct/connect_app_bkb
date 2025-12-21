@@ -118,7 +118,7 @@
                             </div>
                             <div class="flex justify-between">
                                 <span class="text-gray-600">Revenue:</span>
-                                <span class="font-semibold">{{ $stream->currency }} {{ number_format($stream->streamPayments()->sum('amount'), 2) }}</span>
+                                <span class="font-semibold">{{ $stream->currency }} {{ number_format($stream->streamPayments()->where('status', 'completed')->sum('amount'), 2) }}</span>
                             </div>
                         </div>
                     </div>
@@ -450,7 +450,7 @@
                                     {{ $payment->currency }} {{ number_format($payment->amount, 2) }}
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                    {{ $payment->payment_method ?? 'N/A' }}
+                                    {{ $payment->payment_gateway ?? 'N/A' }}
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                     {{ $payment->created_at->format('M j, Y H:i') }}

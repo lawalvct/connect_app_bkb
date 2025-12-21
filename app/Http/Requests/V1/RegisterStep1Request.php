@@ -13,10 +13,34 @@ class RegisterStep1Request extends FormRequest
         return true;
     }
 
+    protected function prepareForValidation()
+    {
+        // Extract email username (part before @) as default for name/username
+        $email = $this->input('email');
+        if ($email) {
+            $emailUsername = explode('@', $email)[0];
+
+            // Set default for username if not provided
+            if (!$this->has('username') || empty($this->input('username'))) {
+                $this->merge([
+                    'username' => $emailUsername
+                ]);
+            }
+
+            // Set default for name if not provided
+            if (!$this->has('name') || empty($this->input('name'))) {
+                $this->merge([
+                    'name' => $emailUsername
+                ]);
+            }
+        }
+    }
+
     public function rules()
     {
         return [
-            'username' => 'required|string|max:255|unique:users',
+            'username' => 'nullable|string|max:255|unique:users',
+            'name' => 'nullable|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8',
             'device_token' => 'nullable|string',

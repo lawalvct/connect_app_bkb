@@ -92,11 +92,11 @@ public function register(RegisterRequest $request)
         }
 
         // Log file details for debugging
-        Log::info('Processing profile image upload', [
-            'original_name' => $profileImage->getClientOriginalName(),
-            'size' => $profileImage->getSize(),
-            'mime_type' => $profileImage->getMimeType()
-        ]);
+        // Log::info('Processing profile image upload', [
+        //     'original_name' => $profileImage->getClientOriginalName(),
+        //     'size' => $profileImage->getSize(),
+        //     'mime_type' => $profileImage->getMimeType()
+        // ]);
 
         // Upload file using our helper to public/uploads/profiles
         $fileData = StorageUploadHelper::uploadFile(
@@ -109,11 +109,11 @@ public function register(RegisterRequest $request)
             $registrationData['profile'] = $fileData['filename'];
             $registrationData['profile_url'] = 'uploads/profiles/';
 
-            Log::info('Profile image upload successful', [
-                'filename' => $fileData['filename'],
-                'path' => $fileData['path'],
-                'full_url' => $fileData['full_url']
-            ]);
+            // Log::info('Profile image upload successful', [
+            //     'filename' => $fileData['filename'],
+            //     'path' => $fileData['path'],
+            //     'full_url' => $fileData['full_url']
+            // ]);
         } else {
             Log::warning('Profile image upload failed but no exception thrown');
         }
