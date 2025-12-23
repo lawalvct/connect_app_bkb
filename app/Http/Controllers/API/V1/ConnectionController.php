@@ -486,11 +486,16 @@ class ConnectionController extends Controller
                     $socialCircle = \App\Models\SocialCircle::find($data['social_id']);
                     $socialCircleName = $socialCircle ? $socialCircle->name : null;
 
-                    $randomUser = UserHelper::getRandomUserFromSocialCircle(
-                        $data['social_id'],
-                        $user->id,
-                        [$data['user_id']]
-                    );
+                    // $randomUser = UserHelper::getRandomUserFromSocialCircle(
+                    //     $data['social_id'],
+                    //     $user->id,
+                    //     [$data['user_id']]
+                    // );
+                      $randomUser = UserHelper::getRandomUser(
+
+                    $user->id,
+                    [$data['user_id']] // Exclude the user we just swiped on
+                );
 
                     if ($randomUser) {
                         $randomUser = Utility::convertString($randomUser);
@@ -596,11 +601,17 @@ class ConnectionController extends Controller
                     $socialCircle = \App\Models\SocialCircle::find($data['social_id']);
                     $socialCircleName = $socialCircle ? $socialCircle->name : null;
 
-                    $randomUser = UserHelper::getRandomUserFromSocialCircle(
-                        $data['social_id'],
-                        $user->id,
-                        [$data['user_id']] // Exclude the user we just swiped on
-                    );
+                    // $randomUser = UserHelper::getRandomUserFromSocialCircle(
+                    //     $data['social_id'],
+                    //     $user->id,
+                    //     [$data['user_id']] // Exclude the user we just swiped on
+                    // );
+
+                      $randomUser = UserHelper::getRandomUser(
+
+                    $user->id,
+                    [$data['user_id']] // Exclude the user we just swiped on
+                );
 
                     if ($randomUser) {
                         $randomUser = Utility::convertString($randomUser);
@@ -674,8 +685,13 @@ class ConnectionController extends Controller
                 $socialCircle = \App\Models\SocialCircle::find($data['social_id']);
                 $socialCircleName = $socialCircle ? $socialCircle->name : null;
 
-                $randomUser = UserHelper::getRandomUserFromSocialCircle(
-                    $data['social_id'],
+                // $randomUser = UserHelper::getRandomUserFromSocialCircle(
+                //     $data['social_id'],
+                //     $user->id,
+                //     [$data['user_id']] // Exclude the user we just swiped on
+                // );
+                  $randomUser = UserHelper::getRandomUser(
+
                     $user->id,
                     [$data['user_id']] // Exclude the user we just swiped on
                 );
@@ -1920,4 +1936,104 @@ class ConnectionController extends Controller
             ], 500);
         }
     }
+
+    // no social circle filter
+    public function getUsers(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'country_id' => 'nullable|integer',
+            'last_id' => 'nullable|integer',
+            'limit' => 'nullable|integer|min:1|max:50'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => $validator->errors()->first(),
+                'status' => 0,
+                'data' => []
+            ], $this->successStatus);
+        }
+
+        try {
+            $user = $request->user(); // Get current authenticated user
+            $countryId = $request->input('country_id');
+            $lastId = $request->input('last_id');
+            $limit = $request->input('limit', 10);
+
+            // Get any users without social circle filtering
+            $getData = UserHelper::getAnyLatestUsers($user->id, $lastId, $countryId, $limit);
+
+            // After getting users, check if it's time to show an ad
+        try {
+            $swipeCount = UserSwipe::getTodayRecord($user->id)->total_swipes ?? 0;
+
+            // Show ad after every 10 swipes
+            if ($swipeCount > 0 && $swipeCount % 10 === 0) {
+                $ads = Ad::getAdsForDiscovery($user->id, 1);
+                if ($ads->isNotEmpty()) {
+                    // Insert ad into the response
+                    $adData = [
+                        'type' => 'advertisement',
+                        'ad_data' => $ads->first(),
+                        'is_ad' => true
+                    ];
+
+                    // Add ad to response
+                    $getData = $getData->push($adData);
+                }
+            }
+        } catch (\Exception $e) {
+            // Silently ignore ad errors - ads are optional
+            \Log::warning('Failed to load ads for discovery', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage()
+            ]);
+        }
+
+        if (count($getData) != 0) {
+            // Add connection count for each user
+            $getData = $getData->map(function($userItem) use ($user) {
+                // Get connection count for this user
+                $connectionCount = UserRequestsHelper::getConnectionCount($userItem->id);
+                $userItem->total_connections = $connectionCount;
+
+                // Check if the current user is connected to this user
+                $isConnected = UserRequestsHelper::areUsersConnected($user->id, $userItem->id);
+                $userItem->is_connected_to_current_user = $isConnected;
+
+                 // Add country details using CountryResource
+                if ($userItem->country) {
+                    $userItem->country_details = new CountryResource($userItem->country);
+                }
+                return $userItem;
+            });
+
+            // Use UserResource collection to properly handle profile URLs with legacy user logic
+            $getData = \App\Http\Resources\V1\UserResource::collection($getData);
+
+            return response()->json([
+                'message' => 'Successfully!',
+                'status' => 1,
+                'data' => $getData
+            ], $this->successStatus);
+        } else {
+            return response()->json([
+                'message' => "No users available.",
+                'status' => 0,
+                'data' => []
+            ], $this->successStatus);
+        }
+    } catch (\Exception $e) {
+        \Log::error('getUsers error:', [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+
+        return response()->json([
+            'message' => 'An error occurred: ' . $e->getMessage(),
+            'status' => 0,
+            'data' => []
+        ], $this->successStatus);
+    }
+}
 }

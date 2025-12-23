@@ -653,4 +653,61 @@ public static function getAllDetailByUserId($id)
             return null;
         }
     }
+
+    // Get random user from anywhere in the system (no social circle filter)
+    public static function getRandomUser($currentUserId, $excludeUserIds = [])
+    {
+        try {
+            // Make sure we exclude the current user
+            $excludeUserIds[] = $currentUserId;
+            $excludeUserIds = array_unique($excludeUserIds);
+
+            // Get swiped user IDs to exclude
+            $swipedUserIds = UserRequestsHelper::getSwipedUserIds($currentUserId);
+            if (!empty($swipedUserIds)) {
+                $excludeUserIds = array_merge($excludeUserIds, $swipedUserIds);
+            }
+
+            // Get blocked user IDs to exclude
+            $blockedUserIds = BlockUserHelper::blockUserList($currentUserId);
+            if (!empty($blockedUserIds)) {
+                $excludeUserIds = array_merge($excludeUserIds, $blockedUserIds);
+            }
+
+            // Remove duplicates
+            $excludeUserIds = array_unique($excludeUserIds);
+
+            // Build the query - get any user in the system
+            $query = User::where('deleted_flag', 'N')
+                ->whereNull('deleted_at')
+                ->where('id', '!=', $currentUserId)
+                ->where('id', '>=', 500) // Exclude testing users below ID 500
+                ->whereNotIn('id', $excludeUserIds);
+
+            // Get a random user
+            $randomUser = $query->with(['profileImages', 'country', 'socialCircles'])
+                ->inRandomOrder()
+                ->first();
+
+            if ($randomUser) {
+                Log::info('Found random user from system', [
+                    'user_id' => $randomUser->id,
+                    'name' => $randomUser->name
+                ]);
+
+                // Get additional user details
+                $randomUser = self::getAllDetailByUserId($randomUser->id);
+            } else {
+                Log::info('No random user found in system');
+            }
+
+            return $randomUser;
+        } catch (\Exception $e) {
+            Log::error('Error getting random user from system', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return null;
+        }
+    }
 }

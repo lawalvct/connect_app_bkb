@@ -965,7 +965,8 @@ class StreamController extends BaseController
                 'platform' => $platform,
                 'shared_at' => $shareInteraction->created_at,
                 'interaction_stats' => $stream->getInteractionStats(),
-                'share_url' => url("/streams/{$stream->id}"), // You can customize this URL
+               // 'share_url' => url("/streams/{$stream->id}"),
+                'share_url' =>'https://www.connectinc.app/livestream',
             ], 201);
 
         } catch (\Exception $e) {

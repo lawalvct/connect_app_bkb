@@ -401,7 +401,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
         // Discovery with rate limiting
         Route::middleware(['swipe.limit'])->group(function () {
-            Route::post('/discover', [ConnectionController::class, 'getUsersBySocialCircle']);
+            Route::post('/discover', [ConnectionController::class, 'getUsers']);
+            // Route::post('/discover', [ConnectionController::class, 'getUsersBySocialCircle']);
         });
 
         // User likes (with rate limiting since these count as swipes)
