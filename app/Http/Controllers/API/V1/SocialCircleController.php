@@ -6,6 +6,7 @@ use App\Http\Resources\V1\SocialCircleResource;
 use App\Models\SocialCircle;
 use App\Models\UserSocialCircle;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 
 class SocialCircleController extends BaseController
 {
