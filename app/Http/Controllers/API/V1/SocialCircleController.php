@@ -49,8 +49,8 @@ class SocialCircleController extends BaseController
     public function updateUserSocialCircles(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'social_circle_ids' => 'required|array',
-            'social_circle_ids.*' => 'exists:social_circles,id',
+            'social_circles' => 'required|array',
+            'social_circles.*' => 'exists:social_circles,id',
         ]);
 
         if ($validator->fails()) {
@@ -63,7 +63,7 @@ class SocialCircleController extends BaseController
         UserSocialCircle::where('user_id', $user->id)->update(['deleted_flag' => 'Y']);
 
         // Add new social circles
-        foreach ($request->social_circle_ids as $socialCircleId) {
+        foreach ($request->social_circles as $socialCircleId) {
             UserSocialCircle::updateOrCreate(
                 ['user_id' => $user->id, 'social_id' => $socialCircleId],
                 ['deleted_flag' => 'N']
