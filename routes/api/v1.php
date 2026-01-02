@@ -240,6 +240,7 @@ Route::get('countries', [UserController::class, 'getCountries']);
 Route::get('states/{country}', [UserController::class, 'getStatesByCountry']);
 Route::get('social-circles', [SocialCircleController::class, 'index']);
 Route::post('verify-email', [AuthController::class, 'verifyEmail']);
+Route::post('verify-registration-otp', [AuthController::class, 'verifyEmail']); // Alias for verify-email
 Route::post('resend-verification-otp', [AuthController::class, 'resendVerificationOTP'])
     ->middleware(['throttle:5,1']);
 Route::post('verify-email-otp', [AuthController::class, 'verifyEmailOTP'])

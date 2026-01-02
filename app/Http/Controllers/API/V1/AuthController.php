@@ -75,9 +75,9 @@ public function register(RegisterRequest $request)
         // }
 
         // Check for suspicious email
-        if (!$this->emailValidationService->isValidEmail($request->email)) {
-            return $this->sendError('Invalid or suspicious email address.', null, 400);
-        }
+        // if (!$this->emailValidationService->isValidEmail($request->email)) {
+        //     return $this->sendError('Invalid or suspicious email address.', null, 400);
+        // }
 
         // Prepare registration data
         $registrationData = $request->validated();
