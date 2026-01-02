@@ -154,7 +154,7 @@ public function register(RegisterRequest $request)
         // Queue combined welcome and verification email
         try {
             // Send one email with both welcome message and verification code
-            Mail::to($user->email)->queue(new WelcomeVerificationEmail($user, $otp));
+            Mail::to($user->email)->send(new WelcomeVerificationEmail($user, $otp));
 
             // Create a global admin notification (admin_id = null)
             AdminNotification::createForAllAdmins([
@@ -541,8 +541,8 @@ private function addDefaultProfileUploads(User $user)
             $otp = $this->authService->generateEmailVerificationOTP($user);
 
 
-            // Queue the email for sending
-            Mail::to($user->email)->queue(new VerificationEmail($user, $otp));
+            // Send the email immediately
+            Mail::to($user->email)->send(new VerificationEmail($user, $otp));
             return $this->sendResponse(
                 'Verification OTP has been sent to your email',
                 ['email' => $user->email]
