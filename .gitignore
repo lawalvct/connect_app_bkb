@@ -161,4 +161,23 @@ config.local.php
 database.local.php
 mail.local.php
 
+# Google Services
+google-services.json
+GoogleService-Info.plist
 
+# Firebase credentials
+firebase-credentials.json
+firebase-adminsdk-*.json
+*-firebase-adminsdk-*.json
+
+# Postman files (may contain sensitive data)
+.postman/
+postman/globals/
+postman/environments/
+*.postman_environment.json
+*.postman_globals.json
+
+# Keep collection templates only
+!postman/collections/
+postman/collections/*
+!postman/collections/*.template.json

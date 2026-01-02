@@ -614,7 +614,8 @@ private function addDefaultProfileUploads(User $user)
     }
 
     /**
-     * Handle social login from mobile app
+     * Handle social login from mobile app using access token
+     * Mobile app gets token from Google/Facebook SDK and sends it here
      *
      * @param Request $request
      * @param string $provider
@@ -632,6 +633,11 @@ private function addDefaultProfileUploads(User $user)
         }
 
         try {
+            // Validate provider
+            if (!in_array($provider, ['google', 'facebook', 'apple'])) {
+                return $this->sendError('Invalid provider', null, 400);
+            }
+
             $user = $this->authService->handleSocialLogin($provider, $request->access_token);
 
             // Update device token if provided
@@ -645,15 +651,22 @@ private function addDefaultProfileUploads(User $user)
             return $this->sendResponse('Social login successful', [
                 'user' => new UserResource($user),
                 'token' => $token,
+                'is_new_user' => $user->wasRecentlyCreated ?? false
             ]);
         } catch (\Exception $e) {
+            Log::error('Social login from app failed', [
+                'provider' => $provider,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return $this->sendError('Social login failed: ' . $e->getMessage(), null, 500);
         }
     }
 
     /**
      * Handle social login with user data directly from app
-     * Used when social SDK is handled on client side
+     * Used when social SDK is handled on client side and sends user data directly
+     * This is for mobile apps that get user data from Google/Facebook SDK
      *
      * @param Request $request
      * @param string $provider
@@ -662,10 +675,12 @@ private function addDefaultProfileUploads(User $user)
     public function handleSocialLoginWithUserData(Request $request, $provider)
     {
         $validator = Validator::make($request->all(), [
-            'id' => 'required|string',
+            'id' => 'required|string',  // Social provider ID
             'email' => 'required|email',
             'name' => 'required|string',
-            'avatar' => 'nullable|string',
+            'avatar' => 'nullable|string|url',
+            'device_token' => 'nullable|string',
+            'id_token' => 'nullable|string',  // For Google ID token verification
         ]);
 
         if ($validator->fails()) {
@@ -673,39 +688,193 @@ private function addDefaultProfileUploads(User $user)
         }
 
         try {
-            // Find or create user based on provided social data
-            $user = User::where('email', $request->email)->first();
-
-            if (!$user) {
-                $user = User::create([
-                    'name' => $request->name,
-                    'email' => $request->email,
-                    'password' => Hash::make(Str::random(24)),
-                    'email_verified_at' => now(),
-                    'provider_id' => $provider === 'google' ? $request->id : null,
-                    'provider' => $provider,
-                    // Set other social IDs based on provider
-                ]);
-
-                $user->assignRole('user');
-            } else {
-                // Update social ID if not set
-                if ($provider === 'google' && empty($user->google_id)) {
-                    $user->google_id = $request->id;
-                    $user->save();
-                }
-                // Handle other providers similarly
+            // Validate provider
+            if (!in_array($provider, ['google', 'facebook', 'apple'])) {
+                return $this->sendError('Invalid provider', null, 400);
             }
 
+            // For Google, verify ID token if provided for extra security
+            if ($provider === 'google' && $request->id_token) {
+                try {
+                    $client = new \Google_Client(['client_id' => config('services.google.client_id')]);
+                    $payload = $client->verifyIdToken($request->id_token);
+
+                    if (!$payload) {
+                        return $this->sendError('Invalid Google ID token', null, 401);
+                    }
+
+                    // Verify that the token matches the provided data
+                    if ($payload['sub'] !== $request->id || $payload['email'] !== $request->email) {
+                        return $this->sendError('Token data mismatch', null, 401);
+                    }
+                } catch (\Exception $e) {
+                    Log::warning('Google ID token verification failed', ['error' => $e->getMessage()]);
+                    // Continue without verification if token check fails (optional)
+                }
+            }
+
+            // Find or create user based on social ID first, then email
+            $user = User::where('social_id', $request->id)
+                ->where('social_type', $provider)
+                ->first();
+
+            if (!$user) {
+                $user = User::where('email', $request->email)->first();
+            }
+
+            $isNewUser = false;
+
+            if (!$user) {
+                // Create new user
+                $isNewUser = true;
+
+                // Generate unique username from email or name
+                $baseUsername = explode('@', $request->email)[0];
+                $baseUsername = preg_replace('/[^a-zA-Z0-9]/', '', $baseUsername);
+                $username = $this->generateUniqueUsername($baseUsername);
+
+                $user = User::create([
+                    'name' => $request->name,
+                    'username' => $username,
+                    'email' => $request->email,
+                    'password' => Hash::make(Str::random(32)), // Random password for social login users
+                    'email_verified_at' => now(),
+                    'is_verified' => true,
+                    'verified_at' => now(),
+                    'social_id' => $request->id,
+                    'social_type' => $provider,
+                    'profile' => $request->avatar,
+                    'device_token' => $request->device_token,
+                    'deleted_flag' => 'N',
+                ]);
+
+                // Download and save avatar if provided
+                if ($request->avatar) {
+                    try {
+                        $this->downloadAndSaveAvatar($user, $request->avatar);
+                    } catch (\Exception $e) {
+                        Log::warning('Failed to download social avatar', [
+                            'user_id' => $user->id,
+                            'error' => $e->getMessage()
+                        ]);
+                    }
+                }
+
+                // Send welcome notification
+                try {
+                    Mail::to($user->email)->send(new WelcomeEmail($user));
+                } catch (\Exception $e) {
+                    Log::warning('Failed to send welcome email', ['error' => $e->getMessage()]);
+                }
+
+            } else {
+                // Update existing user with social info
+                $updateData = [
+                    'social_id' => $request->id,
+                    'social_type' => $provider,
+                ];
+
+                if ($request->device_token) {
+                    $updateData['device_token'] = $request->device_token;
+                }
+
+                // Update avatar if not set or if different
+                if ($request->avatar && empty($user->profile)) {
+                    $updateData['profile'] = $request->avatar;
+                    try {
+                        $this->downloadAndSaveAvatar($user, $request->avatar);
+                    } catch (\Exception $e) {
+                        Log::warning('Failed to download social avatar', ['error' => $e->getMessage()]);
+                    }
+                }
+
+                $user->update($updateData);
+            }
+
+            // Update last login and online status
+            $user->last_login_at = now();
+            $user->is_online = true;
+            $user->save();
+
             // Create token
-            $token = $user->createToken('auth-token')->plainTextToken;
+            $token = $user->createToken('auth-token', ['*'], now()->addDays(30))->plainTextToken;
 
             return $this->sendResponse('Social login successful', [
                 'user' => new UserResource($user),
                 'token' => $token,
+                'is_new_user' => $isNewUser,
             ]);
         } catch (\Exception $e) {
+            Log::error('Social login with user data failed', [
+                'provider' => $provider,
+                'email' => $request->email ?? 'unknown',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return $this->sendError('Social login failed: ' . $e->getMessage(), null, 500);
+        }
+    }
+
+    /**
+     * Generate unique username
+     */
+    private function generateUniqueUsername($baseUsername)
+    {
+        $username = strtolower($baseUsername);
+        $counter = 1;
+
+        while (User::where('username', $username)->exists()) {
+            $username = strtolower($baseUsername) . $counter;
+            $counter++;
+        }
+
+        return $username;
+    }
+
+    /**
+     * Download and save social media avatar
+     */
+    private function downloadAndSaveAvatar($user, $avatarUrl)
+    {
+        try {
+            // Download image from URL
+            $imageContent = file_get_contents($avatarUrl);
+
+            if ($imageContent === false) {
+                return;
+            }
+
+            // Generate filename
+            $extension = 'jpg'; // Default to jpg
+            $filename = 'profile_' . $user->id . '_' . time() . '.' . $extension;
+
+            // Save using storage helper
+            $uploadedPath = StorageUploadHelper::uploadFromContent(
+                $imageContent,
+                'profile_images',
+                $filename
+            );
+
+            if ($uploadedPath) {
+                // Create profile upload record
+                UserProfileUpload::create([
+                    'user_id' => $user->id,
+                    'profile_media_url' => $uploadedPath,
+                    'is_main' => true,
+                    'deleted_flag' => 'N'
+                ]);
+
+                // Update user profile
+                $user->profile = $uploadedPath;
+                $user->save();
+            }
+        } catch (\Exception $e) {
+            Log::error('Failed to download social avatar', [
+                'user_id' => $user->id,
+                'url' => $avatarUrl,
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
         }
     }
 
