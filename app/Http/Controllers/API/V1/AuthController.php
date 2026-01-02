@@ -503,8 +503,15 @@ private function addDefaultProfileUploads(User $user)
         $user->email_otp_expires_at = null;
         $user->save();
 
+        // Generate token for the user
+        $token = $this->authService->createToken($user);
+
+        // Load user relationships
+        $user->load(['country', 'profileUploads']);
+
         return $this->sendResponse('Email verified successfully', [
-            'user' => new UserResource($user)
+            'user' => new UserResource($user),
+            'token' => $token
         ]);
     }
 
