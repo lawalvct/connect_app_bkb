@@ -77,8 +77,8 @@ class PostController extends BaseController
                     ->whereNotIn('id', $processedPostIds)
                     ->published()
                     ->where('published_at', '>=', now()->subDays(7))
-                    ->withCount('reactions')
-                    ->orderBy('reactions_count', 'desc')
+                    ->withCount('likes')
+                    ->orderBy('likes_count', 'desc')
                     ->limit(10)
                     ->get();
 
