@@ -104,6 +104,21 @@ class PostController extends BaseController
                     ->get();
 
                 $feedPosts = $feedPosts->concat($missedPosts);
+                $processedPostIds = array_merge($processedPostIds, $missedPosts->pluck('id')->toArray());
+
+                // Fallback: If we don't have 50 posts, fill with any available posts
+                if ($feedPosts->count() < $perPage) {
+                    $remaining = $perPage - $feedPosts->count();
+                    $fallbackPosts = Post::with($this->getPostRelations($user))
+                        ->whereNotIn('user_id', $blockedUserIds)
+                        ->whereNotIn('id', $processedPostIds)
+                        ->published()
+                        ->latest('published_at')
+                        ->limit($remaining)
+                        ->get();
+
+                    $feedPosts = $feedPosts->concat($fallbackPosts);
+                }
 
             } else {
                 // OTHER PAGES: Standard chronological with variety
@@ -138,6 +153,21 @@ class PostController extends BaseController
                     ->get();
 
                 $feedPosts = $feedPosts->concat($olderPosts);
+                $processedPostIds = array_merge($processedPostIds, $olderPosts->pluck('id')->toArray());
+
+                // Fallback: If we don't have 50 posts, fill with any available posts
+                if ($feedPosts->count() < $perPage) {
+                    $remaining = $perPage - $feedPosts->count();
+                    $fallbackPosts = Post::with($this->getPostRelations($user))
+                        ->whereNotIn('user_id', $blockedUserIds)
+                        ->whereNotIn('id', $processedPostIds)
+                        ->published()
+                        ->latest('published_at')
+                        ->limit($remaining)
+                        ->get();
+
+                    $feedPosts = $feedPosts->concat($fallbackPosts);
+                }
             }
 
             // Transform posts with user interaction data
