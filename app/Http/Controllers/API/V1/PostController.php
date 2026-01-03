@@ -37,7 +37,7 @@ class PostController extends BaseController
      * Page 1: 20 random recent posts (1-3 days) + 30 mixed content
      * Other pages: Standard chronological feed with variety
      */
-    public function getFeednew(Request $request): JsonResponse
+    public function getFeed(Request $request): JsonResponse
     {
         try {
             $user = auth()->user();
@@ -148,23 +148,19 @@ class PostController extends BaseController
                 return $post;
             });
 
-            // Calculate total for pagination
-            $total = Post::whereNotIn('user_id', $blockedUserIds)
-                ->published()
-                ->count();
+            // Create paginator instance to match getFeedOld format
+            $paginator = new \Illuminate\Pagination\LengthAwarePaginator(
+                $feedPosts,
+                Post::whereNotIn('user_id', $blockedUserIds)->published()->count(),
+                $perPage,
+                $page,
+                ['path' => request()->url(), 'query' => request()->query()]
+            );
 
             return response()->json([
                 'status' => 1,
                 'message' => 'Feed retrieved successfully',
-                'data' => $feedPosts,
-                'pagination' => [
-                    'current_page' => $page,
-                    'per_page' => $perPage,
-                    'total' => $total,
-                    'last_page' => ceil($total / $perPage),
-                    'from' => (($page - 1) * $perPage) + 1,
-                    'to' => min($page * $perPage, $total),
-                ]
+                'data' => $paginator
             ], $this->successStatus);
 
         } catch (\Exception $e) {
@@ -228,7 +224,7 @@ class PostController extends BaseController
     /**
      * Get feed posts for user's social circles
      */
-    public function getFeed(Request $request): JsonResponse
+    public function getFeedold(Request $request): JsonResponse
     {
         try {
             $user = auth()->user();
