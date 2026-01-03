@@ -139,10 +139,12 @@ class PostController extends BaseController
                     ->get();
 
                 $feedPosts = $feedPosts->concat($recentPosts);
+                $processedPostIds = array_merge($processedPostIds, $recentPosts->pluck('id')->toArray());
 
                 // Older posts (7-60 days)
                 $olderPosts = Post::with($this->getPostRelations($user))
                     ->whereNotIn('user_id', $blockedUserIds)
+                    ->whereNotIn('id', $processedPostIds)
                     ->published()
                     ->whereBetween('published_at', [
                         now()->subDays(60),
@@ -169,6 +171,9 @@ class PostController extends BaseController
                     $feedPosts = $feedPosts->concat($fallbackPosts);
                 }
             }
+
+            // Remove duplicates using unique by id (in case any slipped through)
+            $feedPosts = $feedPosts->unique('id')->values();
 
             // Transform posts with user interaction data
             $feedPosts = $feedPosts->map(function ($post) use ($user) {
