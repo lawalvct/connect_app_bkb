@@ -183,10 +183,10 @@ class PostController extends BaseController
     private function getPostsFromFrequentInteractions($user, $blockedUserIds, $excludePostIds, $limit)
     {
         // Get users current user has liked/commented on most
-        $frequentUserIds = DB::table('post_reactions')
+        $frequentUserIds = DB::table('post_likes')
             ->select('posts.user_id', DB::raw('COUNT(*) as interaction_count'))
-            ->join('posts', 'post_reactions.post_id', '=', 'posts.id')
-            ->where('post_reactions.user_id', $user->id)
+            ->join('posts', 'post_likes.post_id', '=', 'posts.id')
+            ->where('post_likes.user_id', $user->id)
             ->whereNotIn('posts.user_id', $blockedUserIds)
             ->groupBy('posts.user_id')
             ->orderBy('interaction_count', 'desc')
