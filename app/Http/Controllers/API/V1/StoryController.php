@@ -69,7 +69,7 @@ class StoryController extends Controller
                 case 'text':
                     $storyData['content'] = $data['content'];
                     $storyData['background_color'] = $data['background_color'] ?? '#000000';
-                    $storyData['font_settings'] = $data['font_settings'] ?? null;
+                    $storyData['font_settings'] = $data['font_settings']; // Will be cast to JSON by model
                     break;
 
                 case 'image':
@@ -90,6 +90,7 @@ class StoryController extends Controller
                         $storyData['duration'] = $uploadResult['duration'] ?? null;
                     }
 
+                    // Use caption field for media stories
                     if (!empty($data['caption'])) {
                         $storyData['caption'] = $data['caption'];
                     }
@@ -98,7 +99,7 @@ class StoryController extends Controller
 
             // Handle custom privacy
             if ($data['privacy'] === 'custom' && !empty($data['custom_viewers'])) {
-                $storyData['custom_viewers'] = $data['custom_viewers'];
+                $storyData['custom_viewers'] = $data['custom_viewers']; // Will be cast to JSON by model
             }
 
             $story = Story::create($storyData);
