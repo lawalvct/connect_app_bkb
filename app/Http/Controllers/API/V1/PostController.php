@@ -121,14 +121,15 @@ class PostController extends BaseController
                 }
 
             } else {
-                // OTHER PAGES: Standard chronological with variety
+                // OTHER PAGES: Mix of chronological and random posts
                 $offset = ($page - 1) * $perPage;
 
-                // Mix of recent and older posts
-                $recentCount = 30; // 60% recent
-                $olderCount = 20;  // 40% older
+                // Strategy: Mix recent chronological with random older posts
+                $recentCount = 25; // 50% recent chronological
+                $randomRecentCount = 10; // 20% random recent
+                $olderCount = 15;  // 30% older random
 
-                // Recent posts (last 7 days)
+                // Recent chronological posts (last 7 days)
                 $recentPosts = Post::with($this->getPostRelations($user))
                     ->whereNotIn('user_id', $blockedUserIds)
                     ->published()
@@ -141,7 +142,20 @@ class PostController extends BaseController
                 $feedPosts = $feedPosts->concat($recentPosts);
                 $processedPostIds = array_merge($processedPostIds, $recentPosts->pluck('id')->toArray());
 
-                // Older posts (7-60 days)
+                // Random recent posts (last 7 days) - for variety
+                $randomRecentPosts = Post::with($this->getPostRelations($user))
+                    ->whereNotIn('user_id', $blockedUserIds)
+                    ->whereNotIn('id', $processedPostIds)
+                    ->published()
+                    ->where('published_at', '>=', now()->subDays(7))
+                    ->inRandomOrder()
+                    ->limit($randomRecentCount)
+                    ->get();
+
+                $feedPosts = $feedPosts->concat($randomRecentPosts);
+                $processedPostIds = array_merge($processedPostIds, $randomRecentPosts->pluck('id')->toArray());
+
+                // Older random posts (7-60 days)
                 $olderPosts = Post::with($this->getPostRelations($user))
                     ->whereNotIn('user_id', $blockedUserIds)
                     ->whereNotIn('id', $processedPostIds)
@@ -174,6 +188,11 @@ class PostController extends BaseController
 
             // Remove duplicates using unique by id (in case any slipped through)
             $feedPosts = $feedPosts->unique('id')->values();
+
+            // Shuffle the feed for page 1 to ensure true randomness
+            if ($page === 1) {
+                $feedPosts = $feedPosts->shuffle();
+            }
 
             // Transform posts with user interaction data
             $feedPosts = $feedPosts->map(function ($post) use ($user) {
