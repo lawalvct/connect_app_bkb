@@ -31,10 +31,204 @@ class PostController extends BaseController
         $this->mediaService = $mediaService;
     }
 
+
+    /**
+     * Get feed posts with intelligent content mixing
+     * Page 1: 20 random recent posts (1-3 days) + 30 mixed content
+     * Other pages: Standard chronological feed with variety
+     */
+    public function getFeed(Request $request): JsonResponse
+    {
+        try {
+            $user = auth()->user();
+            $page = $request->get('page', 1);
+            $perPage = 50;
+
+            // Get blocked user IDs
+            $blockedUserIds = BlockUser::where('user_id', $user->id)
+                ->where('deleted_flag', 'N')
+                ->pluck('block_user_id')
+                ->toArray();
+
+            $feedPosts = collect();
+            $processedPostIds = [];
+
+            if ($page === 1) {
+                // PAGE 1: Special mixed content strategy
+
+                // 1. First 20: Random recent posts (1-3 days old)
+                $recentPosts = Post::with($this->getPostRelations($user))
+                    ->whereNotIn('user_id', $blockedUserIds)
+                    ->published()
+                    ->whereBetween('published_at', [
+                        now()->subDays(3),
+                        now()
+                    ])
+                    ->inRandomOrder()
+                    ->limit(20)
+                    ->get();
+
+                $feedPosts = $feedPosts->concat($recentPosts);
+                $processedPostIds = $recentPosts->pluck('id')->toArray();
+
+                // 2. Next 10: Trending posts (most reactions in last 7 days)
+                $trendingPosts = Post::with($this->getPostRelations($user))
+                    ->whereNotIn('user_id', $blockedUserIds)
+                    ->whereNotIn('id', $processedPostIds)
+                    ->published()
+                    ->where('published_at', '>=', now()->subDays(7))
+                    ->withCount('reactions')
+                    ->orderBy('reactions_count', 'desc')
+                    ->limit(10)
+                    ->get();
+
+                $feedPosts = $feedPosts->concat($trendingPosts);
+                $processedPostIds = array_merge($processedPostIds, $trendingPosts->pluck('id')->toArray());
+
+                // 3. Next 10: Posts from users you interact with most
+                $interactionPosts = $this->getPostsFromFrequentInteractions($user, $blockedUserIds, $processedPostIds, 10);
+                $feedPosts = $feedPosts->concat($interactionPosts);
+                $processedPostIds = array_merge($processedPostIds, $interactionPosts->pluck('id')->toArray());
+
+                // 4. Last 10: Older posts you might have missed (4-30 days old)
+                $missedPosts = Post::with($this->getPostRelations($user))
+                    ->whereNotIn('user_id', $blockedUserIds)
+                    ->whereNotIn('id', $processedPostIds)
+                    ->published()
+                    ->whereBetween('published_at', [
+                        now()->subDays(30),
+                        now()->subDays(4)
+                    ])
+                    ->inRandomOrder()
+                    ->limit(10)
+                    ->get();
+
+                $feedPosts = $feedPosts->concat($missedPosts);
+
+            } else {
+                // OTHER PAGES: Standard chronological with variety
+                $offset = ($page - 1) * $perPage;
+
+                // Mix of recent and older posts
+                $recentCount = 30; // 60% recent
+                $olderCount = 20;  // 40% older
+
+                // Recent posts (last 7 days)
+                $recentPosts = Post::with($this->getPostRelations($user))
+                    ->whereNotIn('user_id', $blockedUserIds)
+                    ->published()
+                    ->where('published_at', '>=', now()->subDays(7))
+                    ->latest('published_at')
+                    ->skip($offset)
+                    ->take($recentCount)
+                    ->get();
+
+                $feedPosts = $feedPosts->concat($recentPosts);
+
+                // Older posts (7-60 days)
+                $olderPosts = Post::with($this->getPostRelations($user))
+                    ->whereNotIn('user_id', $blockedUserIds)
+                    ->published()
+                    ->whereBetween('published_at', [
+                        now()->subDays(60),
+                        now()->subDays(7)
+                    ])
+                    ->inRandomOrder()
+                    ->limit($olderCount)
+                    ->get();
+
+                $feedPosts = $feedPosts->concat($olderPosts);
+            }
+
+            // Transform posts with user interaction data
+            $feedPosts = $feedPosts->map(function ($post) use ($user) {
+                $post->reaction_counts = $post->getReactionCounts();
+                $post->user_reaction = $post->getUserReaction($user->id);
+                $post->has_user_liked = $post->hasUserLiked($user->id);
+                return $post;
+            });
+
+            // Calculate total for pagination
+            $total = Post::whereNotIn('user_id', $blockedUserIds)
+                ->published()
+                ->count();
+
+            return response()->json([
+                'status' => 1,
+                'message' => 'Feed retrieved successfully',
+                'data' => $feedPosts,
+                'pagination' => [
+                    'current_page' => $page,
+                    'per_page' => $perPage,
+                    'total' => $total,
+                    'last_page' => ceil($total / $perPage),
+                    'from' => (($page - 1) * $perPage) + 1,
+                    'to' => min($page * $perPage, $total),
+                ]
+            ], $this->successStatus);
+
+        } catch (\Exception $e) {
+            Log::error('Feed retrieval failed', ['error' => $e->getMessage()]);
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to retrieve feed',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get posts from users the current user interacts with frequently
+     */
+    private function getPostsFromFrequentInteractions($user, $blockedUserIds, $excludePostIds, $limit)
+    {
+        // Get users current user has liked/commented on most
+        $frequentUserIds = DB::table('post_reactions')
+            ->select('posts.user_id', DB::raw('COUNT(*) as interaction_count'))
+            ->join('posts', 'post_reactions.post_id', '=', 'posts.id')
+            ->where('post_reactions.user_id', $user->id)
+            ->whereNotIn('posts.user_id', $blockedUserIds)
+            ->groupBy('posts.user_id')
+            ->orderBy('interaction_count', 'desc')
+            ->limit(10)
+            ->pluck('posts.user_id')
+            ->toArray();
+
+        if (empty($frequentUserIds)) {
+            return collect();
+        }
+
+        return Post::with($this->getPostRelations($user))
+            ->whereIn('user_id', $frequentUserIds)
+            ->whereNotIn('id', $excludePostIds)
+            ->published()
+            ->where('published_at', '>=', now()->subDays(7))
+            ->latest('published_at')
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
+     * Get standard post relations for queries
+     */
+    private function getPostRelations($user)
+    {
+        return [
+            'user:id,name,username,profile,profile_url',
+            'socialCircle:id,name,color',
+            'media',
+            'taggedUsers:id,name,username',
+            'likes' => function ($query) use ($user) {
+                $query->where('user_id', $user->id);
+            }
+        ];
+    }
+
+
     /**
      * Get feed posts for user's social circles
      */
-    public function getFeed(Request $request): JsonResponse
+    public function getFeedOld(Request $request): JsonResponse
     {
         try {
             $user = auth()->user();
