@@ -37,7 +37,7 @@ class PostController extends BaseController
      * Page 1: 20 random recent posts (1-3 days) + 30 mixed content
      * Other pages: Standard chronological feed with variety
      */
-    public function getFeed(Request $request): JsonResponse
+    public function getFeednew(Request $request): JsonResponse
     {
         try {
             $user = auth()->user();
@@ -228,7 +228,7 @@ class PostController extends BaseController
     /**
      * Get feed posts for user's social circles
      */
-    public function getFeedOld(Request $request): JsonResponse
+    public function getFeed(Request $request): JsonResponse
     {
         try {
             $user = auth()->user();
