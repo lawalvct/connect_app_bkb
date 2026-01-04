@@ -878,10 +878,19 @@ class UserManagementController extends Controller
         }
 
         if (!empty($filters['social_circles'])) {
-            $socialCircles = $filters['social_circles'];
-            $query->whereHas('socialCircles', function ($q) use ($socialCircles) {
-                $q->whereIn('social_circles.id', $socialCircles);
-            });
+            $socialCircleFilter = $filters['social_circles'];
+
+            // Handle special filter values
+            if ($socialCircleFilter === 'has_circles') {
+                $query->whereHas('socialCircles');
+            } elseif ($socialCircleFilter === 'no_circles') {
+                $query->whereDoesntHave('socialCircles');
+            } elseif (is_numeric($socialCircleFilter)) {
+                // Filter by specific social circle ID
+                $query->whereHas('socialCircles', function ($q) use ($socialCircleFilter) {
+                    $q->where('social_circles.id', $socialCircleFilter);
+                });
+            }
         }
 
         if (!empty($filters['date_from'])) {

@@ -124,8 +124,9 @@ class SimpleUsersExport implements FromCollection, WithHeadings, WithMapping, Sh
 
         $users = $query->select([
             'id', 'name', 'email', 'phone', 'is_active', 'is_banned',
-            'created_at', 'email_verified_at', 'updated_at'
+            'created_at', 'email_verified_at', 'updated_at', 'country_id'
         ])
+        ->with(['socialCircles:id,name', 'country:id,name'])
         ->orderBy('created_at', 'desc')
         ->get();
 
@@ -145,6 +146,8 @@ class SimpleUsersExport implements FromCollection, WithHeadings, WithMapping, Sh
             'Name',
             'Email',
             'Phone',
+            'Country',
+            'Social Circles',
             'Status',
             'Email Verified',
             'Registration Date',
@@ -166,11 +169,22 @@ class SimpleUsersExport implements FromCollection, WithHeadings, WithMapping, Sh
             $status = 'Suspended';
         }
 
+        // Get country name
+        $countryName = $user->country ? $user->country->name : 'N/A';
+
+        // Get social circles names
+        $socialCircles = 'None';
+        if ($user->socialCircles && $user->socialCircles->count() > 0) {
+            $socialCircles = $user->socialCircles->pluck('name')->join(', ');
+        }
+
         return [
             $user->id,
             $user->name,
             $user->email,
             $user->phone ?? 'N/A',
+            $countryName,
+            $socialCircles,
             $status,
             $user->email_verified_at ? 'Yes' : 'No',
             $user->created_at->format('Y-m-d H:i:s'),
