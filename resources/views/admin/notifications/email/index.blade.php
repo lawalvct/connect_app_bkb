@@ -4,6 +4,10 @@
 @section('title', 'Send Email Notification')
 @section('page-title', 'Send Email Notification')
 
+@push('styles')
+<script src="https://cdn.tiny.cloud/1/xxeafvl0or3eww2lkza2cpthrrr8emm11v8xzizxp2278vah/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
+@endpush
+
 @section('content')
 <div x-data="emailNotificationManager()" x-init="init()">
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
@@ -105,17 +109,17 @@
                 <!-- Body -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">Body <span class="text-red-500">*</span></label>
-                    <textarea x-model="form.body" rows="8" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm" placeholder="Enter email body (HTML supported)" required></textarea>
+                    <textarea id="emailBodyEditor" x-model="form.body" rows="8" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm" placeholder="Enter email body (HTML supported)" required></textarea>
                 </div>
 
                 <!-- Attachment -->
-                <div>
+                {{-- <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">Attachment</label>
                     <input type="file" @change="handleFileUpload($event)" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm" />
                     <template x-if="form.attachment">
                         <div class="mt-2 text-xs text-gray-600">Selected: <span x-text="form.attachment.name"></span></div>
                     </template>
-                </div>
+                </div> --}}
 
                 <!-- Send Button -->
                 <div class="flex justify-end pt-4 border-t border-gray-200">
@@ -201,6 +205,33 @@ window.emailNotificationManager = function() {
             this.loadStats();
             this.loadCircles();
             this.loadCountries();
+            this.initTinyMCE();
+        },
+
+        initTinyMCE() {
+            const self = this;
+            setTimeout(() => {
+                tinymce.init({
+                    selector: '#emailBodyEditor',
+                    height: 400,
+                    menubar: true,
+                    plugins: [
+                        'advlist', 'autolink', 'lists', 'link', 'image', 'charmap', 'preview',
+                        'anchor', 'searchreplace', 'visualblocks', 'code', 'fullscreen',
+                        'insertdatetime', 'media', 'table', 'code', 'help', 'wordcount'
+                    ],
+                    toolbar: 'undo redo | blocks | ' +
+                        'bold italic forecolor backcolor | alignleft aligncenter ' +
+                        'alignright alignjustify | bullist numlist outdent indent | ' +
+                        'removeformat | code | help',
+                    content_style: 'body { font-family:Helvetica,Arial,sans-serif; font-size:14px }',
+                    setup: function(editor) {
+                        editor.on('change keyup', function() {
+                            self.form.body = editor.getContent();
+                        });
+                    }
+                });
+            }, 100);
         },
 
         resetForm() {
@@ -214,6 +245,11 @@ window.emailNotificationManager = function() {
             };
             this.userResults = [];
             this.userSearch = '';
+
+            // Reset TinyMCE content
+            if (tinymce.get('emailBodyEditor')) {
+                tinymce.get('emailBodyEditor').setContent('');
+            }
         },
 
         async loadStats() {
