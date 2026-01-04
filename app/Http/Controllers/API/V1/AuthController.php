@@ -1125,6 +1125,7 @@ public function resendVerificationEmail(Request $request)
             $user = User::create([
                 'username' => $data['username'],
                 'email' => $data['email'],
+                  'name' => $data['name'],
                 'password' => Hash::make($data['password']),
                 'device_token' => $data['device_token'] ?? null,
                 'registration_step' => 1, // Track current step
