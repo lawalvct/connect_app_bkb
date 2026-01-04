@@ -58,6 +58,15 @@ _ide_helper_models.php
 *.csr
 *.der
 *.keystore
+
+# Firebase configuration and documentation (contains API keys and sensitive config)
+FIREBASE_*.md
+FCM_*.md
+firebase-credentials-template.json
+*_fcm_*.php
+diagnose_fcm_api.php
+clear_old_fcm_tokens.php
+test_new_push_notifications.php
 *.jks
 *.p7b
 *.p7c
