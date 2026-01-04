@@ -22,7 +22,7 @@ try {
     $usersWithoutCircles = User::whereDoesntHave('socialCircles')
         ->where('deleted_flag', 'N')
         ->whereNull('deleted_at')
-        ->where('is_active', true)
+
         ->get();
 
     $count = $usersWithoutCircles->count();
