@@ -1,0 +1,69 @@
+📋 REMAINING FIREBASE SETUP STEPS
+=====================================
+
+✅ COMPLETED:
+- Firebase Project ID updated (connect-app-efa83)
+- VAPID Keys configured
+- API Key and configuration updated
+- Expo notification service added
+
+⚠️  STILL NEEDED:
+
+1️⃣  GET FIREBASE SERVER KEY (Cloud Messaging API - Legacy)
+
+   Steps:
+   a) Go to: https://console.firebase.google.com/project/connect-app-efa83/settings/cloudmessaging
+   b) Look for "Cloud Messaging API (Legacy)" section
+   c) If you see "ENABLE CLOUD MESSAGING API", click it first
+   d) Copy the "Server key" (starts with something like "AAAAxxxxxxx...")
+   e) Update in .env:
+      FIREBASE_SERVER_KEY=your_server_key_here
+
+   📝 NOTE: If the Legacy API is disabled, you can skip this and use only FCM v1 API
+
+2️⃣  DOWNLOAD SERVICE ACCOUNT JSON (Required for FCM v1 API)
+
+   Steps:
+   a) Go to: https://console.firebase.google.com/project/connect-app-efa83/settings/serviceaccounts/adminsdk
+   b) Click "Generate new private key" button
+   c) Save the downloaded JSON file
+   d) Replace the content of: storage/app/firebase-credentials.json
+
+   ⚠️  IMPORTANT: The JSON should have:
+      - "project_id": "connect-app-efa83" (NOT connect-app-fbaca)
+      - "client_email": "firebase-adminsdk-xxxxx@connect-app-efa83.iam.gserviceaccount.com"
+
+3️⃣  CLEAR CACHE & TEST
+
+   After updating, run:
+   ```bash
+   php artisan config:clear
+   php artisan cache:clear
+   php test_new_push_notifications.php
+   ```
+
+=====================================
+
+📝 CURRENT STATUS:
+
+✅ VAPID Keys: CONFIGURED
+   - Public: BGrUZJ-XVR7RANtVElJwyS0I3k_mPfooOV4_EG3XpF7wUw2Wpl7rGFRV7PN5gy7G3NSZPUJ3ajMb308HSwdqMOE
+   - Private: vOhjU-aOxqdkqgcCzNSNdwNWxeRHk0AwbECzJfi-nnU
+
+⚠️  Firebase Server Key: NOT YET CONFIGURED
+⚠️  Service Account JSON: STILL USING OLD PROJECT (connect-app-fbaca)
+
+=====================================
+
+🔗 QUICK LINKS:
+
+- Cloud Messaging Settings:
+  https://console.firebase.google.com/project/connect-app-efa83/settings/cloudmessaging
+
+- Service Accounts:
+  https://console.firebase.google.com/project/connect-app-efa83/settings/serviceaccounts/adminsdk
+
+- Project Overview:
+  https://console.firebase.google.com/project/connect-app-efa83
+
+=====================================

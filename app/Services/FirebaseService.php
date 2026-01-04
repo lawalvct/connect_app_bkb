@@ -29,11 +29,21 @@ class FirebaseService
     }
 
     /**
-     * Send notification to a specific FCM token
+     * Send notification to a specific FCM token or Expo token
      */
     public function sendNotification($fcmToken, $title, $body, $data = [], $userId = null)
     {
         try {
+            // Check if this is an Expo push token and route to Expo service
+            if (ExpoNotificationService::isExpoPushToken($fcmToken)) {
+                Log::info('Detected Expo push token, routing to Expo service', [
+                    'token' => substr($fcmToken, 0, 30) . '...'
+                ]);
+                $expoService = new ExpoNotificationService();
+                return $expoService->sendNotification($fcmToken, $title, $body, $data, $userId);
+            }
+
+            // Continue with FCM logic for regular FCM tokens
             // FCM requires data to be an object/map, not an array
             // Convert empty arrays to empty objects
             if (is_array($data) && empty($data)) {
