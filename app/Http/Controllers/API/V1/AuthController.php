@@ -758,8 +758,22 @@ private function addDefaultProfileUploads(User $user)
                     'social_type' => $provider,
                     'profile' => $request->avatar,
                     'device_token' => $request->device_token,
+                    'country_id' => 160,
                     'deleted_flag' => 'N',
                 ]);
+
+                // Add default profile uploads
+                $this->addDefaultProfileUploads($user);
+
+                // Add user to default social circle (ID 26)
+                try {
+                    $user->addToSocialCircle(26);
+                } catch (\Exception $e) {
+                    Log::warning('Failed to add user to default social circle', [
+                        'user_id' => $user->id,
+                        'error' => $e->getMessage()
+                    ]);
+                }
 
                 // Download and save avatar if provided
                 if ($request->avatar) {
