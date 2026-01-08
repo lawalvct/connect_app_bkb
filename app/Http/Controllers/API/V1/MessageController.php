@@ -68,6 +68,13 @@ class MessageController extends BaseController
 
     /**
      * Send a message with optional file upload
+     *
+     * For file uploads, you can use either:
+     * 1. Multipart/form-data with actual file (Content-Type: multipart/form-data)
+     *    - Send 'file' as actual file upload
+     * 2. JSON with base64 encoded file (Content-Type: application/json)
+     *    - Send 'file' as base64 string (with or without data:mime;base64, prefix)
+     *    - Optionally include 'file_name' for original filename
      */
     public function store(Request $request, $conversationId)
     {
@@ -76,6 +83,8 @@ class MessageController extends BaseController
             'all_data' => $request->all(),
             'input_type' => $request->input('type'),
             'has_file' => $request->hasFile('file'),
+            'file_input' => $request->input('file'),
+            'file_type' => gettype($request->input('file')),
             'content_type' => $request->header('Content-Type'),
             'method' => $request->method()
         ]);
@@ -117,32 +126,7 @@ class MessageController extends BaseController
             ]);
         }
 
-        // Basic validation that always applies
-        $rules = [
-            'type' => 'required|in:text,image,video,audio,file,location',
-            'reply_to_message_id' => 'nullable|exists:messages,id',
-        ];
-
-        // Add specific validation based on type
-        if ($messageType === 'text') {
-            $rules['message'] = 'required|string|max:4000';
-        } elseif (in_array($messageType, ['image', 'video', 'audio', 'file'])) {
-            $rules['file'] = 'required|file';
-            $rules['message'] = 'nullable|string|max:1000'; // Optional caption
-
-            // Add file-specific validation
-            $this->addFileValidationRules($rules, $messageType);
-        } elseif ($messageType === 'location') {
-            $rules['latitude'] = 'required|numeric|between:-90,90';
-            $rules['longitude'] = 'required|numeric|between:-180,180';
-            $rules['address'] = 'nullable|string|max:500';
-            $rules['message'] = 'nullable|string|max:1000';
-        }
-
-        // Debug: Log the rules being applied
-        Log::info('MessageController store - Validation rules:', ['rules' => $rules]);
-
-        // Create validation data from parsed data or request
+        // Create validation data first to check file format
         $validationData = [];
         if (!empty($parsedData)) {
             $validationData = $parsedData;
@@ -154,13 +138,72 @@ class MessageController extends BaseController
             $validationData = $request->all();
         }
 
+        // Early check: Handle case where mobile sends file as object/array with metadata
+        if (in_array($messageType, ['image', 'video', 'audio', 'file'])) {
+            $fileInput = $validationData['file'] ?? null;
+
+            // Check if it's an array/object (metadata only) and not an actual file upload
+            if (is_array($fileInput) && !$request->hasFile('file')) {
+                Log::warning('Mobile app sent file metadata instead of actual file', [
+                    'file_data' => $fileInput,
+                    'message_type' => $messageType
+                ]);
+
+                return $this->sendError('File content required', [
+                    'file' => [
+                        'Please send the actual file content, not just metadata.',
+                        'For mobile apps, send the file as a base64 encoded string.',
+                        'Example: {"type": "image", "file": "data:image/jpeg;base64,/9j/4AAQSkZJRg..."}',
+                        'See MOBILE_FILE_UPLOAD_GUIDE.md for detailed examples.',
+                        'Metadata received: ' . json_encode($fileInput)
+                    ]
+                ], 422);
+            }
+        }
+
+        // Basic validation that always applies
+        $rules = [
+            'type' => 'required|in:text,image,video,audio,file,location',
+            'reply_to_message_id' => 'nullable|exists:messages,id',
+        ];
+
+        // Add specific validation based on type
+        if ($messageType === 'text') {
+            $rules['message'] = 'required|string|max:4000';
+        } elseif (in_array($messageType, ['image', 'video', 'audio', 'file'])) {
+            // Check if file is base64 string or actual file upload
+            $fileInput = $validationData['file'] ?? null;
+
+            if (is_string($fileInput) && !$request->hasFile('file')) {
+                // Base64 string from mobile app
+                $rules['file'] = 'required|string|min:10';
+                Log::info('Detected base64 file from mobile app', ['type' => $messageType]);
+            } else {
+                // Regular file upload
+                $rules['file'] = 'required|file';
+                // Add file-specific validation rules (mime types, dimensions, etc.)
+                $this->addFileValidationRules($rules, $messageType);
+            }
+
+            $rules['message'] = 'nullable|string|max:1000'; // Optional caption
+        } elseif ($messageType === 'location') {
+            $rules['latitude'] = 'required|numeric|between:-90,90';
+            $rules['longitude'] = 'required|numeric|between:-180,180';
+            $rules['address'] = 'nullable|string|max:500';
+            $rules['message'] = 'nullable|string|max:1000';
+        }
+
+        // Debug: Log the rules being applied
+        Log::info('MessageController store - Validation rules:', ['rules' => $rules]);
+
         $validator = Validator::make($validationData, $rules);
 
         if ($validator->fails()) {
             Log::error('MessageController store - Validation failed:', [
                 'errors' => $validator->errors()->toArray(),
                 'validation_data' => $validationData,
-                'rules_applied' => $rules
+                'rules_applied' => $rules,
+                'file_type_received' => isset($validationData['file']) ? gettype($validationData['file']) : 'not_set'
             ]);
             return $this->sendError('Validation Error', $validator->errors(), 422);
         }
@@ -192,8 +235,19 @@ class MessageController extends BaseController
                 $messageData['message'] = $parsedData['message'] ?? $request->input('message');
                 $messageData['metadata'] = null;
             } elseif (in_array($finalType, ['image', 'video', 'audio', 'file'])) {
-                // Handle file upload
-                $metadata = $this->handleFileUpload($request->file('file'), $finalType, $request->user()->id);
+                // Handle file upload - check if it's regular upload or base64
+                $fileData = $parsedData['file'] ?? $request->input('file');
+
+                if ($request->hasFile('file')) {
+                    // Regular file upload
+                    $metadata = $this->handleFileUpload($request->file('file'), $finalType, $request->user()->id);
+                } else if (is_string($fileData)) {
+                    // Base64 encoded file from mobile
+                    $metadata = $this->handleBase64FileUpload($fileData, $finalType, $request->user()->id, $parsedData);
+                } else {
+                    throw new \Exception('Invalid file data provided');
+                }
+
                 $messageData['message'] = $parsedData['message'] ?? $request->input('message') ?: null; // Optional caption
                 $messageData['metadata'] = $metadata;
             } elseif ($finalType === 'location') {
@@ -354,10 +408,10 @@ class MessageController extends BaseController
     {
         // Define max file sizes (in KB)
         $maxSizes = [
-            'image' => 51200,  // 50MB
-            'video' => 51200, // 50MB
-            'audio' => 51200, // 50MB
-            'file' => 51200,  // 50MB
+            'image' => 951200,  // 951200KB = 950MB
+            'video' => 951200, // 950MB
+            'audio' => 951200, // 950MB
+            'file' => 951200,  // 950MB
         ];
 
         // Define allowed mime types
@@ -376,7 +430,9 @@ class MessageController extends BaseController
         // Specific rules for each type
         switch ($type) {
             case 'image':
-                $rules['file'] .= '|image|dimensions:max_width=4000,max_height=4000';
+                // More flexible image validation - increased max dimensions to 8000x8000
+                // This allows for high-resolution mobile photos
+                $rules['file'] .= '|image|dimensions:max_width=8000,max_height=8000';
                 break;
             case 'video':
                 // Add video-specific rules if needed
@@ -434,6 +490,139 @@ class MessageController extends BaseController
             ]);
             throw new \Exception('Failed to upload file: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Handle base64 encoded file upload from mobile apps
+     */
+    private function handleBase64FileUpload($base64String, $type, $userId, $requestData = [])
+    {
+        try {
+            // Check if the base64 string contains data:image prefix
+            if (strpos($base64String, 'data:') === 0) {
+                // Extract mime type and base64 data
+                preg_match('/data:([^;]+);base64,(.+)/', $base64String, $matches);
+                if (count($matches) === 3) {
+                    $mimeType = $matches[1];
+                    $base64Data = $matches[2];
+                } else {
+                    // Fallback if format is different
+                    $base64Data = explode(',', $base64String)[1] ?? $base64String;
+                    $mimeType = $this->getMimeTypeForFileType($type);
+                }
+            } else {
+                // Pure base64 without prefix
+                $base64Data = $base64String;
+                $mimeType = $this->getMimeTypeForFileType($type);
+            }
+
+            // Decode base64
+            $fileData = base64_decode($base64Data);
+
+            if ($fileData === false) {
+                throw new \Exception('Invalid base64 data');
+            }
+
+            // Get file extension from mime type or from file name in request
+            $extension = $this->getExtensionFromMimeType($mimeType);
+
+            // If we have file name in request data, use its extension
+            if (isset($requestData['file']['name'])) {
+                $pathInfo = pathinfo($requestData['file']['name']);
+                if (isset($pathInfo['extension'])) {
+                    $extension = $pathInfo['extension'];
+                }
+            }
+
+            // Create uploads/messages directory if it doesn't exist
+            $uploadPath = public_path('uploads/messages');
+            if (!file_exists($uploadPath)) {
+                mkdir($uploadPath, 0755, true);
+            }
+
+            // Generate unique filename
+            $filename = 'user_' . $userId . '_' . time() . '_' . $type . '.' . $extension;
+            $filePath = $uploadPath . '/' . $filename;
+
+            // Save file
+            file_put_contents($filePath, $fileData);
+
+            // Get file size
+            $fileSize = strlen($fileData);
+
+            // Get original name from request data if available
+            $originalName = $requestData['file']['name'] ?? $filename;
+
+            // Generate file URL
+            $fileUrl = url('uploads/messages/' . $filename);
+
+            Log::info('Base64 file uploaded successfully', [
+                'filename' => $filename,
+                'size' => $fileSize,
+                'type' => $type,
+                'mime_type' => $mimeType
+            ]);
+
+            // Return metadata
+            return [
+                'file_name' => $filename,
+                'file_path' => 'uploads/messages/' . $filename,
+                'file_url' => $fileUrl,
+                'file_size' => $fileSize,
+                'file_type' => $mimeType,
+                'original_name' => $originalName
+            ];
+        } catch (\Exception $e) {
+            Log::error('Base64 file upload error:', [
+                'error' => $e->getMessage(),
+                'type' => $type,
+                'user_id' => $userId
+            ]);
+            throw new \Exception('Failed to upload base64 file: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get mime type for file type
+     */
+    private function getMimeTypeForFileType($type)
+    {
+        $mimeTypes = [
+            'image' => 'image/jpeg',
+            'video' => 'video/mp4',
+            'audio' => 'audio/mpeg',
+            'file' => 'application/octet-stream'
+        ];
+        return $mimeTypes[$type] ?? 'application/octet-stream';
+    }
+
+    /**
+     * Get file extension from mime type
+     */
+    private function getExtensionFromMimeType($mimeType)
+    {
+        $extensions = [
+            'image/jpeg' => 'jpg',
+            'image/jpg' => 'jpg',
+            'image/png' => 'png',
+            'image/gif' => 'gif',
+            'image/webp' => 'webp',
+            'video/mp4' => 'mp4',
+            'video/quicktime' => 'mov',
+            'video/x-msvideo' => 'avi',
+            'video/webm' => 'webm',
+            'audio/mpeg' => 'mp3',
+            'audio/mp3' => 'mp3',
+            'audio/wav' => 'wav',
+            'audio/aac' => 'aac',
+            'audio/ogg' => 'ogg',
+            'audio/mp4' => 'm4a',
+            'audio/x-m4a' => 'm4a',
+            'application/pdf' => 'pdf',
+            'application/msword' => 'doc',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
+        ];
+        return $extensions[$mimeType] ?? 'bin';
     }
 
        /**
