@@ -28,10 +28,12 @@ class UserProfileResource extends JsonResource
                     ];
                 });
             }),
-            'country' => $this->whenLoaded('country', [
-                'id' => $this->country->id,
-                'name' => $this->country->name,
-            ]),
+            'country' => $this->whenLoaded('country', function () {
+                return $this->country ? [
+                    'id' => $this->country->id,
+                    'name' => $this->country->name,
+                ] : null;
+            }),
             'social_circles' => SocialCircleResource::collection($this->whenLoaded('socialCircles')),
             'stats' => [
                 'total_connections' => $this->total_connections ?? 0,
