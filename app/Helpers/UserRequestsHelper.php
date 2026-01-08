@@ -89,7 +89,10 @@ class UserRequestsHelper
 
         return $connections->map(function ($connection) use ($userId) {
             return $connection->sender_id == $userId ? $connection->receiver : $connection->sender;
-        });
+        })->filter(function ($user) {
+            // Filter out null users (deleted accounts or orphaned records)
+            return $user !== null;
+        })->values();
     }
 
           /**
