@@ -169,6 +169,27 @@ class MessageController extends BaseController
 
         // Add specific validation based on type
         if ($messageType === 'text') {
+            // Only require message if no file is being sent
+            $hasFileInput = $request->hasFile('file') ||
+                           (isset($validationData['file']) && (is_string($validationData['file']) || is_array($validationData['file'])));
+
+            if ($hasFileInput) {
+                // File is present, so treat as file upload with wrong type
+                Log::warning('File detected but type is "text". Type should be image/audio/video/file', [
+                    'type_received' => $messageType,
+                    'has_file_upload' => $request->hasFile('file'),
+                    'file_input_type' => isset($validationData['file']) ? gettype($validationData['file']) : 'not_set'
+                ]);
+
+                return $this->sendError('Invalid type for file upload', [
+                    'type' => [
+                        'When sending a file, type must be one of: image, audio, video, file',
+                        'You sent type="text" but included a file.',
+                        'Change type to: "image" for photos, "audio" for voice notes, "video" for videos, "file" for documents'
+                    ]
+                ], 422);
+            }
+
             $rules['message'] = 'required|string|max:4000';
         } elseif (in_array($messageType, ['image', 'video', 'audio', 'file'])) {
             // Check if file is base64 string or actual file upload
