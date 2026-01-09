@@ -448,6 +448,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/feed', [StoryController::class, 'feed']);
         Route::get('/my-stories', [StoryController::class, 'myStories']);
         Route::get('/archive', [StoryController::class, 'archive']);
+        Route::get('/reactions/supported', [StoryController::class, 'getSupportedReactions']);
 
         Route::prefix('{story}')->group(function () {
             Route::get('/', [StoryController::class, 'show']);
@@ -456,6 +457,11 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/viewers', [StoryController::class, 'getViewers']);
             Route::post('/reply', [StoryController::class, 'reply']);
             Route::get('/replies', [StoryController::class, 'getReplies']);
+
+            // Reactions
+            Route::post('/react', [StoryController::class, 'react']);
+            Route::delete('/react', [StoryController::class, 'removeReaction']);
+            Route::get('/reactions', [StoryController::class, 'getReactions']);
         });
     });
 

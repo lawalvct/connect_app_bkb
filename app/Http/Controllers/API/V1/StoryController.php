@@ -773,6 +773,254 @@ class StoryController extends Controller
     }
 
     /**
+     * @OA\Post(
+     *     path="/api/v1/stories/{story}/react",
+     *     summary="React to a story",
+     *     tags={"Stories"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="story",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"reaction_type"},
+     *             @OA\Property(property="reaction_type", type="string", enum={"like", "love", "haha", "wow", "sad", "angry", "fire", "clap", "heart_eyes", "thinking"})
+     *         )
+     *     ),
+     *     @OA\Response(response=200, description="Reaction added successfully")
+     * )
+     */
+    public function react(Request $request, Story $story): JsonResponse
+    {
+        try {
+            $user = $request->user();
+
+            // Validate reaction type
+            $validated = $request->validate([
+                'reaction_type' => 'required|string|in:like,love,haha,wow,sad,angry,fire,clap,heart_eyes,thinking'
+            ]);
+
+            if ($story->is_expired) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'Cannot react to expired story'
+                ], 404);
+            }
+
+            if (!$story->canBeViewedBy($user->id)) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'You do not have permission to react to this story'
+                ], 403);
+            }
+
+            // Add or update reaction
+            $reaction = $story->addReaction($user->id, $validated['reaction_type']);
+
+            // Mark story as viewed if not already
+            if ($user->id !== $story->user_id) {
+                $story->markAsViewed($user->id);
+            }
+
+            // Get updated reactions summary
+            $reactionsSummary = $story->getReactionsSummary();
+
+            return response()->json([
+                'status' => 1,
+                'message' => 'Reaction added successfully',
+                'data' => [
+                    'reaction' => [
+                        'type' => $reaction->reaction_type,
+                        'emoji' => \App\Models\StoryReaction::supportedReactions()[$reaction->reaction_type] ?? '',
+                        'created_at' => $reaction->created_at->toISOString(),
+                    ],
+                    'reactions_summary' => $reactionsSummary,
+                    'total_reactions' => array_sum($reactionsSummary),
+                ]
+            ], $this->successStatus);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'status' => 0,
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error('Story reaction failed', [
+                'story_id' => $story->id,
+                'user_id' => $request->user()->id,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to add reaction'
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Delete(
+     *     path="/api/v1/stories/{story}/react",
+     *     summary="Remove reaction from a story",
+     *     tags={"Stories"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="story",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(response=200, description="Reaction removed successfully")
+     * )
+     */
+    public function removeReaction(Request $request, Story $story): JsonResponse
+    {
+        try {
+            $user = $request->user();
+
+            $removed = $story->removeReaction($user->id);
+
+            if (!$removed) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'No reaction found to remove'
+                ], 404);
+            }
+
+            // Get updated reactions summary
+            $reactionsSummary = $story->getReactionsSummary();
+
+            return response()->json([
+                'status' => 1,
+                'message' => 'Reaction removed successfully',
+                'data' => [
+                    'reactions_summary' => $reactionsSummary,
+                    'total_reactions' => array_sum($reactionsSummary),
+                ]
+            ], $this->successStatus);
+
+        } catch (\Exception $e) {
+            Log::error('Remove story reaction failed', [
+                'story_id' => $story->id,
+                'user_id' => $request->user()->id,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to remove reaction'
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/v1/stories/{story}/reactions",
+     *     summary="Get story reactions",
+     *     tags={"Stories"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="story",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Parameter(
+     *         name="reaction_type",
+     *         in="query",
+     *         description="Filter by specific reaction type",
+     *         required=false,
+     *         @OA\Schema(type="string")
+     *     ),
+     *     @OA\Response(response=200, description="Story reactions retrieved successfully")
+     * )
+     */
+    public function getReactions(Request $request, Story $story): JsonResponse
+    {
+        try {
+            $user = $request->user();
+
+            // Only story owner can see detailed reactions
+            if ($story->user_id !== $user->id) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'You can only view reactions of your own stories'
+                ], 403);
+            }
+
+            $query = $story->reactions()->with('user:id,name,username,profile,profile_url');
+
+            // Filter by reaction type if provided
+            if ($request->has('reaction_type')) {
+                $query->where('reaction_type', $request->reaction_type);
+            }
+
+            $reactions = $query->orderBy('created_at', 'desc')->get();
+
+            // Get summary
+            $summary = $story->getReactionsSummary();
+
+            return response()->json([
+                'status' => 1,
+                'message' => 'Story reactions retrieved successfully',
+                'data' => [
+                    'total_reactions' => $reactions->count(),
+                    'reactions_summary' => $summary,
+                    'reactions' => $reactions->map(function ($reaction) {
+                        return [
+                            'id' => $reaction->id,
+                            'reaction_type' => $reaction->reaction_type,
+                            'emoji' => \App\Models\StoryReaction::supportedReactions()[$reaction->reaction_type] ?? '',
+                            'user' => [
+                                'id' => $reaction->user->id,
+                                'name' => $reaction->user->name,
+                                'username' => $reaction->user->username,
+                                'profile_image' => $reaction->user->profile_image_url,
+                            ],
+                            'created_at' => $reaction->created_at->toISOString(),
+                        ];
+                    })
+                ]
+            ], $this->successStatus);
+
+        } catch (\Exception $e) {
+            Log::error('Get story reactions failed', [
+                'story_id' => $story->id,
+                'user_id' => $request->user()->id,
+                'error' => $e->getMessage()
+            ]);
+
+            return response()->json([
+                'status' => 0,
+                'message' => 'Failed to retrieve story reactions'
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/v1/stories/reactions/supported",
+     *     summary="Get list of supported reactions",
+     *     tags={"Stories"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(response=200, description="Supported reactions retrieved successfully")
+     * )
+     */
+    public function getSupportedReactions(): JsonResponse
+    {
+        return response()->json([
+            'status' => 1,
+            'message' => 'Supported reactions retrieved successfully',
+            'data' => \App\Models\StoryReaction::supportedReactions()
+        ], $this->successStatus);
+    }
+
+    /**
      * Helper method to get connected user IDs
      */
     private function getConnectedUserIds(int $userId): array

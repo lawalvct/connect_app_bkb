@@ -53,6 +53,11 @@ class Story extends Model
         return $this->hasMany(StoryReply::class);
     }
 
+    public function reactions()
+    {
+        return $this->hasMany(StoryReaction::class);
+    }
+
     // Accessors
     public function getIsExpiredAttribute(): bool
     {
@@ -142,7 +147,7 @@ class Story extends Model
         switch ($this->privacy) {
             case 'all_connections':
                 // Check if users are connected
-                return $this->user->isConnectedWith($userId);
+                return $this->user->isConnectedTo($userId);
 
             case 'custom':
                 return in_array($userId, $this->custom_viewers ?? []);
@@ -150,6 +155,57 @@ class Story extends Model
             default:
                 return false;
         }
+    }
+
+    /**
+     * Add or update reaction to story
+     */
+    public function addReaction($userId, string $reactionType): StoryReaction
+    {
+        return StoryReaction::updateOrCreate(
+            [
+                'story_id' => $this->id,
+                'user_id' => $userId,
+            ],
+            [
+                'reaction_type' => $reactionType,
+            ]
+        );
+    }
+
+    /**
+     * Remove reaction from story
+     */
+    public function removeReaction($userId): bool
+    {
+        return StoryReaction::where('story_id', $this->id)
+            ->where('user_id', $userId)
+            ->delete() > 0;
+    }
+
+    /**
+     * Get user's reaction to this story
+     */
+    public function getUserReaction($userId): ?StoryReaction
+    {
+        return StoryReaction::where('story_id', $this->id)
+            ->where('user_id', $userId)
+            ->first();
+    }
+
+    /**
+     * Get reactions grouped by type with counts
+     */
+    public function getReactionsSummary(): array
+    {
+        $reactions = $this->reactions()
+            ->selectRaw('reaction_type, COUNT(*) as count')
+            ->groupBy('reaction_type')
+            ->get()
+            ->pluck('count', 'reaction_type')
+            ->toArray();
+
+        return $reactions;
     }
 
     protected static function boot()
