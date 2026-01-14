@@ -23,6 +23,7 @@ use App\Http\Controllers\API\V1\StreamPaymentController;
 use App\Http\Controllers\API\V1\StreamChatMvpController;
 use App\Http\Controllers\API\V1\SettingsController;
 use App\Http\Controllers\API\V1\GuestStreamController;
+use App\Http\Controllers\API\V1\BlogController;
 
 // Handle OPTIONS requests for CORS preflight (browser Postman compatibility)
 Route::options('{any}', function () {
@@ -239,6 +240,14 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::get('countries', [UserController::class, 'getCountries']);
 Route::get('states/{country}', [UserController::class, 'getStatesByCountry']);
 Route::get('social-circles', [SocialCircleController::class, 'index']);
+
+// Blog routes (Public)
+Route::prefix('blogs')->group(function () {
+    Route::get('/', [BlogController::class, 'index']);
+    Route::get('/latest', [BlogController::class, 'latest']);
+    Route::get('/{slug}', [BlogController::class, 'show']);
+});
+
 Route::post('verify-email', [AuthController::class, 'verifyEmail']);
 Route::post('verify-registration-otp', [AuthController::class, 'verifyEmail']); // Alias for verify-email
 Route::post('resend-verification-otp', [AuthController::class, 'resendVerificationOTP'])

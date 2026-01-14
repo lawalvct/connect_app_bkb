@@ -164,10 +164,19 @@
 
                 <!-- Blog Management -->
                 @if(auth('admin')->user()->canManageBlogs())
+                @php
+                    $blogFeatureDate = \Carbon\Carbon::parse('2025-01-15');
+                    $showNewBadge = now()->diffInDays($blogFeatureDate) < 7;
+                @endphp
                 <a href="{{ route('admin.blogs.index') }}"
-                   class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-primary-light hover:text-primary transition-colors duration-200 {{ request()->routeIs('admin.blogs*') ? 'bg-primary-light text-primary' : '' }}">
-                    <i class="fas fa-blog w-6"></i>
-                    <span class="ml-3">Blogs</span>
+                   class="flex items-center justify-between px-4 py-3 text-gray-700 rounded-lg hover:bg-primary-light hover:text-primary transition-colors duration-200 {{ request()->routeIs('admin.blogs*') ? 'bg-primary-light text-primary' : '' }}">
+                    <div class="flex items-center">
+                        <i class="fas fa-blog w-6"></i>
+                        <span class="ml-3">Blogs</span>
+                    </div>
+                    @if($showNewBadge)
+                    <span class="px-2 py-0.5 text-xs font-semibold text-white bg-green-500 rounded-full">NEW</span>
+                    @endif
                 </a>
                 @endif
 

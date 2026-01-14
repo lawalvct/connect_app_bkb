@@ -10,7 +10,7 @@ class Blog extends Model
     protected $fillable = [
         'title', 'slug', 'excerpt', 'content', 'featured_image',
         'type', 'external_url', 'status', 'created_by', 'updated_by',
-        'published_at', 'views_count', 'deleted_flag'
+        'published_at', 'views_count', 'meta_title', 'meta_description', 'meta_keywords', 'deleted_flag'
     ];
 
     protected $casts = [

@@ -55,6 +55,9 @@ class BlogController extends Controller
             'type' => 'required|in:regular,external',
             'external_url' => 'required_if:type,external|nullable|url',
             'status' => 'required|in:draft,published,archived',
+            'meta_title' => 'nullable|string|max:255',
+            'meta_description' => 'nullable|string|max:500',
+            'meta_keywords' => 'nullable|string|max:255',
         ]);
 
         $validated['slug'] = Str::slug($validated['title']);
@@ -96,6 +99,9 @@ class BlogController extends Controller
             'type' => 'required|in:regular,external',
             'external_url' => 'required_if:type,external|nullable|url',
             'status' => 'required|in:draft,published,archived',
+            'meta_title' => 'nullable|string|max:255',
+            'meta_description' => 'nullable|string|max:500',
+            'meta_keywords' => 'nullable|string|max:255',
         ]);
 
         $changes = [];

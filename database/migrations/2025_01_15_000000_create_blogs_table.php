@@ -22,6 +22,9 @@ return new class extends Migration
             $table->unsignedBigInteger('updated_by')->nullable();
             $table->timestamp('published_at')->nullable();
             $table->integer('views_count')->default(0);
+            $table->string('meta_title')->nullable();
+            $table->text('meta_description')->nullable();
+            $table->string('meta_keywords')->nullable();
             $table->char('deleted_flag', 1)->default('N');
             $table->timestamps();
 
