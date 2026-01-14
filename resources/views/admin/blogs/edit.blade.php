@@ -8,7 +8,7 @@
     <form action="{{ route('admin.blogs.update', $blog) }}" method="POST" enctype="multipart/form-data" x-data="{ type: '{{ $blog->type }}' }">
         @csrf
         @method('PUT')
-        
+
         <div class="bg-white rounded-lg shadow p-6 space-y-6">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-2">Title</label>
@@ -68,7 +68,7 @@
 
             <div class="border-t pt-6">
                 <h3 class="text-lg font-medium text-gray-900 mb-4">SEO Settings</h3>
-                
+
                 <div class="space-y-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Meta Title</label>
@@ -97,9 +97,9 @@
             </div>
 
             <div class="flex justify-end space-x-4">
-                <a href="{{ route('admin.blogs.index') }}" 
+                <a href="{{ route('admin.blogs.index') }}"
                    class="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</a>
-                <button type="submit" 
+                <button type="submit"
                         class="px-6 py-2 bg-primary text-white rounded-lg hover:bg-opacity-90">Update Blog</button>
             </div>
         </div>
@@ -108,7 +108,7 @@
 @endsection
 
 @push('scripts')
-<script src="https://cdn.tiny.cloud/1/no-api-key/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
+<script src="https://cdn.tiny.cloud/1/xxeafvl0or3eww2lkza2cpthrrr8emm11v8xzizxp2278vah/tinymce/6/tinymce.min.js" referrerpolicy="origin"></script>
 <script>
     tinymce.init({
         selector: '#blog-content',
