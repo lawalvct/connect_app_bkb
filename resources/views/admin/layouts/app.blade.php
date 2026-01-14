@@ -162,6 +162,15 @@
                 </a>
                 @endif
 
+                <!-- Blog Management -->
+                @if(auth('admin')->user()->canManageBlogs())
+                <a href="{{ route('admin.blogs.index') }}"
+                   class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-primary-light hover:text-primary transition-colors duration-200 {{ request()->routeIs('admin.blogs*') ? 'bg-primary-light text-primary' : '' }}">
+                    <i class="fas fa-blog w-6"></i>
+                    <span class="ml-3">Blogs</span>
+                </a>
+                @endif
+
                 <!-- Subscriptions -->
                 @if(auth('admin')->user()->canManageSubscriptions())
                 <div x-data="{ open: {{ request()->routeIs('admin.subscriptions*') ? 'true' : 'false' }} }">

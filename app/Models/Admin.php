@@ -251,6 +251,17 @@ class Admin extends Authenticatable
     }
 
     /**
+     * Check if admin can manage blogs
+     */
+    public function canManageBlogs(): bool
+    {
+        return $this->hasRole(self::ROLE_SUPER_ADMIN) ||
+               $this->hasRole(self::ROLE_ADMIN) ||
+               $this->hasRole(self::ROLE_CONTENT_MANAGER) ||
+               $this->hasPermission('manage_blogs');
+    }
+
+    /**
      * Get role display name
      */
     public function getRoleDisplayName(): string

@@ -84,6 +84,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('/ads/countries', [AdManagementController::class, 'getCountries']);
             Route::get('/ads/social-circles', [AdManagementController::class, 'getSocialCircles']);
 
+            // Blog Management API
+            Route::get('/blogs', [\App\Http\Controllers\Admin\BlogController::class, 'getBlogs']);
+            Route::patch('/blogs/{blog}/status', [\App\Http\Controllers\Admin\BlogController::class, 'updateStatus']);
+
             // System Management API
             Route::prefix('system')->group(function () {
                 Route::get('/social-circles', [SocialCircleController::class, 'getSocialCircles']);
@@ -297,6 +301,17 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::post('/{ad}/resume', [AdManagementController::class, 'resumeAd'])->name('resume');
             Route::post('/{ad}/stop', [AdManagementController::class, 'stopAd'])->name('stop');
             Route::delete('/{ad}', [AdManagementController::class, 'destroy'])->name('destroy');
+        });
+
+        // Blog Management
+        Route::prefix('blogs')->name('blogs.')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Admin\BlogController::class, 'index'])->name('index');
+            Route::get('/create', [\App\Http\Controllers\Admin\BlogController::class, 'create'])->name('create');
+            Route::post('/', [\App\Http\Controllers\Admin\BlogController::class, 'store'])->name('store');
+            Route::get('/{blog}', [\App\Http\Controllers\Admin\BlogController::class, 'show'])->name('show');
+            Route::get('/{blog}/edit', [\App\Http\Controllers\Admin\BlogController::class, 'edit'])->name('edit');
+            Route::put('/{blog}', [\App\Http\Controllers\Admin\BlogController::class, 'update'])->name('update');
+            Route::delete('/{blog}', [\App\Http\Controllers\Admin\BlogController::class, 'destroy'])->name('destroy');
         });
 
         // Subscription Management
