@@ -123,7 +123,7 @@ class AdminManagementController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:admins',
             'password' => 'required|string|min:8|confirmed',
-            'role' => 'required|in:admin,moderator,content_manager,analytics_manager,subscription_manager',
+            'role' => 'required|in:admin,moderator,content_manager,analytics_manager,subscription_manager,blog_manager',
             'phone' => 'nullable|string|max:20',
             'permissions' => 'nullable|array',
             'profile_image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',

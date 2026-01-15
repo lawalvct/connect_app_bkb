@@ -53,6 +53,7 @@ class Admin extends Authenticatable
     const ROLE_ADMIN = 'admin';
     const ROLE_MODERATOR = 'moderator';
     const ROLE_CONTENT_MANAGER = 'content_manager';
+    const ROLE_BLOG_MANAGER = 'blog_manager';
     const ROLE_ANALYTICS_MANAGER = 'analytics_manager';
     const ROLE_SUBSCRIPTION_MANAGER = 'subscription_manager';
 
@@ -258,6 +259,7 @@ class Admin extends Authenticatable
         return $this->hasRole(self::ROLE_SUPER_ADMIN) ||
                $this->hasRole(self::ROLE_ADMIN) ||
                $this->hasRole(self::ROLE_CONTENT_MANAGER) ||
+               $this->hasRole(self::ROLE_BLOG_MANAGER) ||
                $this->hasPermission('manage_blogs');
     }
 
@@ -271,6 +273,7 @@ class Admin extends Authenticatable
             self::ROLE_ADMIN => 'Admin',
             self::ROLE_MODERATOR => 'Moderator',
             self::ROLE_CONTENT_MANAGER => 'Content Manager',
+            self::ROLE_BLOG_MANAGER => 'Blog Manager',
             self::ROLE_ANALYTICS_MANAGER => 'Analytics Manager',
             self::ROLE_SUBSCRIPTION_MANAGER => 'Subscription Manager',
             default => ucfirst($this->role)

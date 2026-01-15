@@ -172,6 +172,7 @@
                                 <option value="">Select Role</option>
                                 <option value="admin" {{ old('role') === 'admin' ? 'selected' : '' }}>Administrator</option>
                                 <option value="content_manager" {{ old('role') === 'content_manager' ? 'selected' : '' }}>Content Manager</option>
+                                <option value="blog_manager" {{ old('role') === 'blog_manager' ? 'selected' : '' }}>Blog Manager</option>
                                 <option value="moderator" {{ old('role') === 'moderator' ? 'selected' : '' }}>Moderator</option>
                                 <option value="analytics_manager" {{ old('role') === 'analytics_manager' ? 'selected' : '' }}>Analytics Manager</option>
                                 <option value="subscription_manager" {{ old('role') === 'subscription_manager' ? 'selected' : '' }}>Subscription Manager</option>
@@ -204,6 +205,19 @@
                                     <div class="ml-3">
                                         <p class="text-sm text-green-700">
                                             <strong>Content Manager:</strong> Access to user management, posts, stories, live streams moderation, and content-related notifications. Limited analytics access.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div x-show="selectedRole === 'blog_manager'" x-transition class="bg-teal-50 border-l-4 border-teal-400 p-4">
+                                <div class="flex">
+                                    <div class="flex-shrink-0">
+                                        <i class="fas fa-blog text-teal-400"></i>
+                                    </div>
+                                    <div class="ml-3">
+                                        <p class="text-sm text-teal-700">
+                                            <strong>Blog Manager:</strong> Full access to blog management including creating, editing, publishing blogs and managing SEO settings.
                                         </p>
                                     </div>
                                 </div>
@@ -263,6 +277,7 @@
                                         'manage_posts' => 'Manage Posts',
                                         'manage_stories' => 'Manage Stories',
                                         'manage_streams' => 'Manage Live Streams',
+                                        'manage_blogs' => 'Manage Blogs',
 
                                         // Business Operations
                                         'manage_ads' => 'Manage Advertisements',
@@ -356,9 +371,10 @@
                         <li class="text-sm text-gray-700"><strong>1. Super Admin</strong> - Complete system access</li>
                         <li class="text-sm text-gray-700"><strong>2. Administrator</strong> - Full management access</li>
                         <li class="text-sm text-gray-700"><strong>3. Content Manager</strong> - Content & user focus</li>
-                        <li class="text-sm text-gray-700"><strong>4. Moderator</strong> - Content moderation</li>
-                        <li class="text-sm text-gray-700"><strong>5. Analytics Manager</strong> - Data & reporting</li>
-                        <li class="text-sm text-gray-700"><strong>6. Subscription Manager</strong> - Business operations</li>
+                        <li class="text-sm text-gray-700"><strong>4. Blog Manager</strong> - Blog management</li>
+                        <li class="text-sm text-gray-700"><strong>5. Moderator</strong> - Content moderation</li>
+                        <li class="text-sm text-gray-700"><strong>6. Analytics Manager</strong> - Data & reporting</li>
+                        <li class="text-sm text-gray-700"><strong>7. Subscription Manager</strong> - Business operations</li>
                     </ol>
                 </div>
             </div>
@@ -425,6 +441,17 @@
                             'manage_posts', 'manage_stories', 'manage_streams',
                             'send_push_notifications', 'view_notification_logs',
                             'view_user_analytics', 'view_content_analytics', 'view_streaming_analytics'
+                        ].forEach(permission => {
+                            const checkbox = document.getElementById(permission);
+                            if (checkbox) checkbox.checked = true;
+                        });
+                        break;
+
+                    case 'blog_manager':
+                        // Blog manager focuses on blog management
+                        [
+                            'manage_blogs',
+                            'view_content_analytics'
                         ].forEach(permission => {
                             const checkbox = document.getElementById(permission);
                             if (checkbox) checkbox.checked = true;
