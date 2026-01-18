@@ -35,6 +35,13 @@ class Stream extends Model
         'scheduled_at',
         'started_at',
         'ended_at',
+        'is_recorded',
+        'video_file',
+        'video_url',
+        'video_duration',
+        'is_downloadable',
+        'available_from',
+        'available_until',
     ];
 
     protected $casts = [
@@ -44,6 +51,10 @@ class Stream extends Model
         'scheduled_at' => 'datetime',
         'started_at' => 'datetime',
         'ended_at' => 'datetime',
+        'is_recorded' => 'boolean',
+        'is_downloadable' => 'boolean',
+        'available_from' => 'datetime',
+        'available_until' => 'datetime',
     ];
 
     protected $appends = ['is_live', 'viewer_count', 'duration'];
@@ -165,6 +176,34 @@ class Stream extends Model
     public function scopeByUser($query, $userId)
     {
         return $query->where('user_id', $userId);
+    }
+
+    public function scopeRecorded($query)
+    {
+        return $query->where('is_recorded', true);
+    }
+
+    public function scopeLiveStreams($query)
+    {
+        return $query->where('is_recorded', false);
+    }
+
+    public function scopeAvailable($query)
+    {
+        return $query->where(function ($q) {
+            $q->where('is_recorded', false)
+              ->orWhere(function ($subQuery) {
+                  $subQuery->where('is_recorded', true)
+                           ->where(function ($dateQuery) {
+                               $dateQuery->whereNull('available_from')
+                                        ->orWhere('available_from', '<=', now());
+                           })
+                           ->where(function ($dateQuery) {
+                               $dateQuery->whereNull('available_until')
+                                        ->orWhere('available_until', '>=', now());
+                           });
+              });
+        });
     }
 
     // Accessors
@@ -479,5 +518,59 @@ class Stream extends Model
     public function hasGuestPaid(User $guest): bool
     {
         return $this->hasUserPaid($guest);
+    }
+
+    // Recorded video methods
+    public function isAvailable(): bool
+    {
+        if (!$this->is_recorded) {
+            return true; // Live streams are always available when they're live
+        }
+
+        $now = now();
+
+        if ($this->available_from && $now->lt($this->available_from)) {
+            return false; // Not yet available
+        }
+
+        if ($this->available_until && $now->gt($this->available_until)) {
+            return false; // No longer available
+        }
+
+        return true;
+    }
+
+    public function getFormattedDuration(): string
+    {
+        if (!$this->video_duration) {
+            return 'N/A';
+        }
+
+        $hours = floor($this->video_duration / 3600);
+        $minutes = floor(($this->video_duration % 3600) / 60);
+        $seconds = $this->video_duration % 60;
+
+        if ($hours > 0) {
+            return sprintf('%02d:%02d:%02d', $hours, $minutes, $seconds);
+        }
+
+        return sprintf('%02d:%02d', $minutes, $seconds);
+    }
+
+    public function getAvailabilityStatus(): string
+    {
+        if (!$this->is_recorded) {
+            return $this->status;
+        }
+
+        if (!$this->isAvailable()) {
+            $now = now();
+            if ($this->available_from && $now->lt($this->available_from)) {
+                return 'scheduled';
+            }
+            return 'expired';
+        }
+
+        return 'available';
     }
 }

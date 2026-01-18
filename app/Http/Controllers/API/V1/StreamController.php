@@ -304,53 +304,59 @@ class StreamController extends BaseController
     }
 
     /**
-     * Get latest live streams
+     * Get latest streams (live or recorded)
      */
     public function latest(Request $request)
     {
         try {
-            $query = Stream::with(['user'])
+            $contentType = $request->get('content_type'); // 'live', 'recorded', or null for all
+            $limit = $request->get('limit', 15);
 
-                ->where('status', 'live')
-                ->orderBy('created_at', 'desc');
+            $query = Stream::with(['user']);
 
-            // Make sure to select all necessary fields including channel_name
-            $streams = $query->select([
-                'id',
-                'title',
-                'description',
-                'banner_image_url',
-                'status',
-                'user_id',
-                'channel_name',  // Make sure this is included
-                'created_at',
-                'updated_at'
-            ])->paginate(1);
+            // Filter by content type
+            if ($contentType === 'live') {
+                $query->where('is_recorded', false)
+                      ->where('status', 'live');
+            } elseif ($contentType === 'recorded') {
+                $query->where('is_recorded', true)
+                      ->available(); // Only show available recorded videos
+            } else {
+                // Show both live streams and available recorded videos
+                $query->where(function($q) {
+                    $q->where(function($subQ) {
+                        $subQ->where('is_recorded', false)
+                             ->where('status', 'live');
+                    })->orWhere(function($subQ) {
+                        $subQ->where('is_recorded', true)
+                             ->where(function($availQ) {
+                                 $availQ->whereNull('available_from')
+                                        ->orWhere('available_from', '<=', now());
+                             })
+                             ->where(function($availQ) {
+                                 $availQ->whereNull('available_until')
+                                        ->orWhere('available_until', '>=', now());
+                             });
+                    });
+                });
+            }
 
-            // Transform the data to ensure channel_name is available
-            $transformedStreams = $streams->map(function ($stream) {
-                $streamData = $stream->toArray();
+            $streams = $query->orderBy('created_at', 'desc')
+                            ->paginate($limit);
 
-                // Ensure channel_name exists, generate if missing
-                if (empty($streamData['channel_name'])) {
-                    $streamData['channel_name'] = $stream->channel_name ?? "stream_{$stream->id}_" . time();
-                }
-
-                // Add streamer info
-                $streamData['streamer'] = [
-                    'id' => $stream->user->id ?? null,
-                    'name' => $stream->user->name ?? null,
-                    'username' => $stream->user->username ?? null,
-                ];
-
-                return $streamData;
+            // Transform using the formatStreamResponse method
+            $transformedStreams = $streams->getCollection()->map(function ($stream) use ($request) {
+                return $this->formatStreamResponse($stream, $request->user());
             });
 
             return response()->json([
                 'success' => true,
                 'data' => [
                     'streams' => $transformedStreams,
-                    'total' => $transformedStreams->count()
+                    'total' => $streams->total(),
+                    'current_page' => $streams->currentPage(),
+                    'last_page' => $streams->lastPage(),
+                    'per_page' => $streams->perPage()
                 ]
             ]);
 
@@ -359,7 +365,8 @@ class StreamController extends BaseController
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to fetch streams'
+                'message' => 'Failed to fetch streams',
+                'error' => $e->getMessage()
             ], 500);
         }
     }
@@ -374,6 +381,7 @@ class StreamController extends BaseController
 
             $streams = Stream::with('user')
                 ->upcoming()
+                ->where('is_recorded', false) // Only live streams
                 ->where('scheduled_at', '>', now())
                 ->orderBy('scheduled_at', 'asc')
                 ->limit($limit)
@@ -387,6 +395,49 @@ class StreamController extends BaseController
 
         } catch (\Exception $e) {
             return $this->sendError('Failed to retrieve upcoming streams', $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Get recorded videos
+     */
+    public function getRecordedVideos(Request $request)
+    {
+        try {
+            $limit = $request->get('limit', 15);
+            $status = $request->get('status'); // 'scheduled', 'available', 'expired', or null for all
+
+            $query = Stream::with('user')
+                ->where('is_recorded', true);
+
+            // Filter by availability status
+            if ($status === 'available') {
+                $query->available();
+            } elseif ($status === 'scheduled') {
+                $query->where('available_from', '>', now());
+            } elseif ($status === 'expired') {
+                $query->where('available_until', '<', now());
+            }
+
+            $streams = $query->orderBy('created_at', 'desc')
+                            ->paginate($limit);
+
+            $transformedStreams = $streams->getCollection()->map(function ($stream) use ($request) {
+                return $this->formatStreamResponse($stream, $request->user());
+            });
+
+            return $this->sendResponse('Recorded videos retrieved successfully', [
+                'streams' => $transformedStreams,
+                'pagination' => [
+                    'total' => $streams->total(),
+                    'current_page' => $streams->currentPage(),
+                    'last_page' => $streams->lastPage(),
+                    'per_page' => $streams->perPage()
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->sendError('Failed to retrieve recorded videos', $e->getMessage(), 500);
         }
     }
 
@@ -683,6 +734,17 @@ class StreamController extends BaseController
             'ended_at' => $stream->ended_at,
             'created_at' => $stream->created_at,
             'updated_at' => $stream->updated_at,
+            // Recorded video fields
+            'is_recorded' => $stream->is_recorded ?? false,
+            'video_url' => $stream->video_url,
+            'video_file' => $stream->video_file,
+            'video_duration' => $stream->video_duration,
+            'formatted_duration' => $stream->is_recorded ? $stream->getFormattedDuration() : null,
+            'is_downloadable' => $stream->is_downloadable ?? false,
+            'available_from' => $stream->available_from,
+            'available_until' => $stream->available_until,
+            'availability_status' => $stream->is_recorded ? $stream->getAvailabilityStatus() : null,
+            'is_available' => $stream->is_recorded ? $stream->isAvailable() : true,
             'streamer' => [
                 'id' => $stream->user->id,
                 'username' => $stream->user->username,

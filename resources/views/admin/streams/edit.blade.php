@@ -34,14 +34,32 @@
             <div class="bg-white shadow rounded-lg">
                 <div class="px-6 py-4 border-b border-gray-200">
                     <div class="flex justify-between items-center">
-                        <h3 class="text-lg font-medium text-gray-900">Stream Information</h3>
-                        <span class="px-3 py-1 rounded-full text-sm font-medium
-                            @if($stream->status === 'live') bg-red-100 text-red-800
-                            @elseif($stream->status === 'scheduled') bg-yellow-100 text-yellow-800
-                            @elseif($stream->status === 'ended') bg-gray-100 text-gray-800
-                            @else bg-blue-100 text-blue-800 @endif">
-                            {{ ucfirst($stream->status) }}
-                        </span>
+                        <h3 class="text-lg font-medium text-gray-900">
+                            Stream Information
+                            @if($stream->is_recorded)
+                            <span class="ml-2 px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full">
+                                <i class="fas fa-video mr-1"></i>Recorded Video
+                            </span>
+                            @endif
+                        </h3>
+                        <div class="flex space-x-2">
+                            <span class="px-3 py-1 rounded-full text-sm font-medium
+                                @if($stream->status === 'live') bg-red-100 text-red-800
+                                @elseif($stream->status === 'scheduled') bg-yellow-100 text-yellow-800
+                                @elseif($stream->status === 'ended') bg-gray-100 text-gray-800
+                                @else bg-blue-100 text-blue-800 @endif">
+                                {{ ucfirst($stream->status) }}
+                            </span>
+                            @if($stream->is_recorded)
+                            <span class="px-3 py-1 rounded-full text-sm font-medium
+                                @if($stream->getAvailabilityStatus() === 'scheduled') bg-yellow-100 text-yellow-800
+                                @elseif($stream->getAvailabilityStatus() === 'available') bg-green-100 text-green-800
+                                @elseif($stream->getAvailabilityStatus() === 'expired') bg-red-100 text-red-800
+                                @else bg-gray-100 text-gray-800 @endif">
+                                {{ ucfirst($stream->getAvailabilityStatus()) }}
+                            </span>
+                            @endif
+                        </div>
                     </div>
                 </div>
                 <div class="p-6">
@@ -74,6 +92,53 @@
                                           placeholder="Describe your stream content..."></textarea>
                                 <div x-show="errors.description" class="text-red-500 text-sm mt-1" x-text="errors.description?.[0]"></div>
                             </div>
+
+                            @if($stream->is_recorded)
+                            <!-- Recorded Video Information -->
+                            <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                                <h4 class="text-sm font-semibold text-purple-900 mb-3">
+                                    <i class="fas fa-video mr-2"></i>Recorded Video Information
+                                </h4>
+                                <div class="space-y-2 text-sm">
+                                    @if($stream->video_file)
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Video File:</span>
+                                        <span class="font-medium text-gray-900">{{ basename($stream->video_file) }}</span>
+                                    </div>
+                                    @endif
+                                    @if($stream->video_url)
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Video URL:</span>
+                                        <a href="{{ $stream->video_url }}" target="_blank" class="text-blue-600 hover:underline">View Video</a>
+                                    </div>
+                                    @endif
+                                    @if($stream->video_duration)
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Duration:</span>
+                                        <span class="font-medium text-gray-900">{{ $stream->getFormattedDuration() }}</span>
+                                    </div>
+                                    @endif
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Downloadable:</span>
+                                        <span class="font-medium {{ $stream->is_downloadable ? 'text-green-600' : 'text-red-600' }}">
+                                            {{ $stream->is_downloadable ? 'Yes' : 'No' }}
+                                        </span>
+                                    </div>
+                                    @if($stream->available_from)
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Available From:</span>
+                                        <span class="font-medium text-gray-900">{{ $stream->available_from->format('M j, Y H:i') }}</span>
+                                    </div>
+                                    @endif
+                                    @if($stream->available_until)
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Available Until:</span>
+                                        <span class="font-medium text-gray-900">{{ $stream->available_until->format('M j, Y H:i') }}</span>
+                                    </div>
+                                    @endif
+                                </div>
+                            </div>
+                            @endif
 
                             <!-- Current Banner -->
                             @if($stream->banner_image)
@@ -195,8 +260,8 @@
                                 <div x-show="errors.max_viewers" class="text-red-500 text-sm mt-1" x-text="errors.max_viewers?.[0]"></div>
                             </div>
 
-                            <!-- Stream Type (Only if not live) -->
-                            @if($stream->status !== 'live')
+                            <!-- Stream Type (Only if not live and not recorded) -->
+                            @if($stream->status !== 'live' && !$stream->is_recorded)
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-4">Stream Type</label>
                                 <div class="space-y-3">

@@ -164,6 +164,114 @@
 
                             <!-- Stream Type -->
                             <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-4">Stream Type</label>
+                                <div class="space-y-3">
+                                    <div class="flex items-center">
+                                        <input type="radio"
+                                               id="type_live"
+                                               name="content_type"
+                                               value="live"
+                                               x-model="form.content_type"
+                                               @change="updateContentType()"
+                                               class="h-4 w-4 text-primary focus:ring-primary border-gray-300">
+                                        <label for="type_live" class="ml-3 block text-sm text-gray-700">
+                                            <span class="font-medium">Live Stream</span>
+                                            <span class="block text-gray-500">Real-time broadcast from user</span>
+                                        </label>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <input type="radio"
+                                               id="type_recorded"
+                                               name="content_type"
+                                               value="recorded"
+                                               x-model="form.content_type"
+                                               @change="updateContentType()"
+                                               class="h-4 w-4 text-primary focus:ring-primary border-gray-300">
+                                        <label for="type_recorded" class="ml-3 block text-sm text-gray-700">
+                                            <span class="font-medium">Upload Recorded Video</span>
+                                            <span class="block text-gray-500">Pre-recorded event or past livestream</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div x-show="errors.content_type" class="text-red-500 text-sm mt-1" x-text="errors.content_type?.[0]"></div>
+                            </div>
+
+                            <!-- Video Upload (for recorded content) -->
+                            <div x-show="form.content_type === 'recorded'" x-transition>
+                                <label for="video_file" class="block text-sm font-medium text-gray-700 mb-2 required">Upload Video File</label>
+                                <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md hover:border-primary transition-colors">
+                                    <div class="space-y-1 text-center w-full">
+                                        <div x-show="!videoPreview">
+                                            <i class="fas fa-video text-4xl text-gray-400"></i>
+                                            <div class="flex text-sm text-gray-600 justify-center">
+                                                <label for="video_file" class="relative cursor-pointer bg-white rounded-md font-medium text-primary hover:text-primary-dark focus-within:outline-none">
+                                                    <span>Upload a video</span>
+                                                    <input id="video_file" name="video_file" type="file" class="sr-only" accept="video/*" @change="handleVideoUpload($event)">
+                                                </label>
+                                                <p class="pl-1">or drag and drop</p>
+                                            </div>
+                                            <p class="text-xs text-gray-500">MP4, MOV, AVI, WebM up to 2GB</p>
+                                        </div>
+                                        <div x-show="videoPreview" class="relative">
+                                            <div class="bg-gray-100 rounded-lg p-4">
+                                                <i class="fas fa-file-video text-5xl text-primary mb-2"></i>
+                                                <p class="text-sm font-medium text-gray-900" x-text="videoFileName"></p>
+                                                <p class="text-xs text-gray-500" x-text="videoFileSize"></p>
+                                            </div>
+                                            <button type="button" @click="removeVideo()"
+                                                    class="mt-2 bg-red-500 text-white rounded-md px-3 py-1 hover:bg-red-600 text-sm">
+                                                <i class="fas fa-times mr-1"></i>Remove Video
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div x-show="errors.video_file" class="text-red-500 text-sm mt-1" x-text="errors.video_file?.[0]"></div>
+                            </div>
+
+                            <!-- Downloadable Option (for recorded content) -->
+                            <div x-show="form.content_type === 'recorded'" x-transition>
+                                <div class="flex items-center">
+                                    <input type="checkbox"
+                                           id="is_downloadable"
+                                           name="is_downloadable"
+                                           x-model="form.is_downloadable"
+                                           class="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded">
+                                    <label for="is_downloadable" class="ml-2 block text-sm text-gray-700">
+                                        Allow users to download this video
+                                    </label>
+                                </div>
+                                <div x-show="errors.is_downloadable" class="text-red-500 text-sm mt-1" x-text="errors.is_downloadable?.[0]"></div>
+                            </div>
+
+                            <!-- Availability Period (for recorded content) -->
+                            <div x-show="form.content_type === 'recorded'" x-transition>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Availability Period</label>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label for="available_from" class="block text-xs text-gray-600 mb-1">Available From</label>
+                                        <input type="datetime-local"
+                                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                                               id="available_from"
+                                               name="available_from"
+                                               x-model="form.available_from">
+                                        <p class="text-xs text-gray-500 mt-1">Leave empty for immediate availability</p>
+                                    </div>
+                                    <div>
+                                        <label for="available_until" class="block text-xs text-gray-600 mb-1">Available Until</label>
+                                        <input type="datetime-local"
+                                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                                               id="available_until"
+                                               name="available_until"
+                                               x-model="form.available_until">
+                                        <p class="text-xs text-gray-500 mt-1">Leave empty for permanent availability</p>
+                                    </div>
+                                </div>
+                                <div x-show="errors.available_from" class="text-red-500 text-sm mt-1" x-text="errors.available_from?.[0]"></div>
+                                <div x-show="errors.available_until" class="text-red-500 text-sm mt-1" x-text="errors.available_until?.[0]"></div>
+                            </div>
+
+                            <!-- Stream Scheduling (for live content only) -->
+                            <div x-show="form.content_type === 'live'" x-transition>
                                 <label class="block text-sm font-medium text-gray-700 mb-4">Stream Scheduling</label>
                                 <div class="space-y-3">
                                     <div class="flex items-center">
@@ -196,8 +304,8 @@
                                 <div x-show="errors.stream_type" class="text-red-500 text-sm mt-1" x-text="errors.stream_type?.[0]"></div>
                             </div>
 
-                            <!-- Scheduled Date & Time -->
-                            <div x-show="form.stream_type === 'scheduled'" x-transition>
+                            <!-- Scheduled Date & Time (for live content only) -->
+                            <div x-show="form.content_type === 'live' && form.stream_type === 'scheduled'" x-transition>
                                 <label for="scheduled_at" class="block text-sm font-medium text-gray-700 mb-2 required">Scheduled Date & Time</label>
                                 <input type="datetime-local"
                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
@@ -326,12 +434,19 @@ function streamForm() {
             price: '',
             currency: 'NGN',
             max_viewers: '',
+            content_type: 'live', // New field: 'live' or 'recorded'
             stream_type: 'immediate',
-            scheduled_at: ''
+            scheduled_at: '',
+            is_downloadable: false,
+            available_from: '',
+            available_until: ''
         },
         errors: {},
         submitting: false,
         imagePreview: null,
+        videoPreview: null,
+        videoFileName: '',
+        videoFileSize: '',
 
         handleImageUpload(event) {
             const file = event.target.files[0];
@@ -347,6 +462,43 @@ function streamForm() {
         removeImage() {
             this.imagePreview = null;
             document.getElementById('banner_image').value = '';
+        },
+
+        handleVideoUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                this.videoPreview = true;
+                this.videoFileName = file.name;
+                this.videoFileSize = this.formatFileSize(file.size);
+            }
+        },
+
+        removeVideo() {
+            this.videoPreview = null;
+            this.videoFileName = '';
+            this.videoFileSize = '';
+            document.getElementById('video_file').value = '';
+        },
+
+        formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        },
+
+        updateContentType() {
+            // Reset fields based on content type
+            if (this.form.content_type === 'recorded') {
+                this.form.stream_type = 'immediate'; // Not applicable for recorded
+                this.form.scheduled_at = '';
+            } else {
+                this.form.is_downloadable = false;
+                this.form.available_from = '';
+                this.form.available_until = '';
+                this.removeVideo();
+            }
         },
 
         updatePricing() {
@@ -378,7 +530,12 @@ function streamForm() {
                 // Add form fields
                 Object.keys(this.form).forEach(key => {
                     if (this.form[key] !== null && this.form[key] !== '') {
-                        formData.append(key, this.form[key]);
+                        // Convert boolean values to 1/0 for Laravel validation
+                        if (typeof this.form[key] === 'boolean') {
+                            formData.append(key, this.form[key] ? '1' : '0');
+                        } else {
+                            formData.append(key, this.form[key]);
+                        }
                     }
                 });
 
@@ -386,6 +543,14 @@ function streamForm() {
                 const bannerInput = document.getElementById('banner_image');
                 if (bannerInput.files[0]) {
                     formData.append('banner_image', bannerInput.files[0]);
+                }
+
+                // Add video file if selected (for recorded content)
+                if (this.form.content_type === 'recorded') {
+                    const videoInput = document.getElementById('video_file');
+                    if (videoInput.files[0]) {
+                        formData.append('video_file', videoInput.files[0]);
+                    }
                 }
 
                 // Add CSRF token
@@ -399,7 +564,7 @@ function streamForm() {
                 const data = await response.json();
 
                 if (data.success) {
-                    alert('Stream created successfully for the user!');
+                    alert(this.form.content_type === 'recorded' ? 'Recorded video uploaded successfully!' : 'Stream created successfully for the user!');
                     window.location.href = '/admin/streams';
                 } else {
                     if (data.errors) {

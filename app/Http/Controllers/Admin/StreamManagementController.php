@@ -55,7 +55,10 @@ class StreamManagementController extends Controller
      */
     public function store(Request $request)
     {
-        $validator = Validator::make($request->all(), [
+        // Different validation rules based on content type
+        $isRecorded = $request->input('content_type') === 'recorded';
+
+        $rules = [
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
             'banner_image' => 'nullable|image|max:10120', // 10MB max
@@ -63,10 +66,25 @@ class StreamManagementController extends Controller
             'price' => 'required_if:free_minutes,0|nullable|numeric|min:0',
             'currency' => 'required|string|in:USD,NGN,EUR,GBP',
             'max_viewers' => 'nullable|integer|min:1',
-            'stream_type' => 'required|in:immediate,scheduled',
-            'scheduled_at' => 'required_if:stream_type,scheduled|nullable|date|after:now',
-            'user_id' => 'required|exists:users,id', // Require valid user selection
-        ]);
+            'user_id' => 'required|exists:users,id',
+            'content_type' => 'required|in:live,recorded',
+        ];
+
+        // Add validation for live streams
+        if (!$isRecorded) {
+            $rules['stream_type'] = 'required|in:immediate,scheduled';
+            $rules['scheduled_at'] = 'required_if:stream_type,scheduled|nullable|date|after:now';
+        }
+
+        // Add validation for recorded videos
+        if ($isRecorded) {
+            $rules['video_file'] = 'required|file|mimes:mp4,mov,avi,wmv,flv,webm|max:2048000'; // 2GB max
+            $rules['is_downloadable'] = 'nullable|boolean';
+            $rules['available_from'] = 'nullable|date';
+            $rules['available_until'] = 'nullable|date|after:available_from';
+        }
+
+        $validator = Validator::make($request->all(), $rules);
 
         if ($validator->fails()) {
             return response()->json([
@@ -87,17 +105,7 @@ class StreamManagementController extends Controller
                 ], 422);
             }
 
-            // Log admin action
-          // Log::info('Admin creating stream for user', [
-        //         'admin_id' => auth('admin')->id(),
-        //         'admin_name' => auth('admin')->user()->name,
-        //         'user_id' => $user->id,
-        //         'user_name' => $user->name,
-        //         'stream_title' => $data['title']
-        //     ]);
-
             $data['channel_name'] = 'admin_stream_' . time() . '_' . Str::random(8);
-            $data['go_live_immediately'] = $request->stream_type === 'immediate';
 
             // Set payment status - stream is paid if price is greater than 0
             $data['is_paid'] = isset($data['price']) && $data['price'] > 0;
@@ -110,41 +118,80 @@ class StreamManagementController extends Controller
                 $file->move(public_path('streams'), basename($filename));
                 $data['banner_image'] = $filename;
                 $data['banner_image_url'] = asset($filename);
-                // S3 upload commented out:
-                // Storage::disk('s3')->put($filename, file_get_contents($file));
-                // $data['banner_image'] = $filename;
-                // $data['banner_image_url'] = config('filesystems.disks.s3.url') . '/' . $filename;
             }
 
-            // Set status based on stream type
-            if ($data['stream_type'] === 'immediate' && $data['go_live_immediately']) {
-                $data['status'] = 'live';
-                $data['started_at'] = now();
+            // Handle recorded video vs live stream
+            if ($isRecorded) {
+                // Handle video file upload
+                if ($request->hasFile('video_file')) {
+                    $videoFile = $request->file('video_file');
+                    $videoFilename = 'streams/videos/' . time() . '_' . uniqid() . '.' . $videoFile->getClientOriginalExtension();
+
+                    // Save to local storage (public/streams/videos)
+                    $videoFile->move(public_path('streams/videos'), basename($videoFilename));
+                    $data['video_file'] = $videoFilename;
+                    $data['video_url'] = asset($videoFilename);
+
+                    // Try to get video duration - can be enhanced with ffmpeg
+                    $data['video_duration'] = null;
+                }
+
+                $data['is_recorded'] = true;
+                $data['is_downloadable'] = $request->input('is_downloadable', false);
+                $data['status'] = 'ended'; // Recorded videos are marked as ended
+                $data['stream_type'] = 'immediate'; // Not applicable but set default
+                $data['go_live_immediately'] = false;
+
+                // Set availability dates
+                if ($request->filled('available_from')) {
+                    $data['available_from'] = $request->input('available_from');
+                }
+                if ($request->filled('available_until')) {
+                    $data['available_until'] = $request->input('available_until');
+                }
+
             } else {
-                $data['status'] = 'upcoming';
+                // Live stream logic
+                $data['is_recorded'] = false;
+                $data['go_live_immediately'] = $request->input('stream_type') === 'immediate';
+
+                // Set status based on stream type
+                if ($data['stream_type'] === 'immediate' && $data['go_live_immediately']) {
+                    $data['status'] = 'live';
+                    $data['started_at'] = now();
+                } else {
+                    $data['status'] = 'upcoming';
+                }
             }
 
             $stream = Stream::create($data);
 
-            // Dispatch job to send email notifications to all active users
-            // Using queue to handle 3000+ users efficiently in chunks
-            SendLiveStreamNotifications::dispatch($stream);
+            // Only dispatch notifications for live streams, not recorded videos
+            if (!$isRecorded) {
+                SendLiveStreamNotifications::dispatch($stream);
+            }
 
-            Log::info('Stream created and email notifications queued', [
+            Log::info($isRecorded ? 'Recorded video uploaded' : 'Stream created', [
                 'stream_id' => $stream->id,
-                'stream_title' => $stream->title,
-                'status' => $stream->status,
+                'title' => $stream->title,
+                'user_id' => $stream->user_id,
+                'is_recorded' => $isRecorded,
                 'admin_id' => auth('admin')->id()
             ]);
 
             return response()->json([
                 'success' => true,
-                'message' => "Stream created successfully for {$user->name}. Email notifications are being sent to active users.",
+                'message' => $isRecorded ? 'Recorded video uploaded successfully' : "Stream created successfully for {$user->name}. Email notifications are being sent to active users.",
                 'data' => $stream->load('user'),
                 'admin_created' => true
             ]);
 
         } catch (\Exception $e) {
+            Log::error('Failed to create stream/upload video', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to create stream: ' . $e->getMessage()
@@ -446,6 +493,15 @@ class StreamManagementController extends Controller
             $query->where('stream_type', $request->stream_type);
         }
 
+        // Filter by content type (live vs recorded)
+        if ($request->filled('content_type')) {
+            if ($request->content_type === 'recorded') {
+                $query->where('is_recorded', true);
+            } elseif ($request->content_type === 'live') {
+                $query->where('is_recorded', false);
+            }
+        }
+
         if ($request->filled('date_range')) {
             $dates = explode(' to ', $request->date_range);
             if (count($dates) === 2) {
@@ -491,6 +547,14 @@ class StreamManagementController extends Controller
                 'ended_at' => $stream->ended_at,
                 'created_at' => $stream->created_at,
                 'updated_at' => $stream->updated_at,
+                // Recorded video fields
+                'is_recorded' => $stream->is_recorded ?? false,
+                'video_url' => $stream->video_url,
+                'video_duration' => $stream->video_duration,
+                'is_downloadable' => $stream->is_downloadable ?? false,
+                'available_from' => $stream->available_from,
+                'available_until' => $stream->available_until,
+                'availability_status' => $stream->getAvailabilityStatus(),
                 'user' => [
                     'id' => $stream->user->id,
                     'name' => $stream->user->name,

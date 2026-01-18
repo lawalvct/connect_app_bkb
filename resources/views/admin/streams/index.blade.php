@@ -180,6 +180,16 @@
                     </div>
 
                     <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Content Type</label>
+                        <select x-model="filters.content_type" @change="loadStreams()"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary focus:border-primary">
+                            <option value="">All Content</option>
+                            <option value="live">Live Streams</option>
+                            <option value="recorded">Recorded Videos</option>
+                        </select>
+                    </div>
+
+                    <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
                         <input type="text"
                                x-model="filters.date_range"
@@ -368,6 +378,7 @@
                 search: '',
                 status: '',
                 stream_type: '',
+                content_type: '',
                 date_range: ''
             },
             searchTimeout: null,
@@ -443,6 +454,7 @@
                     search: '',
                     status: '',
                     stream_type: '',
+                    content_type: '',
                     date_range: ''
                 };
                 this.loadStreams();
